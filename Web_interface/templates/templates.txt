@@ -1,0 +1,68 @@
+header
+    version
+    corpus_name
+    state
+    menu ($config->{"params"}->{"m"})
+
+footer
+
+home
+    state
+
+help
+    state
+
+about
+
+change_corpus
+    corpora
+
+word_form_query
+    hidden_states
+    pos_tags
+    word_classes
+    chunks
+
+lemma_query
+    hidden_states
+    word_classes
+    chunks
+
+complex_query_token
+    hidden_states
+    pos_tags
+    word_classes
+
+complex_query_token
+    hidden_states
+    chunk_types
+    pos_tags
+    word_classes
+
+unknown
+    dump
+
+single_item_query_results
+    error
+    query
+    matches
+    word_forms
+    display_type
+    call_strucn
+
+results_table
+    query_anchor
+    query_title
+    return_type
+    frequency
+    ngram_tokens
+    ngram_types
+    too_many_ngram_types
+    frequency_too_high
+    execution_times
+    hidden_states
+    pos_tags
+    word_classes
+    rows
+    previous_href
+    next_href

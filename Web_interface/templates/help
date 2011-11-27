@@ -1,0 +1,134 @@
+[% INCLUDE header
+    version = version
+    corpus_name = corpus_name
+    state = state
+    menu = menu
+%]
+<h2>
+  Help
+</h2>
+<p>
+  <em>Please note that this introductory text has not been changed
+  since version 0.7.1. It does not reflect more recent additions and
+  changes yet.</em>
+</p>
+<h3>
+  Where to start
+</h3>
+<p>
+  At the current stage, you have three options for starting your
+  research:
+</p>
+<ol>
+  <li>word form query</li>
+  <li>lemma query</li>
+  <li>n-gram query</li>
+</ol>
+<p>
+  A click on <a href='pareidoscope.cgi?m=wfq&amp;[% state %]'>word form
+  query</a> opens a page with the following form: <img
+  src='../wfq.png' alt='word form query'
+  style='border:none;display:block;' /> Here you can enter a word form
+  and can further constrain your query by indicating the
+  part-of-speech tag or the word class of the search term.  Note that
+  you may not leave the word form field empty and that the pos
+  constraint overrides the word class constraint.
+</p>
+<p>
+  If you want to do a <a
+  href='pareidoscope.cgi?m=lq&amp;[% state %]'>lemma query</a> you can
+  enter a lemma and its word class in the following form: <img
+  src='../lq.png' alt='lemma query'
+  style='border:none;display:block;' /> Note that you must indicate the
+  lemma as well as its word class.
+</p>
+<p>
+  If you click on <a href='pareidoscope.cgi?m=cqtl&amp;[% state
+  %]'>complex query (token level)</a> a page with nine rows opens:
+  <img src='../ngq.png' alt='n-gram query'
+  style='border:none;display:block;' /> Here you can enter any sequence
+  of word forms, part-of-speech tags and word classes.  In contrast to
+  the word form query, you may also leave the word form field empty.
+  Empty rows between non-empty rows mean &ldquo;any word form with any
+  pos tag&rdquo;.
+</p>
+<p>
+  All three query forms offer the option of case-insensitive
+  search.
+</p>
+<h3>
+  How to proceed
+</h3>
+<h4>
+  Results of a structual query
+</h4>
+<p>
+  Here you can see part of the results page of a structural query, in
+  this case &ldquo;decided&rdquo; tagged as a verb: <img
+  src='../strucq.png' alt='results of a structural query'
+  style='border:none;display:block;' /> At the top of the page, a
+  tabular overview of all the word form and tag combinations matching
+  your query is displayed.  Clicking on one of the rows will take you
+  directly to the corresponding part of the results page.
+</p>
+<p>
+  Let's have a look at the results for &ldquo;decided&rdquo; tagged as
+  a past tense verb.  First you can find some frequency information
+  and an indication of the speed of the query.  Then there is a form
+  that allows you to filter the results according to n-gram length
+  and/or occurrence of certain part-of-speech tags or word classes.
+  Finally there is a table containing the results.  It shows you which
+  part-of-speech sequences are associated with your query, the
+  frequency of their co-occurrence with the query, their overall
+  frequency and the association strength.  If you want to see the
+  concordance lines, just click on the frequencies.  The rightmost
+  column contains navigation links.  You can use <em>lex</em> to find
+  out which word forms are associated with the slots of a particular
+  sequence of part-of-speech tags that is associated with your query
+  or you can use <em>struc</em> to find out in which larger structures
+  this sequence occurs.
+</p>
+<h4>
+  Results of a lexical query
+</h4>
+<p>
+  Here you can see part of the results page of a lexical query that
+  was performed by using the previous example, the word form
+  &ldquo;decided&rdquo; tagged as a past tense verb, and clicking on
+  <em>lex</em> in the row that contains the part-of-speech n-gram
+  <em>VVD</em> TO0 VVI AT0 NN1 (which is not visible in the screenshot
+  above): <img src='../lexq1.png' alt='results of a lexical query (1)'
+  style='border:none;display:block;' /> At the top of the page you can
+  find some information on how your query was processed.  Next there
+  is an overview table that shows the ten most strongly associated
+  word forms for each slot in the query.  If you scroll down the page
+  you will find a more detailed table for each slot: <img
+  src='../lexq2.png' alt='results of a lexical query (2)'
+  style='border:none;display:block;' /> Here you can find a list of all
+  word forms that are associated with this slot of the query, the
+  frequency of their co-occurrence with your query, their overall
+  frequency in this part-of-speech n-gram (ignoring any lexical items
+  in the query) and the association strength.  The last column
+  contains the navigation links <em>lex</em> and <em>struc</em>.
+</p>
+<p>
+  Clicking on <em>lex</em> modifies your current query to include that
+  particular lexical item.  This is useful for finding out in which
+  ways the lexical items in a given structure interact.  Clicking on
+  <em>lex</em> in the row of &ldquo;leave&rdquo;, for example, creates
+  a new lexical query: &ldquo;decided&rdquo; tagged as a past tense
+  verb (VVD), followed by the infinitive marker &ldquo;to&rdquo;
+  (TO0), followed by &ldquo;leave&rdquo; tagged as an infinitive
+  (VVI), followed by an article (AT0), followed by a singular noun
+  (NN1).  The results of that query would tell us which singular nouns
+  are used in the former structure when the infinitive slot is filled
+  by &ldquo;leave&rdquo;.
+</p>
+<p>
+  A click on <em>struc</em> also modifies your current query by
+  filling the slot with a specific lexical item but performs a
+  structural query.  I.e. by clicking on <em>struc</em> you can find
+  out in which larger grammatical structures the modified query
+  occurs.
+</p>
+[% INCLUDE footer %]

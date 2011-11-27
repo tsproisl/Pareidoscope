@@ -1,0 +1,178 @@
+<?xml version="1.0" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <title>Pareidoscope</title>
+    <meta name="keywords" content="lexicogrammar, lexico-grammar, collocation, collocations, colligation, colligations, construction, constructions, valency" />
+    <meta name="author" content="Thomas Proisl" />
+    <meta name="description" content="Pareidoscope &ndash; a reasearch tool for investigating patterns of lexicogrammatical interaction" />
+    <link rel="stylesheet" type="text/css" href="../Envision12/Envision.css" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    [% IF display_loading %]
+    <script type="text/javascript" language="JavaScript">
+      function showDisplay () {
+        document.write('<div id="load_display"><div id="display_background"><div id="progress_bar"><div id="progress"></div></div><p>Please wait. Your query is currently being processed.</p></div></div>');
+	refreshProgressBar(0);
+      }
+
+      percentage = 0;
+
+      function refreshProgressBar () {
+        percentage = percentage + 1;
+        if (percentage > 100) {
+          percentage = percentage - 100;
+        }
+        if (document.getElementById) {
+          document.getElementById('progress').style.width = percentage + '%';
+        }
+        else {
+          if (document.layers) {
+	    document.progress.width = percentage + '%';
+          }
+          else {
+	    document.all.progress.style.width = percentage + '%';
+          }
+        }
+	setTimeout(refreshProgressBar, 50);
+      }
+
+      function addEvent (obj, event, eventHandler) {
+        if (obj.addEventListener)
+          obj.addEventListener (event, eventHandler, false);
+        else if (obj.attachEvent)
+          obj.attachEvent (event, eventHandler);
+        else if (obj.setAttribute)
+          obj.setAttribute (event, eventHandler.toString ());
+        else
+          obj[event] = eventHandler;
+      } 
+
+      function hideWhenLoaded() {
+        if (document.getElementById) {  // DOM3 = IE5, NS6
+          document.getElementById('load_display').style.visibility = 'hidden';
+        }
+        else {
+          if (document.layers) {  // Netscape 4
+            document.load_display.visibility = 'hidden';
+          }
+          else {  // IE 4
+            document.all.load_display.style.visibility = 'hidden';
+          }
+        }
+      }
+
+      addEvent(window, 'load', hideWhenLoaded);
+    </script>
+    [% END %]
+  </head>
+  <body>
+    [% IF display_loading %]
+    <!-- start load_display -->
+    <script type="text/javascript">
+      showDisplay();
+    </script>
+    <!-- end load_display -->
+    [% END %]
+    <!-- start wrap -->
+    <div id="wrap">
+      <!-- start header -->
+      <div id="header">
+	<h1 id="logo-text">
+	  <a href="pareidoscope.cgi?[% state %]">Pareidoscope</a>
+	</h1>
+	<p id="slogan">
+	  &ndash; a research tool for investigating patterns of
+	  lexicogrammatical interaction
+	</p>
+	<div id="header-links">
+	  <a href="pareidoscope.cgi?[% state %]">Home</a>&nbsp;|&nbsp;<a href="mailto:thomas.proisl@linguistik.uni-erlangen.de">Contact</a>
+	</div>
+      </div>
+      <!-- end header -->
+      <!-- start menu -->
+      <div id="menu">
+	<div id="version">
+	  version [% version %]
+	</div>
+	<ul>
+	  <li [% IF menu == "o" %]id="current"[% END %]>
+	    <a href="pareidoscope.cgi?[% state %]">Home</a>
+	  </li>
+	  <li [% IF menu == "h" %]id="current"[% END %]>
+	    <a href="pareidoscope.cgi?m=h&amp;[% state %]">Help</a>
+	  </li>
+	  <li class="last" [% IF menu == "a" %]id="current"[% END %]>
+	    <a href="pareidoscope.cgi?m=a&amp;[% state %]">About</a>
+	  </li>
+	</ul>
+      </div>
+      <!-- end menu -->
+      <!-- start content-wrap -->
+      <div id="content-wrap">
+	<!-- start sidebar -->
+	<div id="sidebar">
+	  <h3>
+	    Active corpus
+	  </h3>
+	  <ul class="sidemenu">
+	    <li>
+	      [% corpus_name %] (<a href='pareidoscope.cgi?m=cc&amp;[% state %]'>change</a>)
+	    </li>
+	  </ul>
+	  <h3>
+	    Query options
+	  </h3>
+	  <ul class="sidemenu">
+	    <li>
+	      <a href="pareidoscope.cgi?m=wfq&amp;[% state %]">word form query</a>
+	    </li>
+	    <li>
+	      <a href="pareidoscope.cgi?m=lq&amp;[% state %]">lemma query</a>
+	    </li>
+	    <li>
+	      <a href="pareidoscope.cgi?m=cqtl&amp;[% state %]">complex query (token level)</a>
+	    </li>
+	    <li>
+	      <a href="pareidoscope.cgi?m=cqcl&amp;[% state %]">complex query (chunk level)</a>
+	    </li>
+	  </ul>
+	  <h3>
+	    Links
+	  </h3>
+	  <ul class="sidemenu">
+	    <li>
+	      <a target="_blank" href="http://www.linguistik.uni-erlangen.de"><strong>
+		CLUE
+	      </strong></a>
+	      <br />
+	      Professorship for Computational Linguistics at the
+	      University of Erlangen-Nuremberg
+	    </li>
+	    <li>
+	      <a target="_blank" href="http://www.lexi.uni-erlangen.de"><strong>
+		IZ LVK
+	      </strong></a>
+	      <br />
+	      Interdisciplinary Centre for Research on Lexicography,
+	      Valency and Collocation
+	    </li>
+	  </ul>
+	  <h3>
+	    Quote
+	  </h3>
+	  <!-- start left-box -->
+	  <div class="left-box">
+	    <p> 
+	      &ldquo;Then, by using the same evidence in reverse,
+	      the traditional domain of syntax will be invaded by
+	      lexical hordes.&rdquo;
+	    </p>
+	    <p class="align-right">
+	      &ndash; John Sinclair
+	    </p>
+	  </div>
+	  <!-- end  left-box -->
+	</div>
+	<!-- end sidebar -->
+	<!-- start main -->
+	<div id="main">

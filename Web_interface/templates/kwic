@@ -1,0 +1,54 @@
+<h2>
+  Query results
+</h2>
+[% IF error %]
+<p>
+  [% error %]
+</p>
+[% ELSE %]
+[% IF matches == 0 %]
+<p>
+  There are no matches for your query.
+</p>
+[% ELSE %]
+<table>
+  <tr>
+    <th class="first">
+      ID
+    </th>
+    <th>
+      Matches [% start %]&ndash;[% end %] from [% matches %]
+    </th>
+  </tr>
+  [% rowa = 1 %]
+  [% FOREACH row IN rows %]
+  <tr [% IF rowa == 1%]class="row-a"[% rowa = 0 %][% ELSE %]class="row-b"[% rowa = 1 %][% END %]>
+    <td class="first">
+    <a href="[% row.id_href %]">[% row.id %]</a>
+    </td>
+    <td>
+      [% row.pre %]
+      <strong class="kwic">
+	[% row.kwic %]
+      </strong>
+      [% row.post %]
+    </td>
+  </tr>
+  [% END %]
+</table>
+<p style="margin-top: -10px;text-align: center;">
+  [% IF previous_href %]
+  <a href="[% previous_href %]">previous</a>
+  [% ELSE %]
+  previous
+  [% END %]
+  &nbsp;&nbsp;
+  [% IF next_href %]
+  <a href="[% next_href %]">next</a>
+  [% ELSE %]
+  next
+  [% END %]
+</p>
+[% END %]
+[% END %]
+[% INCLUDE footer %]

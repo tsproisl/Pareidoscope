@@ -1,0 +1,13 @@
+[% INCLUDE header
+    version = version
+    corpus_name = corpus_name
+    state = state
+    menu = menu
+%]
+<p>
+  [% error %]
+</p>
+<pre>
+  [% dump %]
+</pre>
+[% INCLUDE footer %]

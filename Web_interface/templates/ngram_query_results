@@ -1,0 +1,22 @@
+<h2>
+  [% query_type %]
+</h2>
+[% IF error %]
+<p>
+  [% error %]
+</p>
+[% ELSE %]
+<p>
+  Your query: [% query %]
+</p>
+[% IF matches == 0 %]
+<p>
+  There are no matches for your query.
+</p>
+[% ELSE %]
+[% INCLUDE results_table
+    vars = vars
+%]
+[% END %]
+[% END %]
+[% INCLUDE footer %]
