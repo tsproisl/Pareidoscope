@@ -10,7 +10,7 @@ chunkdb="oanc_chunks.db"
 
 export PERL5LIB="/home/linguistik/tsproisl/local/lib/perl5/site_perl:/home/linguistik/tsproisl/local/lib/perl5/site_perl/x86_64-linux-thread-multi"
 
-./01_cwb-encode_oanc.sh $corpus $corpusoutdir $registryfile $corpusname $outdir && \
+./01_cwb-encode_treebank.sh $corpus $corpusoutdir $registryfile $corpusname $outdir && \
 ./02_create_sqlite_db.sh $outdir $dbname && \
 ./03_fill_db_collect_ngrams.pl $outdir $corpusname $dbname $registryfile && \
 ./04_count_ngrams.sh $outdir "ngrams" && \
