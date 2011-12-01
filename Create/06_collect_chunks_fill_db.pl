@@ -21,12 +21,12 @@ my $regfile = shift(@ARGV);
 die("Not a directory: $outdir") unless(-d $outdir);
 
 
-my @chunks = qw(adjp advp conjp intj lst np o pp prt sbar ucp vp);
+my @chunks = qw(adjp advp conjp intj lst np o pp prt qp sbar ucp vp);
 my %chunks;
 my $chunks = join("|", @chunks);
 
 my $maxloglevel = 3;
-my $cwb_decode = "cwb-decode -r /localhome/Databases/CWB/registry -n -H $corpus -P word -S s -S adjp -S advp -S conjp -S intj -S lst -S np -S o -S pp -S prt -S sbar -S ucp -S vp";
+my $cwb_decode = "cwb-decode -r /localhome/Databases/CWB/registry -n -H $corpus -P word -S s " . join(" ", map("-S $_", @chunks));
 my $dbh = DBI->connect( "dbi:SQLite:$outdir/$chunkdbname" ) or die("Cannot connect: $DBI::errstr");
 my $other_dbh = DBI->connect( "dbi:SQLite:$outdir/$dbname" ) or die("Cannot connect: $DBI::errstr");
 open(my $decode, "-|", $cwb_decode) or die("Cannot open pipe: $!");
