@@ -25,15 +25,17 @@ sub read_corpus {
     $cqp->exec($corpus);
     $CWB::CL::Registry = '/localhome/Databases/CWB/registry';
     my $corpus_handle = new CWB::CL::Corpus $corpus;
+
     #$cqp->exec("A = <s> [] expand to s");
     #my ($size) = $cqp->exec("size A");
     #$cqp->exec("tabulate A match .. matchend indep, match .. matchend outdep, match .. matchend root, match .. matchend, match s_id > \"$outdir/tabulate.out\"");
     open( TAB, "<:encoding(utf8)", "$outdir/tabulate.out" ) or die("Cannot open $outdir/tabulate.out: $!");
 OUTER: while ( defined( my $match = <TAB> ) ) {
-	print STDERR "$.\n" if($. % 1000 == 0);
-	last if ($. == 5000);
+        print STDERR "$.\n" if ( $. % 1000 == 0 );
+        last if ( $. == 5000 );
         chomp($match);
         my ( $indeps, $outdeps, $roots, $cposs, $s_id ) = split( /\t/, $match );
+
         #next unless ( $s_id eq "4eca801b0572f4e02700021d" );
         my @indeps  = split( / /, $indeps );
         my @outdeps = split( / /, $outdeps );
@@ -137,18 +139,23 @@ sub enumerate_connected_subgraphs_recursive {
     my $edges      = Set::Object->new();
     my $neighbours = Set::Object->new();
     foreach my $node ( $subgraph->vertices ) {
+	#my $node_edges = Set::Object->new();
         foreach my $edge ( $graph->edges_from($node) ) {
             next if ( $prohibited_nodes->contains( $edge->[1] ) );
             $edges->insert($edge);
+            #$node_edges->insert($edge);
             $neighbours->insert( $edge->[1] );
         }
         foreach my $edge ( $graph->edges_to($node) ) {
             next if ( $prohibited_nodes->contains( $edge->[0] ) );
             $edges->insert($edge);
+            #$node_edges->insert($edge);
             $neighbours->insert( $edge->[0] );
         }
+	#$edges->insert($node_edges) unless ($node_edges->is_null);
     }
-    my $first_powerset = &powerset( $edges, [ $subgraph->vertices ], $max_n );
+    my $first_powerset = &powerset_old( $edges, [$subgraph->vertices], $max_n);
+    #my $first_powerset = &powerset_of_sets_of_sets( $edges, 0, $max_n - $subgraph->vertices);
     foreach my $set ( $first_powerset->elements ) {
         next if ( $set->size == 0 );
         my $new_nodes = Set::Object::intersection( $neighbours, Set::Object->new( map( @$_, $set->elements ) ) );
@@ -158,10 +165,11 @@ sub enumerate_connected_subgraphs_recursive {
         foreach my $new_node ($new_nodes) {
             $edges->insert( grep( $new_nodes->contains( $_->[1] ), $subgraph->edges_from($new_node) ) );
         }
-        my $second_powerset = &powerset( $edges, [], $max_n );
+        my $second_powerset = &powerset_old( $edges, [], $max_n );
+        #my $second_powerset = &powerset( $edges, 0, $edges->size );
         foreach my $new_set ( $second_powerset->elements ) {
             my $local_subgraph = $subgraph->copy_graph;
-            $local_subgraph->add_edges( $set->elements );
+            $local_subgraph->add_edges( $set->elements, $new_set->elements );
             print "$local_subgraph\n";
             if ( $local_subgraph->vertices < $max_n ) {
                 &enumerate_connected_subgraphs_recursive( $graph, $local_subgraph, Set::Object::union( $prohibited_nodes, $neighbours ), $max_n );
@@ -170,23 +178,11 @@ sub enumerate_connected_subgraphs_recursive {
     }
 }
 
-sub powerset {
+sub powerset_old {
     my ( $set, $nodes, $max_n ) = @_;
     my @elements           = $set->elements;
     my $powerset           = Set::Object->new();
     my $number_of_elements = scalar(@elements);
-    if ( $max_n - @$nodes == 1 ) {
-
-        #print STDERR sprintf( "Using shortcut (%d)\n", $set->size );
-        foreach ( $set->elements ) {
-            $powerset->insert( Set::Object->new($_) );
-        }
-        return $powerset;
-    }
-
-    #print STDERR sprintf( "powerset %d ** %d (%d)\n", 2, $number_of_elements, 2**$number_of_elements );
-    #print STDERR "nodes: " . join( ", ", @$nodes ) . "\n";
-    #print STDERR "set: " . join( ", ", map( "($_->[0], $_->[1])", $set->elements ) ) . "\n";
 OUTER: for ( my $i = 0; $i < 2**$number_of_elements; $i++ ) {
         my @binary      = split( //, sprintf( "%0${number_of_elements}b", $i ) );
         my $subset      = Set::Object->new();
@@ -202,6 +198,64 @@ OUTER: for ( my $i = 0; $i < 2**$number_of_elements; $i++ ) {
             }
         }
         $powerset->insert($subset);
+    }
+    return $powerset;
+}
+
+sub powerset_of_sets_of_sets {
+    my ( $set_of_sets, $min, $max ) = @_;
+    my $foo = Set::Object->new();
+    # $set_of_sets = ((edge, edge, ...), (edge, ...), ...)
+    my $powerset = Set::Object->new();
+    foreach my $set ( $set_of_sets->elements ) {
+
+        # $set = (edge, edge, ...)
+        $foo->insert(&powerset( $set, 1, $set->size ) );
+        # $set = ((edge, edge, ...), (edge, ...), ...)
+        # node = ((edge, edge, ...), (edge, ...), ...)
+    }
+    $set_of_sets = $foo;
+    # $set_of_sets = (node, node, ...)
+    my $raw_powerset = &powerset( $set_of_sets, $min, $max );
+    # $raw_powerset = ((node, node, ...), (node, ...), ...)
+    foreach my $set_of_nodes ( $raw_powerset->elements ) {
+	if ($set_of_nodes->is_null) {
+	    $powerset->insert(Set::Object->new());
+	    next;
+	}
+        # $set_of_nodes = (node, node, ...)
+        my @nodes = $set_of_nodes->elements;
+        my $local_powerset = shift(@nodes);
+        while (@nodes) {
+            $local_powerset = &cross_set( $local_powerset, shift(@nodes) );
+        }
+        $powerset->insert( $local_powerset->elements );
+    }
+    return $powerset;
+}
+
+sub cross_set {
+    my ( $set1, $set2 ) = @_;
+    my $cross_set = Set::Object->new();
+    foreach my $e1 ( $set1->elements ) {
+        foreach my $e2 ( $set2->elements ) {
+            $cross_set->insert( Set::Object->new( $e1->elements, $e2->elements ) );
+        }
+    }
+    return $cross_set;
+}
+
+sub powerset {
+    my ( $set, $min, $max ) = @_;
+    my @elements           = $set->elements;
+    my $powerset           = Set::Object->new();
+    my $number_of_elements = $set->size;
+OUTER: for ( my $i = 0; $i < 2**$number_of_elements; $i++ ) {
+        my $binary = sprintf( "%0${number_of_elements}b", $i );
+        my $ones = $binary =~ tr/1/1/;
+        next if ( $ones < $min or $ones > $max );
+        my @binary = split( //, $binary );
+        $powerset->insert( Set::Object->new( map( $elements[$_], grep( $binary[$_], ( 0 .. $#binary ) ) ) ) );
     }
     return $powerset;
 }
