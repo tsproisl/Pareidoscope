@@ -13,7 +13,7 @@ use Set::Object;
 
 my $outdir = "/localhome/Diss/trunk/Resources/Pareidoscope/Studies/";
 my $corpus = "OANC";
-my $max_n  = 4;
+my $max_n  = 5;
 
 &read_corpus( $outdir, $corpus, $max_n );
 
@@ -137,24 +137,29 @@ sub enumerate_connected_subgraphs_recursive {
     # determine all edges to neighbouring nodes that are not
     # prohibited
     my $edges      = Set::Object->new();
+    my $out_edges      = Set::Object->new();
+    my $in_edges      = Set::Object->new();
     my $neighbours = Set::Object->new();
     foreach my $node ( $subgraph->vertices ) {
 	#my $node_edges = Set::Object->new();
         foreach my $edge ( $graph->edges_from($node) ) {
             next if ( $prohibited_nodes->contains( $edge->[1] ) );
             $edges->insert($edge);
+            $out_edges->insert($edge);
             #$node_edges->insert($edge);
             $neighbours->insert( $edge->[1] );
         }
         foreach my $edge ( $graph->edges_to($node) ) {
             next if ( $prohibited_nodes->contains( $edge->[0] ) );
             $edges->insert($edge);
+            $in_edges->insert($edge);
             #$node_edges->insert($edge);
             $neighbours->insert( $edge->[0] );
         }
 	#$edges->insert($node_edges) unless ($node_edges->is_null);
     }
-    my $first_powerset = &powerset_old( $edges, [$subgraph->vertices], $max_n);
+    #my $first_powerset = &powerset_old( $edges, [$subgraph->vertices], $max_n);
+    my $first_powerset = &cross_set(&powerset( $out_edges, 0, $max_n - $subgraph->vertices), &powerset( $in_edges, 0, $max_n - $subgraph->vertices), $max_n - $subgraph->vertices);
     #my $first_powerset = &powerset_of_sets_of_sets( $edges, 0, $max_n - $subgraph->vertices);
     foreach my $set ( $first_powerset->elements ) {
         next if ( $set->size == 0 );
@@ -165,8 +170,8 @@ sub enumerate_connected_subgraphs_recursive {
         foreach my $new_node ($new_nodes) {
             $edges->insert( grep( $new_nodes->contains( $_->[1] ), $subgraph->edges_from($new_node) ) );
         }
-        my $second_powerset = &powerset_old( $edges, [], $max_n );
-        #my $second_powerset = &powerset( $edges, 0, $edges->size );
+        #my $second_powerset = &powerset_old( $edges, [], $max_n );
+        my $second_powerset = &powerset( $edges, 0, $edges->size );
         foreach my $new_set ( $second_powerset->elements ) {
             my $local_subgraph = $subgraph->copy_graph;
             $local_subgraph->add_edges( $set->elements, $new_set->elements );
@@ -183,6 +188,17 @@ sub powerset_old {
     my @elements           = $set->elements;
     my $powerset           = Set::Object->new();
     my $number_of_elements = scalar(@elements);
+    # if (@$nodes > 0 and $max_n - @$nodes == 1) {
+    # 	my $nodes_set = Set::Object->new(@$nodes);
+    # 	foreach my $node (@$nodes) {
+    # 	    my @local_edges;
+    # 	    foreach my $edge ($set->elements) {
+    # 		push(@local_edges, $edge) if(grep($nodes_set->contains($_), @$edge));
+    # 	    }
+    # 	    $powerset->insert((&powerset(Set::Object->new(@local_edges), 0, scalar(@local_edges)))->elements);
+    # 	}
+    # 	return $powerset;
+    # }
 OUTER: for ( my $i = 0; $i < 2**$number_of_elements; $i++ ) {
         my @binary      = split( //, sprintf( "%0${number_of_elements}b", $i ) );
         my $subset      = Set::Object->new();
@@ -190,11 +206,11 @@ OUTER: for ( my $i = 0; $i < 2**$number_of_elements; $i++ ) {
         for ( my $j = 0; $j <= $#binary; $j++ ) {
             if ( $binary[$j] ) {
                 my $edge = $elements[$j];
-                $subset->insert($edge);
                 if ( @$nodes > 0 ) {
                     $local_nodes->insert(@$edge);
                     next OUTER if ( $local_nodes->size > $max_n );
                 }
+                $subset->insert($edge);
             }
         }
         $powerset->insert($subset);
@@ -235,11 +251,25 @@ sub powerset_of_sets_of_sets {
 }
 
 sub cross_set {
-    my ( $set1, $set2 ) = @_;
+    my ( $set1, $set2, $max ) = @_;
     my $cross_set = Set::Object->new();
     foreach my $e1 ( $set1->elements ) {
         foreach my $e2 ( $set2->elements ) {
-            $cross_set->insert( Set::Object->new( $e1->elements, $e2->elements ) );
+	    my $e3 = Set::Object::union($e1, $e2);
+	    if ($e3->size <= $max) {
+		$cross_set->insert($e3);
+	    }
+	    else {
+		my $nodes = Set::Object->new(map($_->[1], $e1->elements), map($_->[0], $e2->elements));
+		$cross_set->insert($e3) if($nodes->size <= $max);
+	    }
+	    #$e3->size > $max or ($cross_set->insert($e3) and next);
+	    #$cross_set->insert($e3) and next if($e3->size <= $max);
+	    #if ($e3->size > $max) {
+	    #}
+	    #else {
+		#$cross_set->insert($e3);
+	    #}
         }
     }
     return $cross_set;
