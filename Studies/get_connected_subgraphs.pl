@@ -5,13 +5,15 @@ use strict;
 
 use Data::Dumper;
 
-use lib "/home/linguistik/tsproisl/local/lib/perl5/site_perl";
+#use lib "/home/linguistik/tsproisl/local/lib/perl5/site_perl";
 use Graph::Directed;
-use CWB::CQP;
-use CWB::CL;
+
+# use CWB::CQP;
+# use CWB::CL;
 use Set::Object;
 
-my $outdir = "/localhome/Diss/trunk/Resources/Pareidoscope/Studies/";
+# my $outdir = "/localhome/Diss/trunk/Resources/Pareidoscope/Studies";
+my $outdir = ".";
 my $corpus = "OANC";
 my $max_n  = 5;
 
@@ -19,12 +21,13 @@ my $max_n  = 5;
 
 sub read_corpus {
     my ( $outdir, $corpus, $max_n ) = @_;
-    my $cqp = new CWB::CQP;
-    $cqp->set_error_handler('die');    # built-in, useful for one-off scripts
-    $cqp->exec("set Registry '/localhome/Databases/CWB/registry'");
-    $cqp->exec($corpus);
-    $CWB::CL::Registry = '/localhome/Databases/CWB/registry';
-    my $corpus_handle = new CWB::CL::Corpus $corpus;
+
+    # my $cqp = new CWB::CQP;
+    # $cqp->set_error_handler('die');    # built-in, useful for one-off scripts
+    # $cqp->exec("set Registry '/localhome/Databases/CWB/registry'");
+    # $cqp->exec($corpus);
+    # $CWB::CL::Registry = '/localhome/Databases/CWB/registry';
+    # my $corpus_handle = new CWB::CL::Corpus $corpus;
 
     #$cqp->exec("A = <s> [] expand to s");
     #my ($size) = $cqp->exec("size A");
@@ -95,7 +98,7 @@ OUTER: while ( defined( my $match = <TAB> ) ) {
         }
 
         # get all connected subgraphs
-        &enumerate_connected_subgraphs( $graph, $max_n );
+        &enumerate_connected_subgraphs( $graph, $max_n, \%graph_to_raw, \%relations );
     }
     close(TAB) or die("Cannot open $outdir/tabulate.out: $!");
 }
@@ -118,34 +121,36 @@ OUTER: while ( defined( my $match = <TAB> ) ) {
 # }
 
 sub enumerate_connected_subgraphs {
-    my ( $graph, $max_n ) = @_;
+    my ( $graph, $max_n, $graph_to_raw, $relations ) = @_;
     foreach my $node ( sort { $b <=> $a } $graph->vertices ) {
 
         # emit node $i
         my $subgraph = Graph::Directed->new;
         $subgraph->add_vertex($node);
-        print "$subgraph\n";
+        &emit( $subgraph, $graph_to_raw, $relations );
         my $prohibited_nodes = Set::Object->new();
         $prohibited_nodes->insert( 0 .. $node );
-        &enumerate_connected_subgraphs_recursive( $graph, $subgraph, $prohibited_nodes, $max_n );
+        &enumerate_connected_subgraphs_recursive( $graph, $subgraph, $prohibited_nodes, $max_n, $graph_to_raw, $relations );
     }
 }
 
 sub enumerate_connected_subgraphs_recursive {
-    my ( $graph, $subgraph, $prohibited_nodes, $max_n ) = @_;
+    my ( $graph, $subgraph, $prohibited_nodes, $max_n, $graph_to_raw, $relations ) = @_;
 
     # determine all edges to neighbouring nodes that are not
     # prohibited
     my $edges      = Set::Object->new();
-    my $out_edges      = Set::Object->new();
-    my $in_edges      = Set::Object->new();
+    my $out_edges  = Set::Object->new();
+    my $in_edges   = Set::Object->new();
     my $neighbours = Set::Object->new();
     foreach my $node ( $subgraph->vertices ) {
-	#my $node_edges = Set::Object->new();
+
+        #my $node_edges = Set::Object->new();
         foreach my $edge ( $graph->edges_from($node) ) {
             next if ( $prohibited_nodes->contains( $edge->[1] ) );
             $edges->insert($edge);
             $out_edges->insert($edge);
+
             #$node_edges->insert($edge);
             $neighbours->insert( $edge->[1] );
         }
@@ -153,13 +158,17 @@ sub enumerate_connected_subgraphs_recursive {
             next if ( $prohibited_nodes->contains( $edge->[0] ) );
             $edges->insert($edge);
             $in_edges->insert($edge);
+
             #$node_edges->insert($edge);
             $neighbours->insert( $edge->[0] );
         }
-	#$edges->insert($node_edges) unless ($node_edges->is_null);
+
+        #$edges->insert($node_edges) unless ($node_edges->is_null);
     }
+
     #my $first_powerset = &powerset_old( $edges, [$subgraph->vertices], $max_n);
-    my $first_powerset = &cross_set(&powerset( $out_edges, 0, $max_n - $subgraph->vertices), &powerset( $in_edges, 0, $max_n - $subgraph->vertices), $max_n - $subgraph->vertices);
+    my $first_powerset = &cross_set( &powerset( $out_edges, 0, $max_n - $subgraph->vertices ), &powerset( $in_edges, 0, $max_n - $subgraph->vertices ), $max_n - $subgraph->vertices );
+
     #my $first_powerset = &powerset_of_sets_of_sets( $edges, 0, $max_n - $subgraph->vertices);
     foreach my $set ( $first_powerset->elements ) {
         next if ( $set->size == 0 );
@@ -170,14 +179,15 @@ sub enumerate_connected_subgraphs_recursive {
         foreach my $new_node ($new_nodes) {
             $edges->insert( grep( $new_nodes->contains( $_->[1] ), $subgraph->edges_from($new_node) ) );
         }
+
         #my $second_powerset = &powerset_old( $edges, [], $max_n );
         my $second_powerset = &powerset( $edges, 0, $edges->size );
         foreach my $new_set ( $second_powerset->elements ) {
             my $local_subgraph = $subgraph->copy_graph;
             $local_subgraph->add_edges( $set->elements, $new_set->elements );
-            print "$local_subgraph\n";
+            &emit( $local_subgraph, $graph_to_raw, $relations );
             if ( $local_subgraph->vertices < $max_n ) {
-                &enumerate_connected_subgraphs_recursive( $graph, $local_subgraph, Set::Object::union( $prohibited_nodes, $neighbours ), $max_n );
+                &enumerate_connected_subgraphs_recursive( $graph, $local_subgraph, Set::Object::union( $prohibited_nodes, $neighbours ), $max_n, $graph_to_raw, $relations );
             }
         }
     }
@@ -188,6 +198,7 @@ sub powerset_old {
     my @elements           = $set->elements;
     my $powerset           = Set::Object->new();
     my $number_of_elements = scalar(@elements);
+
     # if (@$nodes > 0 and $max_n - @$nodes == 1) {
     # 	my $nodes_set = Set::Object->new(@$nodes);
     # 	foreach my $node (@$nodes) {
@@ -221,26 +232,31 @@ OUTER: for ( my $i = 0; $i < 2**$number_of_elements; $i++ ) {
 sub powerset_of_sets_of_sets {
     my ( $set_of_sets, $min, $max ) = @_;
     my $foo = Set::Object->new();
+
     # $set_of_sets = ((edge, edge, ...), (edge, ...), ...)
     my $powerset = Set::Object->new();
     foreach my $set ( $set_of_sets->elements ) {
 
         # $set = (edge, edge, ...)
-        $foo->insert(&powerset( $set, 1, $set->size ) );
+        $foo->insert( &powerset( $set, 1, $set->size ) );
+
         # $set = ((edge, edge, ...), (edge, ...), ...)
         # node = ((edge, edge, ...), (edge, ...), ...)
     }
     $set_of_sets = $foo;
+
     # $set_of_sets = (node, node, ...)
     my $raw_powerset = &powerset( $set_of_sets, $min, $max );
+
     # $raw_powerset = ((node, node, ...), (node, ...), ...)
     foreach my $set_of_nodes ( $raw_powerset->elements ) {
-	if ($set_of_nodes->is_null) {
-	    $powerset->insert(Set::Object->new());
-	    next;
-	}
+        if ( $set_of_nodes->is_null ) {
+            $powerset->insert( Set::Object->new() );
+            next;
+        }
+
         # $set_of_nodes = (node, node, ...)
-        my @nodes = $set_of_nodes->elements;
+        my @nodes          = $set_of_nodes->elements;
         my $local_powerset = shift(@nodes);
         while (@nodes) {
             $local_powerset = &cross_set( $local_powerset, shift(@nodes) );
@@ -255,21 +271,22 @@ sub cross_set {
     my $cross_set = Set::Object->new();
     foreach my $e1 ( $set1->elements ) {
         foreach my $e2 ( $set2->elements ) {
-	    my $e3 = Set::Object::union($e1, $e2);
-	    if ($e3->size <= $max) {
-		$cross_set->insert($e3);
-	    }
-	    else {
-		my $nodes = Set::Object->new(map($_->[1], $e1->elements), map($_->[0], $e2->elements));
-		$cross_set->insert($e3) if($nodes->size <= $max);
-	    }
-	    #$e3->size > $max or ($cross_set->insert($e3) and next);
-	    #$cross_set->insert($e3) and next if($e3->size <= $max);
-	    #if ($e3->size > $max) {
-	    #}
-	    #else {
-		#$cross_set->insert($e3);
-	    #}
+            my $e3 = Set::Object::union( $e1, $e2 );
+            if ( $e3->size <= $max ) {
+                $cross_set->insert($e3);
+            }
+            else {
+                my $nodes = Set::Object->new( map( $_->[1], $e1->elements ), map( $_->[0], $e2->elements ) );
+                $cross_set->insert($e3) if ( $nodes->size <= $max );
+            }
+
+            #$e3->size > $max or ($cross_set->insert($e3) and next);
+            #$cross_set->insert($e3) and next if($e3->size <= $max);
+            #if ($e3->size > $max) {
+            #}
+            #else {
+            #$cross_set->insert($e3);
+            #}
         }
     }
     return $cross_set;
@@ -288,4 +305,38 @@ OUTER: for ( my $i = 0; $i < 2**$number_of_elements; $i++ ) {
         $powerset->insert( Set::Object->new( map( $elements[$_], grep( $binary[$_], ( 0 .. $#binary ) ) ) ) );
     }
     return $powerset;
+}
+
+sub emit {
+    my ( $subgraph, $graph_to_raw, $relations ) = @_;
+    print $subgraph, "\n";
+    # foreach my $edge ($subgraph->edges) {
+    # 	print $relations->{$graph_to_raw->{$edge->[0]}}->{$graph_to_raw->{$edge->[1]}}, "\n";
+    # }
+    #
+    # edge: (relation, vertex1, vertex2)
+    # vertex: (incoming_relations, outgoing_relations)
+    my @sources = $subgraph->source_vertices();
+    my @sinks = $subgraph->sink_vertices();
+    if (@sources == 1) {
+	&build_matrix($subgraph, $graph_to_raw, $relations, $sources[0]);
+    }
+    elsif (@sinks == 1) {
+	&build_matrix($subgraph, $graph_to_raw, $relations, $sinks[0]);
+    }
+    elsif (@sources > 1) {
+	my $start = (sort {$subgraph->edges_from($a) <=> $subgraph->edges_from($b) or
+		           join(",", sort $subgraph->edges_from($a)) cmp join(",", sort $subgraph->edges_from($b)) } @start)[0];
+	&build_matrix($subgraph, $graph_to_raw, $relations, $start);
+    }
+    elsif (@sinks > 1) {
+	my $start = (sort {} @start)[0];
+	&build_matrix($subgraph, $graph_to_raw, $relations, $start);
+    }
+    else {
+    }
+}
+
+sub build_matrix {
+
 }
