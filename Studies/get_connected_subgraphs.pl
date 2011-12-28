@@ -309,32 +309,36 @@ OUTER: for ( my $i = 0; $i < 2**$number_of_elements; $i++ ) {
 
 sub emit {
     my ( $subgraph, $graph_to_raw, $relations ) = @_;
-    print $subgraph, "\n";
-    # foreach my $edge ($subgraph->edges) {
-    # 	print $relations->{$graph_to_raw->{$edge->[0]}}->{$graph_to_raw->{$edge->[1]}}, "\n";
-    # }
-    #
-    # edge: (relation, vertex1, vertex2)
-    # vertex: (incoming_relations, outgoing_relations)
-    my @sources = $subgraph->source_vertices();
-    my @sinks = $subgraph->sink_vertices();
-    if (@sources == 1) {
-	&build_matrix($subgraph, $graph_to_raw, $relations, $sources[0]);
+    my %edges;
+    my @list_representation;
+    my %nodes;
+    foreach my $edge ($subgraph->edges()) {
+	$edges{$edge->[0]}->{$edge->[1]} = $relations->{$graph_to_raw->{$edge->[0]}}->{$graph_to_raw->{$edge->[1]}};
+	push(@list_representation, sprintf("%s(%d, %d)", $edges{$edge->[0]}->{$edge->[1]}, $edge->[0], $edge->[1]));
     }
-    elsif (@sinks == 1) {
-	&build_matrix($subgraph, $graph_to_raw, $relations, $sinks[0]);
+    foreach my $vertex ($subgraph->vertices()) {
+	my (@incoming, @outgoing);
+	foreach my $edge ($subgraph->edges_to($vertex)) {
+	    my $ins = join(",", sort map($edges{$_->[0]}->{$_->[1]}, $subgraph->edges_to($edge->[0])));
+	    my $outs = join(",", sort map($edges{$_->[0]}->{$_->[1]}, $subgraph->edges_from($edge->[0])));
+	    $ins = defined($ins) ? "<($ins)" : "";
+	    $outs = defined($outs) ? "<($outs)" : "";
+	    push(@incoming, sprintf("%s(%s%s)", $edges{$edge->[0]}->{$edge->[1]}, $ins, $outs));
+	}
+	foreach my $edge ($subgraph->edges_from($vertex)) {
+	    my $ins = join(",", sort map($edges{$_->[0]}->{$_->[1]}, $subgraph->edges_to($edge->[1])));
+	    my $outs = join(",", sort map($edges{$_->[0]}->{$_->[1]}, $subgraph->edges_from($edge->[1])));
+	    $ins = defined($ins) ? "<($ins)" : "";
+	    $outs = defined($outs) ? "<($outs)" : "";
+	    push(@outgoing, sprintf("%s(%s%s)", $edges{$edge->[0]}->{$edge->[1]}, $ins, $outs));
+	}
+	my $incoming = join(",", @incoming);
+	my $outgoing = join(",", @outgoing);
+	$incoming = defined($incoming) ? "<($incoming)" : "";
+	$outgoing = defined($outgoing) ? "<($outgoing)" : "";
+	$nodes{$vertex} = $incoming . $outgoing;
     }
-    elsif (@sources > 1) {
-	my $start = (sort {$subgraph->edges_from($a) <=> $subgraph->edges_from($b) or
-		           join(",", sort $subgraph->edges_from($a)) cmp join(",", sort $subgraph->edges_from($b)) } @start)[0];
-	&build_matrix($subgraph, $graph_to_raw, $relations, $start);
-    }
-    elsif (@sinks > 1) {
-	my $start = (sort {} @start)[0];
-	&build_matrix($subgraph, $graph_to_raw, $relations, $start);
-    }
-    else {
-    }
+    sort {$nodes{$a} cmp $nodes{$b} or warn(join("\n", @list_representation))} keys %nodes;
 }
 
 sub build_matrix {
