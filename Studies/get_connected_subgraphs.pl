@@ -4,6 +4,7 @@ use warnings;
 use strict;
 
 use Data::Dumper;
+use DBI;
 
 #use lib "/home/linguistik/tsproisl/local/lib/perl5/site_perl";
 use Graph::Directed;
@@ -16,8 +17,40 @@ use Set::Object;
 my $outdir = ".";
 my $corpus = "OANC";
 my $max_n  = 5;
+my $dbname = "oanc_dependencies.db";
 
+&fill_database($outdir);
 &read_corpus( $outdir, $corpus, $max_n );
+
+sub fill_database {
+    my ($outdir) = @_;
+    my %relations;
+    open( TAB, "<:encoding(utf8)", "$outdir/tabulate.out" ) or die("Cannot open $outdir/tabulate.out: $!");
+    while ( defined( my $match = <TAB> ) ) {
+        print STDERR "$.\n" if ( $. % 1000 == 0 );
+        chomp($match);
+        my ( $indeps ) = split( /\t/, $match );
+        my @indeps  = split( / /, $indeps );
+	foreach my $indeps (@indeps) {
+	    $indeps  =~ s/^\|//;
+            $indeps  =~ s/\|$//;
+	    foreach my $indep (split(/\|/, $indeps)) {
+		#print $indep, "\n";
+		if($indep =~ m/^(?<relation>[^(]+)\((?<offset>-?\d+)(?:&apos;)*,0(?:&apos;)*/){
+		    $relations{$+{"relation"}}++;
+		}
+		else {
+		    die("dependency relation does not match: $indep\n");
+		}
+	    }
+	}
+    }
+    close(TAB) or die("Cannot open $outdir/tabulate.out: $!");
+    my $dbh = DBI->connect( "dbi:SQLite:dbname=$outdir/$dbname", "", "" ) or die("Cannot connect: $DBI::errstr");
+    # create db schema
+    # fill db
+    undef($dbh);
+}
 
 sub read_corpus {
     my ( $outdir, $corpus, $max_n ) = @_;
@@ -61,8 +94,8 @@ OUTER: while ( defined( my $match = <TAB> ) ) {
             $outdep =~ s/\|$//;
 
             # Skip sentences with nodes that have more than ten edges
-            if ( scalar( split( /\|/, $indep ) ) + scalar( split( /\|/, $outdep ) ) > 10 ) {
-                print STDERR sprintf( "Skipped %s (%d edges)\n", $s_id, scalar( split( /\|/, $indep ) ) + scalar( split( /\|/, $outdep ) ) );
+            if ( scalar( () = split( /\|/, $indep, -1 ) ) + scalar( () = split( /\|/, $outdep, -1 ) ) > 10 ) {
+                print STDERR sprintf( "Skipped %s (%d edges)\n", $s_id, scalar( () = split( /\|/, $indep, -1 ) ) + scalar( () = split( /\|/, $outdep, -1 ) ) );
                 next OUTER;
             }
             foreach ( split( /\|/, $outdep ) ) {
@@ -70,7 +103,7 @@ OUTER: while ( defined( my $match = <TAB> ) ) {
                 my $offset = $+{"offset"};
                 $offset = "+" . $offset unless ( substr( $offset, 0, 1 ) eq "-" );
                 my $target = eval "$cpos$offset";
-                $relations{$cpos}->{$target} = $+{relation};
+                $relations{$cpos}->{$target} = $+{"relation"};
                 $raw_graph->add_edge( $cpos, $target );
             }
         }
@@ -312,33 +345,51 @@ sub emit {
     my %edges;
     my @list_representation;
     my %nodes;
-    foreach my $edge ($subgraph->edges()) {
-	$edges{$edge->[0]}->{$edge->[1]} = $relations->{$graph_to_raw->{$edge->[0]}}->{$graph_to_raw->{$edge->[1]}};
-	push(@list_representation, sprintf("%s(%d, %d)", $edges{$edge->[0]}->{$edge->[1]}, $edge->[0], $edge->[1]));
+    my @sorted_nodes;
+    my @emit_structure;
+    foreach my $edge ( $subgraph->edges() ) {
+        $edges{ $edge->[0] }->{ $edge->[1] } = $relations->{ $graph_to_raw->{ $edge->[0] } }->{ $graph_to_raw->{ $edge->[1] } };
+        push( @list_representation, sprintf( "%s(%d, %d)", $edges{ $edge->[0] }->{ $edge->[1] }, $edge->[0], $edge->[1] ) );
     }
-    foreach my $vertex ($subgraph->vertices()) {
-	my (@incoming, @outgoing);
-	foreach my $edge ($subgraph->edges_to($vertex)) {
-	    my $ins = join(",", sort map($edges{$_->[0]}->{$_->[1]}, $subgraph->edges_to($edge->[0])));
-	    my $outs = join(",", sort map($edges{$_->[0]}->{$_->[1]}, $subgraph->edges_from($edge->[0])));
-	    $ins = defined($ins) ? "<($ins)" : "";
-	    $outs = defined($outs) ? "<($outs)" : "";
-	    push(@incoming, sprintf("%s(%s%s)", $edges{$edge->[0]}->{$edge->[1]}, $ins, $outs));
-	}
-	foreach my $edge ($subgraph->edges_from($vertex)) {
-	    my $ins = join(",", sort map($edges{$_->[0]}->{$_->[1]}, $subgraph->edges_to($edge->[1])));
-	    my $outs = join(",", sort map($edges{$_->[0]}->{$_->[1]}, $subgraph->edges_from($edge->[1])));
-	    $ins = defined($ins) ? "<($ins)" : "";
-	    $outs = defined($outs) ? "<($outs)" : "";
-	    push(@outgoing, sprintf("%s(%s%s)", $edges{$edge->[0]}->{$edge->[1]}, $ins, $outs));
-	}
-	my $incoming = join(",", @incoming);
-	my $outgoing = join(",", @outgoing);
-	$incoming = defined($incoming) ? "<($incoming)" : "";
-	$outgoing = defined($outgoing) ? "<($outgoing)" : "";
-	$nodes{$vertex} = $incoming . $outgoing;
+    foreach my $vertex ( $subgraph->vertices() ) {
+        my ( @incoming, @outgoing );
+        foreach my $edge ( $subgraph->edges_to($vertex) ) {
+            my $ins  = join( ",", sort map( $edges{ $_->[0] }->{ $_->[1] }, $subgraph->edges_to( $edge->[0] ) ) );
+            my $outs = join( ",", sort map( $edges{ $_->[0] }->{ $_->[1] }, $subgraph->edges_from( $edge->[0] ) ) );
+            $ins  = $ins  ne "" ? "<($ins)"  : "";
+            $outs = $outs ne "" ? ">($outs)" : "";
+            push( @incoming, sprintf( "%s(%s%s)", $edges{ $edge->[0] }->{ $edge->[1] }, $ins, $outs ) );
+        }
+        foreach my $edge ( $subgraph->edges_from($vertex) ) {
+            my $ins  = join( ",", sort map( $edges{ $_->[0] }->{ $_->[1] }, $subgraph->edges_to( $edge->[1] ) ) );
+            my $outs = join( ",", sort map( $edges{ $_->[0] }->{ $_->[1] }, $subgraph->edges_from( $edge->[1] ) ) );
+            $ins  = $ins  ne "" ? "<($ins)"  : "";
+            $outs = $outs ne "" ? ">($outs)" : "";
+            push( @outgoing, sprintf( "%s(%s%s)", $edges{ $edge->[0] }->{ $edge->[1] }, $ins, $outs ) );
+        }
+        my $incoming = join( ",", @incoming );
+        my $outgoing = join( ",", @outgoing );
+        $incoming = $incoming ne "" ? "<($incoming)" : "";
+        $outgoing = $outgoing ne "" ? ">($outgoing)" : "";
+        $nodes{$vertex} = $incoming . $outgoing;
     }
-    sort {$nodes{$a} cmp $nodes{$b} or warn(join("\n", @list_representation))} keys %nodes;
+    print Dumper(\@list_representation);
+    #foreach my $node (sort {$nodes{$a} cmp $nodes{$b} or warn(join("\n", @list_representation))} keys %nodes) {
+    @sorted_nodes = sort { $nodes{$a} cmp $nodes{$b} } keys %nodes;
+    for (my $i = 0; $i <= $#sorted_nodes; $i++) {
+	my $node_1 = $sorted_nodes[$i];
+	for (my $j = 0; $j <= $#sorted_nodes; $j++) {
+	    my $node_2 = $sorted_nodes[$j];
+	    if ($edges{$node_1}->{$node_2}) {
+		$emit_structure[$i]->[$j] = $edges{$node_1}->{$node_2};
+		die("Self-loop: " . join(", ", @list_representation)) if ($i == $j);
+	    }
+	    else {
+	       $emit_structure[$i]->[$j] = undef;
+	    }
+	}
+    }
+    print Dumper(\@emit_structure);
 }
 
 sub build_matrix {
