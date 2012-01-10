@@ -20,7 +20,7 @@ my $max_n  = 5;
 my $dbname = "oanc_dependencies.db";
 
 &fill_database($outdir);
-&read_corpus( $outdir, $corpus, $max_n );
+#&read_corpus( $outdir, $corpus, $max_n );
 
 sub fill_database {
     my ($outdir) = @_;
@@ -46,9 +46,15 @@ sub fill_database {
 	}
     }
     close(TAB) or die("Cannot open $outdir/tabulate.out: $!");
+    unlink("$outdir/$dbname") if(-e "$outdir/$dbname");
     my $dbh = DBI->connect( "dbi:SQLite:dbname=$outdir/$dbname", "", "" ) or die("Cannot connect: $DBI::errstr");
-    # create db schema
-    # fill db
+    $dbh->do(qq{CREATE TABLE dependencies (id INTEGER PRIMARY KEY AUTOINCREMENT, relation TEXT, frequency INTEGER)});
+    my $insert_dependency = $dbh->prepare(qq{INSERT INTO dependencies (relation, frequency) VALUES (?, ?)});
+    $dbh->do(qq{BEGIN TRANSACTION});
+    foreach my $key (sort keys %relations) {
+	$insert_dependency->execute($key, $relations{$key});
+    }
+    $dbh->do(qq{COMMIT});
     undef($dbh);
 }
 
