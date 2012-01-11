@@ -19,8 +19,10 @@ my $corpus = "OANC";
 my $max_n  = 5;
 my $dbname = "oanc_dependencies.db";
 
+my %relation_ids;
+
 &fill_database($outdir);
-#&read_corpus( $outdir, $corpus, $max_n );
+&read_corpus( $outdir, $corpus, $max_n );
 
 sub fill_database {
     my ($outdir) = @_;
@@ -28,31 +30,37 @@ sub fill_database {
     open( TAB, "<:encoding(utf8)", "$outdir/tabulate.out" ) or die("Cannot open $outdir/tabulate.out: $!");
     while ( defined( my $match = <TAB> ) ) {
         print STDERR "$.\n" if ( $. % 1000 == 0 );
+        last if ( $. == 5000 );
         chomp($match);
-        my ( $indeps ) = split( /\t/, $match );
-        my @indeps  = split( / /, $indeps );
-	foreach my $indeps (@indeps) {
-	    $indeps  =~ s/^\|//;
-            $indeps  =~ s/\|$//;
-	    foreach my $indep (split(/\|/, $indeps)) {
-		#print $indep, "\n";
-		if($indep =~ m/^(?<relation>[^(]+)\((?<offset>-?\d+)(?:&apos;)*,0(?:&apos;)*/){
-		    $relations{$+{"relation"}}++;
-		}
-		else {
-		    die("dependency relation does not match: $indep\n");
-		}
-	    }
-	}
+        my ($indeps) = split( /\t/, $match );
+        my @indeps = split( / /, $indeps );
+        foreach my $indeps (@indeps) {
+            $indeps =~ s/^\|//;
+            $indeps =~ s/\|$//;
+            foreach my $indep ( split( /\|/, $indeps ) ) {
+
+                #print $indep, "\n";
+                if ( $indep =~ m/^(?<relation>[^(]+)\((?<offset>-?\d+)(?:&apos;)*,0(?:&apos;)*/ ) {
+                    $relations{ $+{"relation"} }++;
+                }
+                else {
+                    die("dependency relation does not match: $indep\n");
+                }
+            }
+        }
     }
     close(TAB) or die("Cannot open $outdir/tabulate.out: $!");
-    unlink("$outdir/$dbname") if(-e "$outdir/$dbname");
+    unlink("$outdir/$dbname") if ( -e "$outdir/$dbname" );
     my $dbh = DBI->connect( "dbi:SQLite:dbname=$outdir/$dbname", "", "" ) or die("Cannot connect: $DBI::errstr");
-    $dbh->do(qq{CREATE TABLE dependencies (id INTEGER PRIMARY KEY AUTOINCREMENT, relation TEXT, frequency INTEGER)});
+    $dbh->do(qq{CREATE TABLE dependencies (id INTEGER PRIMARY KEY AUTOINCREMENT, relation TEXT UNIQUE, frequency INTEGER)});
     my $insert_dependency = $dbh->prepare(qq{INSERT INTO dependencies (relation, frequency) VALUES (?, ?)});
+    my $get_dependency_id = $dbh->prepare(qq{SELECT id FROM dependencies WHERE relation = ?});
     $dbh->do(qq{BEGIN TRANSACTION});
-    foreach my $key (sort keys %relations) {
-	$insert_dependency->execute($key, $relations{$key});
+
+    foreach my $key ( sort keys %relations ) {
+        $insert_dependency->execute( $key, $relations{$key} );
+        $get_dependency_id->execute($key);
+        ( $relation_ids{$key} ) = $get_dependency_id->fetchrow_array;
     }
     $dbh->do(qq{COMMIT});
     undef($dbh);
@@ -379,23 +387,21 @@ sub emit {
         $outgoing = $outgoing ne "" ? ">($outgoing)" : "";
         $nodes{$vertex} = $incoming . $outgoing;
     }
-    print Dumper(\@list_representation);
-    #foreach my $node (sort {$nodes{$a} cmp $nodes{$b} or warn(join("\n", @list_representation))} keys %nodes) {
     @sorted_nodes = sort { $nodes{$a} cmp $nodes{$b} } keys %nodes;
-    for (my $i = 0; $i <= $#sorted_nodes; $i++) {
-	my $node_1 = $sorted_nodes[$i];
-	for (my $j = 0; $j <= $#sorted_nodes; $j++) {
-	    my $node_2 = $sorted_nodes[$j];
-	    if ($edges{$node_1}->{$node_2}) {
-		$emit_structure[$i]->[$j] = $edges{$node_1}->{$node_2};
-		die("Self-loop: " . join(", ", @list_representation)) if ($i == $j);
-	    }
-	    else {
-	       $emit_structure[$i]->[$j] = undef;
-	    }
-	}
+    for ( my $i = 0; $i <= $#sorted_nodes; $i++ ) {
+        my $node_1 = $sorted_nodes[$i];
+        for ( my $j = 0; $j <= $#sorted_nodes; $j++ ) {
+            my $node_2 = $sorted_nodes[$j];
+            if ( $edges{$node_1}->{$node_2} ) {
+                $emit_structure[$i]->[$j] = $relation_ids{ $edges{$node_1}->{$node_2} };
+                die( "Self-loop: " . join( ", ", @list_representation ) ) if ( $i == $j );
+            }
+            else {
+                $emit_structure[$i]->[$j] = 0;
+            }
+        }
     }
-    print Dumper(\@emit_structure);
+    printf( "%s\t%d\n", join( " ", map( join( " ", @$_ ), @emit_structure ) ), scalar(@emit_structure) );
 }
 
 sub build_matrix {
