@@ -1,70 +1,25 @@
 #!/usr/bin/perl
 
+# this is time-consuming! preferebly use hpc facilities
+#
+
 use warnings;
 use strict;
 
-use Data::Dumper;
-use DBI;
+use Storable;
 
-#use lib "/home/linguistik/tsproisl/local/lib/perl5/site_perl";
 use Graph::Directed;
-
-# use CWB::CQP;
-# use CWB::CL;
 use Set::Object;
 
-# my $outdir = "/localhome/Diss/trunk/Resources/Pareidoscope/Studies";
-my $outdir = ".";
-my $corpus = "OANC";
-my $max_n  = 5;
-my $dbname = "oanc_dependencies.db";
+die("./09_collect_dependency_subgraphs.pl dependencies.out dependency_relations.dump output_file max_n") unless ( scalar(@ARGV) == 3 );
+my $dependencies = shift(@ARGV);
+my $relations    = shift(@ARGV);
+my $outfile      = shift(@ARGV);
+my $max_n        = shift(@ARGV);
 
-my %relation_ids;
+my $relation_ids = Storable::retrieve($relations);
 
-&fill_database($outdir);
 &read_corpus( $outdir, $corpus, $max_n );
-
-sub fill_database {
-    my ($outdir) = @_;
-    my %relations;
-    open( TAB, "<:encoding(utf8)", "$outdir/tabulate_5000.out" ) or die("Cannot open $outdir/tabulate.out: $!");
-    while ( defined( my $match = <TAB> ) ) {
-        print STDERR "$.\n" if ( $. % 1000 == 0 );
-        #last if ( $. == 5000 );
-        chomp($match);
-        my ($indeps) = split( /\t/, $match );
-        my @indeps = split( / /, $indeps );
-        foreach my $indeps (@indeps) {
-            $indeps =~ s/^\|//;
-            $indeps =~ s/\|$//;
-            foreach my $indep ( split( /\|/, $indeps ) ) {
-
-                #print $indep, "\n";
-                if ( $indep =~ m/^(?<relation>[^(]+)\((?<offset>-?\d+)(?:&apos;)*,0(?:&apos;)*/ ) {
-                    $relations{ $+{"relation"} }++;
-                }
-                else {
-                    die("dependency relation does not match: $indep\n");
-                }
-            }
-        }
-    }
-    close(TAB) or die("Cannot close $outdir/tabulate.out: $!");
-    unlink("$outdir/$dbname") if ( -e "$outdir/$dbname" );
-    my $dbh = DBI->connect( "dbi:SQLite:dbname=$outdir/$dbname", "", "" ) or die("Cannot connect: $DBI::errstr");
-    $dbh->do(qq{CREATE TABLE dependencies (id INTEGER PRIMARY KEY AUTOINCREMENT, relation TEXT UNIQUE, frequency INTEGER)});
-    my $insert_dependency = $dbh->prepare(qq{INSERT INTO dependencies (relation, frequency) VALUES (?, ?)});
-    my $get_dependency_id = $dbh->prepare(qq{SELECT id FROM dependencies WHERE relation = ?});
-    $dbh->do(qq{BEGIN TRANSACTION});
-
-    foreach my $key ( sort keys %relations ) {
-        $insert_dependency->execute( $key, $relations{$key} );
-        $get_dependency_id->execute($key);
-        ( $relation_ids{$key} ) = $get_dependency_id->fetchrow_array;
-    }
-    $dbh->do(qq{COMMIT});
-    undef($dbh);
-}
 
 sub read_corpus {
     my ( $outdir, $corpus, $max_n ) = @_;
@@ -82,6 +37,7 @@ sub read_corpus {
     open( TAB, "<:encoding(utf8)", "$outdir/tabulate_5000.out" ) or die("Cannot open $outdir/tabulate.out: $!");
 OUTER: while ( defined( my $match = <TAB> ) ) {
         print STDERR "$.\n" if ( $. % 1000 == 0 );
+
         #last if ( $. == 5000 );
         chomp($match);
         my ( $indeps, $outdeps, $roots, $cposs, $s_id ) = split( /\t/, $match );
@@ -240,79 +196,6 @@ sub enumerate_connected_subgraphs_recursive {
     }
 }
 
-sub powerset_old {
-    my ( $set, $nodes, $max_n ) = @_;
-    my @elements           = $set->elements;
-    my $powerset           = Set::Object->new();
-    my $number_of_elements = scalar(@elements);
-
-    # if (@$nodes > 0 and $max_n - @$nodes == 1) {
-    # 	my $nodes_set = Set::Object->new(@$nodes);
-    # 	foreach my $node (@$nodes) {
-    # 	    my @local_edges;
-    # 	    foreach my $edge ($set->elements) {
-    # 		push(@local_edges, $edge) if(grep($nodes_set->contains($_), @$edge));
-    # 	    }
-    # 	    $powerset->insert((&powerset(Set::Object->new(@local_edges), 0, scalar(@local_edges)))->elements);
-    # 	}
-    # 	return $powerset;
-    # }
-OUTER: for ( my $i = 0; $i < 2**$number_of_elements; $i++ ) {
-        my @binary      = split( //, sprintf( "%0${number_of_elements}b", $i ) );
-        my $subset      = Set::Object->new();
-        my $local_nodes = Set::Object->new(@$nodes);
-        for ( my $j = 0; $j <= $#binary; $j++ ) {
-            if ( $binary[$j] ) {
-                my $edge = $elements[$j];
-                if ( @$nodes > 0 ) {
-                    $local_nodes->insert(@$edge);
-                    next OUTER if ( $local_nodes->size > $max_n );
-                }
-                $subset->insert($edge);
-            }
-        }
-        $powerset->insert($subset);
-    }
-    return $powerset;
-}
-
-sub powerset_of_sets_of_sets {
-    my ( $set_of_sets, $min, $max ) = @_;
-    my $foo = Set::Object->new();
-
-    # $set_of_sets = ((edge, edge, ...), (edge, ...), ...)
-    my $powerset = Set::Object->new();
-    foreach my $set ( $set_of_sets->elements ) {
-
-        # $set = (edge, edge, ...)
-        $foo->insert( &powerset( $set, 1, $set->size ) );
-
-        # $set = ((edge, edge, ...), (edge, ...), ...)
-        # node = ((edge, edge, ...), (edge, ...), ...)
-    }
-    $set_of_sets = $foo;
-
-    # $set_of_sets = (node, node, ...)
-    my $raw_powerset = &powerset( $set_of_sets, $min, $max );
-
-    # $raw_powerset = ((node, node, ...), (node, ...), ...)
-    foreach my $set_of_nodes ( $raw_powerset->elements ) {
-        if ( $set_of_nodes->is_null ) {
-            $powerset->insert( Set::Object->new() );
-            next;
-        }
-
-        # $set_of_nodes = (node, node, ...)
-        my @nodes          = $set_of_nodes->elements;
-        my $local_powerset = shift(@nodes);
-        while (@nodes) {
-            $local_powerset = &cross_set( $local_powerset, shift(@nodes) );
-        }
-        $powerset->insert( $local_powerset->elements );
-    }
-    return $powerset;
-}
-
 sub cross_set {
     my ( $set1, $set2, $max ) = @_;
     my $cross_set = Set::Object->new();
@@ -402,8 +285,4 @@ sub emit {
         }
     }
     printf( "%s\t%d\n", join( " ", map( join( " ", @$_ ), @emit_structure ) ), scalar(@emit_structure) );
-}
-
-sub build_matrix {
-
 }
