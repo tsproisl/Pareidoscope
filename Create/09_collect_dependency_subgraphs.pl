@@ -7,103 +7,109 @@ use warnings;
 use strict;
 
 use Storable;
+use Tie::File;
+use Fcntl qw(:flock);
 
 use Graph::Directed;
 use Set::Object;
 
-die("./09_collect_dependency_subgraphs.pl dependencies.out dependency_relations.dump output_file max_n") unless ( scalar(@ARGV) == 3 );
+die("./09_collect_dependency_subgraphs.pl dependencies.out dependency_relations.dump output_file max_n runtime") unless ( scalar(@ARGV) == 5 );
 my $dependencies = shift(@ARGV);
 my $relations    = shift(@ARGV);
 my $outfile      = shift(@ARGV);
 my $max_n        = shift(@ARGV);
+my $runtime      = shift(@ARGV);
 
+my $t0           = time;
 my $relation_ids = Storable::retrieve($relations);
 
-&read_corpus( $outdir, $corpus, $max_n );
+&read_corpus( $outfile, $dependencies, $max_n );
 
 sub read_corpus {
-    my ( $outdir, $corpus, $max_n ) = @_;
-
-    # my $cqp = new CWB::CQP;
-    # $cqp->set_error_handler('die');    # built-in, useful for one-off scripts
-    # $cqp->exec("set Registry '/localhome/Databases/CWB/registry'");
-    # $cqp->exec($corpus);
-    # $CWB::CL::Registry = '/localhome/Databases/CWB/registry';
-    # my $corpus_handle = new CWB::CL::Corpus $corpus;
-
-    #$cqp->exec("A = <s> [] expand to s");
-    #my ($size) = $cqp->exec("size A");
-    #$cqp->exec("tabulate A match .. matchend indep, match .. matchend outdep, match .. matchend root, match .. matchend, match s_id > \"$outdir/tabulate.out\"");
-    open( TAB, "<:encoding(utf8)", "$outdir/tabulate_5000.out" ) or die("Cannot open $outdir/tabulate.out: $!");
-OUTER: while ( defined( my $match = <TAB> ) ) {
-        print STDERR "$.\n" if ( $. % 1000 == 0 );
-
-        #last if ( $. == 5000 );
-        chomp($match);
-        my ( $indeps, $outdeps, $roots, $cposs, $s_id ) = split( /\t/, $match );
-
-        #next unless ( $s_id eq "4eca801b0572f4e02700021d" );
-        my @indeps  = split( / /, $indeps );
-        my @outdeps = split( / /, $outdeps );
-        my @roots   = split( / /, $roots );
-        my @cposs   = split( / /, $cposs );
-        my $root    = $cposs[0];
-        my $raw_graph = Graph::Directed->new;
-        my $graph     = Graph::Directed->new;
-        my %relations;
-        my ( %raw_to_graph, %graph_to_raw );
-
-        for ( my $i = 0; $i <= $#cposs; $i++ ) {
-            $root = $cposs[$i] if ( $roots[$i] eq "root" );
-            my $indep  = $indeps[$i];
-            my $outdep = $outdeps[$i];
-            my $cpos   = $cposs[$i];
-            $indep  =~ s/^\|//;
-            $outdep =~ s/^\|//;
-            $indep  =~ s/\|$//;
-            $outdep =~ s/\|$//;
-
-            # Skip sentences with nodes that have more than ten edges
-            if ( scalar( () = split( /\|/, $indep, -1 ) ) + scalar( () = split( /\|/, $outdep, -1 ) ) > 10 ) {
-                print STDERR sprintf( "Skipped %s (%d edges)\n", $s_id, scalar( () = split( /\|/, $indep, -1 ) ) + scalar( () = split( /\|/, $outdep, -1 ) ) );
-                next OUTER;
-            }
-            foreach ( split( /\|/, $outdep ) ) {
-                m/^(?<relation>[^(]+)\(0(?:&apos;)*,(?<offset>-?\d+)(?:&apos;)*/;
-                my $offset = $+{"offset"};
-                $offset = "+" . $offset unless ( substr( $offset, 0, 1 ) eq "-" );
-                my $target = eval "$cpos$offset";
-                $relations{$cpos}->{$target} = $+{"relation"};
-                $raw_graph->add_edge( $cpos, $target );
-            }
+    my ( $outfile, $dependencies, $max_n ) = @_;
+    while ( time - $t0 < $runtime ) {
+        my @tab;
+        my @tablines;
+        my $tie_object = tie( @tab, 'Tie::File', $dependencies ) or die("Cannot tie $dependencies: $!");
+        $tie_object->flock(LOCK_EX);
+        my $i = 0;
+        while ( @tab > 0 and $i < 180 ) {
+            push( @tablines, pop(@tab) );
+            $i++;
+	    print "read $i\n";
         }
+        $tie_object->flock(LOCK_UN);
+        untie(@tab);
+    OUTER: while ( @tablines > 0 ) {
+            print STDERR "$.\n" if ( $. % 1000 == 0 );
 
-        # BFS
-        $raw_to_graph{$root} = 0;
-        $graph_to_raw{0} = $root;
-        my @agenda       = ($root);
-        my $seen_nodes   = Set::Object->new();
-        my $node_counter = 1;
-        while (@agenda) {
-            my $node = shift(@agenda);
-            next if ( $seen_nodes->contains($node) );
-            $seen_nodes->insert($node);
-            foreach my $edge ( sort { $relations{$node}->{ $a->[1] } cmp $relations{$node}->{ $b->[1] } or $a->[1] <=> $b->[1] } $raw_graph->edges_from($node) ) {
-                my $target = $edge->[1];
-                unless ( exists $raw_to_graph{$target} ) {
-                    $raw_to_graph{$target}       = $node_counter;
-                    $graph_to_raw{$node_counter} = $target;
-                    push( @agenda, $target );
-                    $node_counter++;
+            #last if ( $. == 5000 );
+            my $match = shift(@tablines);
+            chomp($match);
+            my ( $indeps, $outdeps, $roots, $cposs, $s_id ) = split( /\t/, $match );
+
+            #next unless ( $s_id eq "4eca801b0572f4e02700021d" );
+            my @indeps  = split( / /, $indeps );
+            my @outdeps = split( / /, $outdeps );
+            my @roots   = split( / /, $roots );
+            my @cposs   = split( / /, $cposs );
+            my $root    = $cposs[0];
+            my $raw_graph = Graph::Directed->new;
+            my $graph     = Graph::Directed->new;
+            my %relations;
+            my ( %raw_to_graph, %graph_to_raw );
+
+            for ( my $i = 0; $i <= $#cposs; $i++ ) {
+                $root = $cposs[$i] if ( $roots[$i] eq "root" );
+                my $indep  = $indeps[$i];
+                my $outdep = $outdeps[$i];
+                my $cpos   = $cposs[$i];
+                $indep  =~ s/^\|//;
+                $outdep =~ s/^\|//;
+                $indep  =~ s/\|$//;
+                $outdep =~ s/\|$//;
+
+                # Skip sentences with nodes that have more than ten edges
+                if ( scalar( () = split( /\|/, $indep, -1 ) ) + scalar( () = split( /\|/, $outdep, -1 ) ) > 10 ) {
+                    print STDERR sprintf( "Skipped %s (%d edges)\n", $s_id, scalar( () = split( /\|/, $indep, -1 ) ) + scalar( () = split( /\|/, $outdep, -1 ) ) );
+                    next OUTER;
                 }
-                $graph->add_edge( $raw_to_graph{$node}, $raw_to_graph{$target} );
+                foreach ( split( /\|/, $outdep ) ) {
+                    m/^(?<relation>[^(]+)\(0(?:&apos;)*,(?<offset>-?\d+)(?:&apos;)*/;
+                    my $offset = $+{"offset"};
+                    $offset = "+" . $offset unless ( substr( $offset, 0, 1 ) eq "-" );
+                    my $target = eval "$cpos$offset";
+                    $relations{$cpos}->{$target} = $+{"relation"};
+                    $raw_graph->add_edge( $cpos, $target );
+                }
             }
-        }
 
-        # get all connected subgraphs
-        &enumerate_connected_subgraphs( $graph, $max_n, \%graph_to_raw, \%relations );
+            # BFS
+            $raw_to_graph{$root} = 0;
+            $graph_to_raw{0} = $root;
+            my @agenda       = ($root);
+            my $seen_nodes   = Set::Object->new();
+            my $node_counter = 1;
+            while (@agenda) {
+                my $node = shift(@agenda);
+                next if ( $seen_nodes->contains($node) );
+                $seen_nodes->insert($node);
+                foreach my $edge ( sort { $relations{$node}->{ $a->[1] } cmp $relations{$node}->{ $b->[1] } or $a->[1] <=> $b->[1] } $raw_graph->edges_from($node) ) {
+                    my $target = $edge->[1];
+                    unless ( exists $raw_to_graph{$target} ) {
+                        $raw_to_graph{$target}       = $node_counter;
+                        $graph_to_raw{$node_counter} = $target;
+                        push( @agenda, $target );
+                        $node_counter++;
+                    }
+                    $graph->add_edge( $raw_to_graph{$node}, $raw_to_graph{$target} );
+                }
+            }
+
+            # get all connected subgraphs
+            &enumerate_connected_subgraphs( $graph, $max_n, \%graph_to_raw, \%relations );
+        }
     }
-    close(TAB) or die("Cannot close $outdir/tabulate.out: $!");
 }
 
 # https://mpi-inf.mpg.de/departments/d5/teaching/ss09/queryoptimization/lecture8.pdf
@@ -276,7 +282,7 @@ sub emit {
         for ( my $j = 0; $j <= $#sorted_nodes; $j++ ) {
             my $node_2 = $sorted_nodes[$j];
             if ( $edges{$node_1}->{$node_2} ) {
-                $emit_structure[$i]->[$j] = $relation_ids{ $edges{$node_1}->{$node_2} };
+                $emit_structure[$i]->[$j] = $relation_ids->{ $edges{$node_1}->{$node_2} };
                 die( "Self-loop: " . join( ", ", @list_representation ) ) if ( $i == $j );
             }
             else {
