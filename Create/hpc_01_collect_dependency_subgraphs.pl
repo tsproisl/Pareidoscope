@@ -1,115 +1,102 @@
 #!/usr/bin/perl
 
 # this is time-consuming! preferebly use hpc facilities
-#
+# output: dependency subgraphs
 
 use warnings;
 use strict;
 
 use Storable;
-use Tie::File;
-use Fcntl qw(:flock);
 
 use Graph::Directed;
 use Set::Object;
 
-die("./09_collect_dependency_subgraphs.pl dependencies.out dependency_relations.dump output_file max_n runtime") unless ( scalar(@ARGV) == 5 );
+die("./09_collect_dependency_subgraphs.pl dependencies.out dependency_relations.dump output_file max_n") unless ( scalar(@ARGV) == 4 );
 my $dependencies = shift(@ARGV);
 my $relations    = shift(@ARGV);
 my $outfile      = shift(@ARGV);
 my $max_n        = shift(@ARGV);
-my $runtime      = shift(@ARGV);
 
 my $t0           = time;
 my $relation_ids = Storable::retrieve($relations);
 
+open( OUT, ">:encoding(utf8)", $outfile ) or die("Cannot open $outfile: $!");
 &read_corpus( $outfile, $dependencies, $max_n );
+close(OUT) or die("Cannot close $outfile: $!");
 
 sub read_corpus {
     my ( $outfile, $dependencies, $max_n ) = @_;
-    while ( time - $t0 < $runtime ) {
-        my @tab;
-        my @tablines;
-        my $tie_object = tie( @tab, 'Tie::File', $dependencies ) or die("Cannot tie $dependencies: $!");
-        $tie_object->flock(LOCK_EX);
-        my $i = 0;
-        while ( @tab > 0 and $i < 180 ) {
-            push( @tablines, pop(@tab) );
-            $i++;
-	    print "read $i\n";
-        }
-        $tie_object->flock(LOCK_UN);
-        untie(@tab);
-    OUTER: while ( @tablines > 0 ) {
-            print STDERR "$.\n" if ( $. % 1000 == 0 );
+    open( TAB, "<:encoding(utf8)", $dependencies ) or die("Cannot open $dependencies: $!");
+OUTER: while ( my $match = <TAB> ) {
 
-            #last if ( $. == 5000 );
-            my $match = shift(@tablines);
-            chomp($match);
-            my ( $indeps, $outdeps, $roots, $cposs, $s_id ) = split( /\t/, $match );
+        #print STDERR "$.\n" if ( $. % 1000 == 0 );
+        #last if ( $. == 5000 );
+        #my $match = shift(@tablines);
+        chomp($match);
+        my ( $indeps, $outdeps, $roots, $cposs, $s_id ) = split( /\t/, $match );
 
-            #next unless ( $s_id eq "4eca801b0572f4e02700021d" );
-            my @indeps  = split( / /, $indeps );
-            my @outdeps = split( / /, $outdeps );
-            my @roots   = split( / /, $roots );
-            my @cposs   = split( / /, $cposs );
-            my $root    = $cposs[0];
-            my $raw_graph = Graph::Directed->new;
-            my $graph     = Graph::Directed->new;
-            my %relations;
-            my ( %raw_to_graph, %graph_to_raw );
+        #next unless ( $s_id eq "4eca801b0572f4e02700021d" );
+        my @indeps  = split( / /, $indeps );
+        my @outdeps = split( / /, $outdeps );
+        my @roots   = split( / /, $roots );
+        my @cposs   = split( / /, $cposs );
+        my $root    = $cposs[0];
+        my $raw_graph = Graph::Directed->new;
+        my $graph     = Graph::Directed->new;
+        my %relations;
+        my ( %raw_to_graph, %graph_to_raw );
 
-            for ( my $i = 0; $i <= $#cposs; $i++ ) {
-                $root = $cposs[$i] if ( $roots[$i] eq "root" );
-                my $indep  = $indeps[$i];
-                my $outdep = $outdeps[$i];
-                my $cpos   = $cposs[$i];
-                $indep  =~ s/^\|//;
-                $outdep =~ s/^\|//;
-                $indep  =~ s/\|$//;
-                $outdep =~ s/\|$//;
+        for ( my $i = 0; $i <= $#cposs; $i++ ) {
+            $root = $cposs[$i] if ( $roots[$i] eq "root" );
+            my $indep  = $indeps[$i];
+            my $outdep = $outdeps[$i];
+            my $cpos   = $cposs[$i];
+            $indep  =~ s/^\|//;
+            $outdep =~ s/^\|//;
+            $indep  =~ s/\|$//;
+            $outdep =~ s/\|$//;
 
-                # Skip sentences with nodes that have more than ten edges
-                if ( scalar( () = split( /\|/, $indep, -1 ) ) + scalar( () = split( /\|/, $outdep, -1 ) ) > 10 ) {
-                    print STDERR sprintf( "Skipped %s (%d edges)\n", $s_id, scalar( () = split( /\|/, $indep, -1 ) ) + scalar( () = split( /\|/, $outdep, -1 ) ) );
-                    next OUTER;
-                }
-                foreach ( split( /\|/, $outdep ) ) {
-                    m/^(?<relation>[^(]+)\(0(?:&apos;)*,(?<offset>-?\d+)(?:&apos;)*/;
-                    my $offset = $+{"offset"};
-                    $offset = "+" . $offset unless ( substr( $offset, 0, 1 ) eq "-" );
-                    my $target = eval "$cpos$offset";
-                    $relations{$cpos}->{$target} = $+{"relation"};
-                    $raw_graph->add_edge( $cpos, $target );
-                }
+            # Skip sentences with nodes that have more than ten edges
+            if ( scalar( () = split( /\|/, $indep, -1 ) ) + scalar( () = split( /\|/, $outdep, -1 ) ) > 10 ) {
+                print STDERR sprintf( "Skipped %s (%d edges)\n", $s_id, scalar( () = split( /\|/, $indep, -1 ) ) + scalar( () = split( /\|/, $outdep, -1 ) ) );
+                next OUTER;
             }
-
-            # BFS
-            $raw_to_graph{$root} = 0;
-            $graph_to_raw{0} = $root;
-            my @agenda       = ($root);
-            my $seen_nodes   = Set::Object->new();
-            my $node_counter = 1;
-            while (@agenda) {
-                my $node = shift(@agenda);
-                next if ( $seen_nodes->contains($node) );
-                $seen_nodes->insert($node);
-                foreach my $edge ( sort { $relations{$node}->{ $a->[1] } cmp $relations{$node}->{ $b->[1] } or $a->[1] <=> $b->[1] } $raw_graph->edges_from($node) ) {
-                    my $target = $edge->[1];
-                    unless ( exists $raw_to_graph{$target} ) {
-                        $raw_to_graph{$target}       = $node_counter;
-                        $graph_to_raw{$node_counter} = $target;
-                        push( @agenda, $target );
-                        $node_counter++;
-                    }
-                    $graph->add_edge( $raw_to_graph{$node}, $raw_to_graph{$target} );
-                }
+            foreach ( split( /\|/, $outdep ) ) {
+                m/^(?<relation>[^(]+)\(0(?:&apos;)*,(?<offset>-?\d+)(?:&apos;)*/;
+                my $offset = $+{"offset"};
+                $offset = "+" . $offset unless ( substr( $offset, 0, 1 ) eq "-" );
+                my $target = eval "$cpos$offset";
+                $relations{$cpos}->{$target} = $+{"relation"};
+                $raw_graph->add_edge( $cpos, $target );
             }
-
-            # get all connected subgraphs
-            &enumerate_connected_subgraphs( $graph, $max_n, \%graph_to_raw, \%relations );
         }
+
+        # BFS
+        $raw_to_graph{$root} = 0;
+        $graph_to_raw{0} = $root;
+        my @agenda       = ($root);
+        my $seen_nodes   = Set::Object->new();
+        my $node_counter = 1;
+        while (@agenda) {
+            my $node = shift(@agenda);
+            next if ( $seen_nodes->contains($node) );
+            $seen_nodes->insert($node);
+            foreach my $edge ( sort { $relations{$node}->{ $a->[1] } cmp $relations{$node}->{ $b->[1] } or $a->[1] <=> $b->[1] } $raw_graph->edges_from($node) ) {
+                my $target = $edge->[1];
+                unless ( exists $raw_to_graph{$target} ) {
+                    $raw_to_graph{$target}       = $node_counter;
+                    $graph_to_raw{$node_counter} = $target;
+                    push( @agenda, $target );
+                    $node_counter++;
+                }
+                $graph->add_edge( $raw_to_graph{$node}, $raw_to_graph{$target} );
+            }
+        }
+
+        # get all connected subgraphs
+        &enumerate_connected_subgraphs( $graph, $max_n, \%graph_to_raw, \%relations );
     }
+    close(TAB) or die("Cannot close $dependencies: $!");
 }
 
 # https://mpi-inf.mpg.de/departments/d5/teaching/ss09/queryoptimization/lecture8.pdf
@@ -290,5 +277,5 @@ sub emit {
             }
         }
     }
-    printf( "%s\t%d\n", join( " ", map( join( " ", @$_ ), @emit_structure ) ), scalar(@emit_structure) );
+    printf OUT ( "%s\t%d\n", join( " ", map( join( " ", @$_ ), @emit_structure ) ), scalar(@emit_structure) );
 }
