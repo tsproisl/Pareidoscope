@@ -8,16 +8,17 @@ use strict;
 
 use Storable;
 
+use lib "/home/hpc/slli/slli02/local/lib/perl5/site_perl/5.8.8";
 use Graph::Directed;
+use lib "/home/hpc/slli/slli02/local/lib/perl5/site_perl/5.8.8/x86_64-linux-thread-multi";
 use Set::Object;
 
-die("./09_collect_dependency_subgraphs.pl dependencies.out dependency_relations.dump output_file max_n") unless ( scalar(@ARGV) == 4 );
+die("./hpc_01_collect_dependency_subgraphs.pl dependencies.out dependency_relations.dump output_file max_n") unless ( scalar(@ARGV) == 4 );
 my $dependencies = shift(@ARGV);
 my $relations    = shift(@ARGV);
 my $outfile      = shift(@ARGV);
 my $max_n        = shift(@ARGV);
 
-my $t0           = time;
 my $relation_ids = Storable::retrieve($relations);
 
 open( OUT, ">:encoding(utf8)", $outfile ) or die("Cannot open $outfile: $!");
