@@ -38,7 +38,7 @@ sub fill_database {
     open( TAB, "<:encoding(utf8)", "$outdir/dependencies.out" ) or die("Cannot open $outdir/dependencies.out: $!");
 
     while ( defined( my $match = <TAB> ) ) {
-        print STDERR "$.\n" if ( $. % 1000 == 0 );
+        print STDERR "$.\n" if ( $. % 10000 == 0 );
         chomp($match);
         my ($indeps) = split( /\t/, $match );
         my @indeps = split( / /, $indeps );
