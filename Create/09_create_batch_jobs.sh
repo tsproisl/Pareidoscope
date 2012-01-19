@@ -2,25 +2,27 @@
 
 if [ $# -ne 3 ]
 then
-    echo "./09_create_batch_jobs.sh dependencies.out dependency_relations.dump max_n"
+    echo "./09_create_batch_jobs.sh outdir dependencies.out dependency_relations.dump max_n"
     exit -1
 fi
 
-dependencies=$1
-relations=$2
-max_n=$3
+outdir=$1
+dependencies=$2
+relations=$3
+max_n=$4
 
 relations_basename=$(basename $relations)
 
-cp $relations batch/$relations_basename
+mkdir $outdir/batch
+cp $relations $outdir/batch/$relations_basename
 
 # split dependencies.out into smaller files of 25,000 lines
-split -a 3 -d -l 25000 $dependencies batch/dependencies
+split -a 3 -d -l 25000 $dependencies $outdir/batch/dependencies
 
 i=0
 infiles=""
 nr=0
-cd batch
+cd $outdir/batch
 for infile in dependencies*
 do
     i=$((i+1))
