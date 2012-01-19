@@ -2,13 +2,13 @@
 
 if [ $# -ne 3 ]
 then
-    echo "./09_create_batch_jobs.sh outdir dependencies.out dependency_relations.dump max_n"
+    echo "./09_create_batch_jobs.sh outdir max_n"
     exit -1
 fi
 
 outdir=$1
-dependencies=$2
-relations=$3
+dependencies=$outdir/dependencies.out
+relations=$outdir/dependency_relations.dump
 max_n=$4
 
 relations_basename=$(basename $relations)
