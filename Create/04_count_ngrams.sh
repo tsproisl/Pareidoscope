@@ -14,12 +14,20 @@ then
     exit -1;
 fi
 
+# http://www.admon.org/about-cpu-the-logical-and-physical-cores/
+# CPU packages (may contain one or more processor cores)
+packages=$(grep "^physical id" /proc/cpuinfo | sort | uniq | wc -l)
+# cores for each CPU
+cores_per_cpu=$(grep -m1 "cpu cores" /proc/cpuinfo | cut -d' ' -f3)
+cores=$(( $packages * $cores_per_cpu ))
+
 printf "[%s] %s\n" $(date "+%T") "Sort $filepath"
-sort -S 50% -T $dir -t ' ' -n -k1,1 -k2,2 -k3,3 -k4,4 -k5,5 -k6,6 -k7,7 -k8,8 -k9,9 $filepath | uniq -c > $filepath.uniqa
+sort -S 50% --parallel=$core -T $dir -t ' ' -n -k1,1 -k2,2 -k3,3 -k4,4 -k5,5 -k6,6 -k7,7 -k8,8 -k9,9 $filepath | uniq -c > $filepath.uniq
 
 printf "[%s] %s\n" $(date "+%T") "Make frequency the last column"
-cat $filepath.uniqa | perl -ne 'chomp;m/^\s*(\d+)\s+(.+)$/;print "$2\t$1\n";' > $filepath.uniq
-rm $filepath.uniqa
+perl -i -pe 's/^\s*(\d+)\s+(.+)$/$2\t$1/' $filepath.uniq
+#cat $filepath.uniqa | perl -ne 'chomp;m/^\s*(\d+)\s+(.+)$/;print "$2\t$1\n";' > $filepath.uniq
+#rm $filepath.uniqa
 
 printf "[%s] %s\n" $(date "+%T") "Determine N"
 n=$(awk '{ SUM += ($2*$3)} END { print SUM }' $filepath.uniq)

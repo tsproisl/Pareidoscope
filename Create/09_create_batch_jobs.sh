@@ -69,7 +69,8 @@ wait
 
 for (( i=1 ; i <= $max_n ; i++ ))
 do
-    grep "\\t\$i\$" subgraphs_${jobnr}_*.txt > \$FASTTMP/subgraphs_${jobnr}_\$i.txt &
+    # this is a tabulator:
+    grep "	\$i\$" subgraphs_${jobnr}_*.txt > \$FASTTMP/subgraphs_${jobnr}_\$i.txt &
 done
 
 wait

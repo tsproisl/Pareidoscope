@@ -8,5 +8,5 @@ ls | egrep '^[[:digit:]]+$' | xargs rm -f
 rm -f cache.db
 rm -f cache/data/*
 rm -f cache/index/*
-/localhome/Diss/trunk/Resources/Pareidoscope/Create/10_create_cache_db.sh $www cache.db
+/localhome/Diss/trunk/Resources/Pareidoscope/Create/11_create_cache_db.sh $www cache.db
 chmod 666 cache.db
