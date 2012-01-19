@@ -7,9 +7,10 @@ then
 fi
 
 outdir=$1
+max_n=$2
+
 dependencies=$outdir/dependencies.out
 relations=$outdir/dependency_relations.dump
-max_n=$4
 
 relations_basename=$(basename $relations)
 
@@ -54,13 +55,13 @@ do
 # first non-empty non-comment line ends PBS options
 
 files=($infiles)
-cd \$HOME/dependencies_batch
+cd \$HOME/Pareidoscope/dependencies_batch
 cp $relations_basename $infiles \$TMPDIR
 cd \$TMPDIR
 
 for (( i=0 ; i < \${#files[@]} ; i++ ))
 do
-    perl hpc_01_collect_dependency_subgraphs.pl \${files[\$i]} $relations_basename subgraphs_${jobnr}_\$i.txt $max_n &
+    perl \$HOME/Pareidoscope/hpc_01_collect_dependency_subgraphs.pl \${files[\$i]} $relations_basename subgraphs_${jobnr}_\$i.txt $max_n &
 done
 
 # Don't execute the next command until subshells finish.

@@ -63,11 +63,14 @@ OUTER: while ( my $match = <TAB> ) {
                 next OUTER;
             }
             foreach ( split( /\|/, $outdep ) ) {
-                m/^(?<relation>[^(]+)\(0(?:&apos;)*,(?<offset>-?\d+)(?:&apos;)*/;
-                my $offset = $+{"offset"};
+                #m/^(?<relation>[^(]+)\(0(?:&apos;)*,(?<offset>-?\d+)(?:&apos;)*/;
+                m/^([^(]+)\(0(?:&apos;)*,(-?\d+)(?:&apos;)*/;
+                #my $offset = $+{"offset"};
+		my $offset = $2;
                 $offset = "+" . $offset unless ( substr( $offset, 0, 1 ) eq "-" );
                 my $target = eval "$cpos$offset";
-                $relations{$cpos}->{$target} = $+{"relation"};
+                #$relations{$cpos}->{$target} = $+{"relation"};
+                $relations{$cpos}->{$target} = $1;
                 $raw_graph->add_edge( $cpos, $target );
             }
         }
