@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [ $# -ne 3 ]
+if [ $# -ne 2 ]
 then
     echo "./09_create_batch_jobs.sh outdir max_n"
     exit -1
