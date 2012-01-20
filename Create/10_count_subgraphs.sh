@@ -18,16 +18,16 @@ cores=$(( $packages * $cores_per_cpu ))
 
 cd $outdir
 
-for (( n=0 ; n<=$max_n ; n++))
+for (( n=1 ; n<=$max_n ; n++))
 do
     keys=""
     n_square=$(( $n ** 2 ))
-    for (( i=0 ; i<=$n_square ; i++))
+    for (( i=1 ; i<=$n_square ; i++))
     do
 	keys="$keys -k$i,$i"
     done
     printf "[%s] %s\n" $(date "+%T") "Sort subgraphs_*_$n"
-    sort -S 50% --parallel=$cores -T $outdir $keys subgraphs_*_$n.txt | uniq -c > subgraphs_$n.uniq
+    sort -S 50% --parallel=$cores -T $outdir -m $keys subgraphs_*_$n.txt | uniq -c > subgraphs_$n.uniq
     printf "[%s] %s\n" $(date "+%T") "Make frequency the last column"
     perl -i -pe 's/^\s*(\d+)\s+(.+)$/$2\t$1/' subgraphs_$n.uniq
     rm subgraphs_*_$n.txt
@@ -35,8 +35,8 @@ done
 
 printf "[%s] %s\n" $(date "+%T") "Determine N"
 n=0
-for (( n=0 ; n<=$max_n ; n++))
+for (( i=1 ; i<=$max_n ; i++))
 do
-    n=$(( $n + $(awk '{ SUM += ($2*$3)} END { print SUM }' subgraphs_$n.uniq) ))
+    n=$(( $n + $(awk '{ SUM += ($2*$3)} END { print SUM }' subgraphs_$i.uniq) ))
 done
 printf "[%s] %s\n" $(date "+%T") "N = $n"

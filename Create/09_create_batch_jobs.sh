@@ -42,9 +42,9 @@ do
 	cat > subgraphjob_$jobnr.sh <<EOF
 #!/bin/bash -l
 #
-# allocate 1 node (4 CPUs) for 3 hours
+# allocate 1 node (4 CPUs) for 4 hours
 # sufficient for 100,000 sentences
-#PBS -l nodes=1:ppn=4,walltime=03:00:00
+#PBS -l nodes=1:ppn=4,walltime=04:00:00
 #
 # job name 
 #PBS -N subgraphjob_$jobnr
@@ -69,8 +69,17 @@ wait
 
 for (( i=1 ; i <= $max_n ; i++ ))
 do
+    keys=""
+    i_square=\$(( \$i ** 2 ))
+    for (( j=1 ; j<=\$i_square ; j++))
+    do
+	keys="\$keys -k\$j,\$j"
+    done
+    percentage=\$(( 50 / $max_n ))
     # this is a tabulator:
-    grep "	\$i\$" subgraphs_${jobnr}_*.txt > \$FASTTMP/subgraphs_${jobnr}_\$i.txt &
+    #grep "	\$i\$" subgraphs_${jobnr}_*.txt > \$FASTTMP/subgraphs_${jobnr}_\$i.txt &
+    grep "	\$i\$" subgraphs_${jobnr}_*.txt | sort -S \${percentage}% -T \$TMPDIR \$keys | gzip > \$FASTTMP/subgraphs_${jobnr}_\$i.txt.gz &
+
 done
 
 wait
