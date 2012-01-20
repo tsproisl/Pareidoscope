@@ -16,7 +16,7 @@ use common_functions;
 
 # record: (c5){9} length frequency
 
-die("./09_compile_ngrams_and_create_index.pl outdir") unless ( scalar(@ARGV) == 2 );
+die("./07_compile_ngrams_and_create_index.pl outdir file") unless ( scalar(@ARGV) == 2 );
 my $dir  = shift(@ARGV);
 my $file = shift(@ARGV);
 die("Not a directory: $dir") unless ( -d $dir );
