@@ -32,3 +32,11 @@ do
     perl -i -pe 's/^\s*(\d+)\s+(.+)$/$2\t$1/' subgraphs_$n.uniq
     rm subgraphs_*_$n.txt
 done
+
+printf "[%s] %s\n" $(date "+%T") "Determine N"
+n=0
+for (( n=0 ; n<=$max_n ; n++))
+do
+    n=$(( $n + $(awk '{ SUM += ($2*$3)} END { print SUM }' subgraphs_$n.uniq) ))
+done
+printf "[%s] %s\n" $(date "+%T") "N = $n"
