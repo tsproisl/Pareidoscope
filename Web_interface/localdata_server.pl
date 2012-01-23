@@ -19,6 +19,7 @@ sub init {
     my $class = ref($invocant) || $invocant;
     my @ngds;
     my @ngramidxs;
+    # Subgraphs: $ngds[($i ** 2) * 2]
     for my $i ( 1 .. 9 ) {
         open( $ngds[$i], "<:raw", "$dir/$file" . sprintf( "%02d", $i ) . ".dat" ) or die( "Cannot open file '$dir/$file" . sprintf( "%02d", $i ) . ".dat': $!" );
         $ngramidxs[$i] = Storable::retrieve( "$dir/$file" . sprintf( "%02d", $i ) . ".idx" );
@@ -72,6 +73,7 @@ sub get_ngram_freq {
         $success    = $self->{"ngramidxs"}->[$length]->[ ( $middle * 2 ) + 1 ];
         $recordsize = $self->{"ngramidxs"}->[$length]->[ ( ( $middle + 1 ) * 2 ) + 1 ] - $success;
     }
+    # Subgraphs: S*
     die( "N-gram not found: " . join( " ", unpack( "C*", $ngram ) ) . "\n" ) if ( $success < 0 );
     my $record;
     flock( $self->{"NGDs"}->[$length], LOCK_EX );
@@ -81,6 +83,7 @@ sub get_ngram_freq {
     $self->{"records"}->[$length] = $record;
     ( $self->{"firstrecords"}->[$length] ) = substr( $self->{"records"}->[$length], 0, $length );
     ( $self->{"lastrecords"}->[$length] ) = substr( $self->{"records"}->[$length], -( $length + 4 ), $length );
+    # Subgraphs: S*
     die( "Error while processing n-grams: " . join( " ", grep( $_ > 0, unpack( "C*", $self->{"firstrecords"}->[$length] ) ) ) . " > " . join( " ", grep( $_ > 0, unpack( "C*", $ngram ) ) ) ) unless ( $self->{"firstrecords"}->[$length] le $ngram );
     die( "Error while processing n-grams: " . join( " ", grep( $_ > 0, unpack( "C*", $self->{"lastrecords"}->[$length] ) ) ) . " < " . join( " ", grep( $_ > 0, unpack( "C*", $ngram ) ) ) ) unless ( $self->{"lastrecords"}->[$length] ge $ngram );
     return $self->scan_cached_records($ngram);

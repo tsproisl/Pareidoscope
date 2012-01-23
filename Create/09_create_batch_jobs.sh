@@ -77,8 +77,8 @@ do
     done
     percentage=\$(( 50 / $max_n ))
     # this is a tabulator:
-    #grep "	\$i\$" subgraphs_${jobnr}_*.txt > \$FASTTMP/subgraphs_${jobnr}_\$i.txt &
-    grep "	\$i\$" subgraphs_${jobnr}_*.txt | sort -S \${percentage}% -T \$TMPDIR \$keys | gzip > \$FASTTMP/subgraphs_${jobnr}_\$i.txt.gz &
+    #grep -h "	\$i\$" subgraphs_${jobnr}_*.txt > \$FASTTMP/subgraphs_${jobnr}_\$i.txt &
+    grep -h "	\$i\$" subgraphs_${jobnr}_*.txt | sort -S \${percentage}% -T \$TMPDIR \$keys | gzip > \$FASTTMP/subgraphs_${jobnr}_\$i.txt.gz &
 
 done
 

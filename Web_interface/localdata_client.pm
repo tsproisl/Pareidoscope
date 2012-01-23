@@ -133,6 +133,7 @@ sub add_freq_and_am {
 		my $position = $record->[1];
 		my $match_length = $record->[2];
 		#$marked_ngram =~ s/^((?:[0-9a-f]{2}){$position})((?:[0-9a-f]{2}){$match_length})((?:[0-9a-f]{2})*)$/${1}<${2}>${3}/;
+		# Subgraphs: {4}
 		$marked_ngram =~ m/^((?:[0-9a-f]{2}){$position})((?:[0-9a-f]{2}){$match_length})((?:[0-9a-f]{2})*)$/;
 		my ($pre, $match, $post) = ($1, $2, $3);
 		$marked_ngram = $pre . "<" . $match . ">". $post;
