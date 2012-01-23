@@ -30,7 +30,7 @@ do
     sort -S 50% --parallel=$cores -T $outdir -m $keys subgraphs_*_$n.txt | uniq -c > subgraphs_$n.uniq
     printf "[%s] %s\n" $(date "+%T") "Make frequency the last column"
     perl -i -pe 's/^\s*(\d+)\s+(.+)$/$2\t$1/' subgraphs_$n.uniq
-    rm subgraphs_*_$n.txt
+    #rm subgraphs_*_$n.txt
 done
 
 printf "[%s] %s\n" $(date "+%T") "Determine N"
