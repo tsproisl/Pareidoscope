@@ -44,7 +44,7 @@ do
 #
 # allocate 1 node (4 CPUs) for 4 hours
 # sufficient for 100,000 sentences
-#PBS -l nodes=1:ppn=4,walltime=04:00:00
+#PBS -l nodes=1:ppn=4,walltime=23:50:00
 #
 # job name 
 #PBS -N subgraphjob_$jobnr
@@ -78,7 +78,7 @@ do
     percentage=\$(( 50 / $max_n ))
     # this is a tabulator:
     #grep -h "	\$i\$" subgraphs_${jobnr}_*.txt > \$FASTTMP/subgraphs_${jobnr}_\$i.txt &
-    grep -h "	\$i\$" subgraphs_${jobnr}_*.txt | sort -S \${percentage}% -T \$TMPDIR \$keys | gzip > \$FASTTMP/subgraphs_${jobnr}_\$i.txt.gz &
+    grep -h "	\$i\$" subgraphs_${jobnr}_*.txt | sort -S \${percentage}% -T \$TMPDIR -n \$keys | gzip > \$FASTTMP/subgraphs_${jobnr}_\$i.txt.gz &
 
 done
 

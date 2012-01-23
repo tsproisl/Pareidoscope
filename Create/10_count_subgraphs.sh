@@ -27,7 +27,7 @@ do
 	keys="$keys -k$i,$i"
     done
     printf "[%s] %s\n" $(date "+%T") "Sort subgraphs_*_$n"
-    sort -S 50% --parallel=$cores -T $outdir -m $keys subgraphs_*_$n.txt | uniq -c > subgraphs_$n.uniq
+    sort -S 50% --parallel=$cores -T $outdir -m -n $keys subgraphs_*_$n.txt | uniq -c > subgraphs_$n.uniq
     printf "[%s] %s\n" $(date "+%T") "Make frequency the last column"
     perl -i -pe 's/^\s*(\d+)\s+(.+)$/$2\t$1/' subgraphs_$n.uniq
     #rm subgraphs_*_$n.txt
