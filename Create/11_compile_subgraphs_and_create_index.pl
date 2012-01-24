@@ -22,6 +22,7 @@ die("Not a directory: $dir") unless ( -d $dir );
 &common_functions::log( "Compile subgraph index", 1, 1 );
 
 for my $i ( 1 .. $max_n ) {
+    &common_functions::log( "    ... $i nodes", 1, 1 );
     open( IN, "<", "$dir/subgraphs_$i.uniq" ) or die("Cannot open file: $!");
     open( OUT, ">", "$dir/subgraphs" . sprintf( "%02d", $i ) . ".dat" ) or die("Cannot open file: $!");
     my $counter = 0;
@@ -31,7 +32,7 @@ for my $i ( 1 .. $max_n ) {
         chomp($line);
         my @fields = split( /\t/,  $line );
         my @matrix = split( /\s+/, $fields[0] );
-        die("There should be no tags with code > 65535: $line\n") if ( grep( $_ > 65535, @tags ) );
+        die("There should be no tags with code > 65535: $line\n") if ( grep( $_ > 65535, @matrix ) );
         my $matrix = pack( "S*", @matrix );
         my $freq   = pack( "L",  $fields[2] );
         if ( $counter % 512 == 0 ) {

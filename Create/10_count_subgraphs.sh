@@ -39,4 +39,12 @@ for (( i=1 ; i<=$max_n ; i++))
 do
     n=$(( $n + $(awk '{ SUM += ($2*$3)} END { print SUM }' subgraphs_$i.uniq) ))
 done
-printf "[%s] %s\n" $(date "+%T") "N = $n"
+printf "[%s] %s\n" $(date "+%T") "Subgraph N = $n"
+printf "[%s] %s\n" $(date "+%T") "Subgraph N = $n" >> logfile.txt
+
+printf "[%s] %s\n" $(date "+%T") "Remove hapax patterns"
+for (( i=1 ; i<=$max_n ; i++))
+do
+    egrep -v '\t1\t' subgraphs_$n.uniq > subgraphs_$n.uniq.filtered
+done
+printf "[%s] %s\n" $(date "+%T") "Finished"

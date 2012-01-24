@@ -9,6 +9,8 @@ use strict;
 use Storable;
 use DBI;
 
+use common_functions;
+
 #use lib "/home/linguistik/tsproisl/local/lib/perl5/site_perl";
 use CWB::CQP;
 use CWB::CL;
@@ -21,7 +23,11 @@ die("Not a directory: $outdir") unless ( -d $outdir );
 
 my %relation_ids;
 
+&common_functions::log( "Tabulate dependencies and collect dependency relations", 1, 1 );
+
 &fill_database($outdir);
+
+&common_functions::log( "Finished", 1, 1 );
 
 sub fill_database {
     my ($outdir) = @_;
@@ -38,7 +44,6 @@ sub fill_database {
     open( TAB, "<:encoding(utf8)", "$outdir/dependencies.out" ) or die("Cannot open $outdir/dependencies.out: $!");
 
     while ( defined( my $match = <TAB> ) ) {
-        print STDERR "$.\n" if ( $. % 10000 == 0 );
         chomp($match);
         my ($indeps) = split( /\t/, $match );
         my @indeps = split( / /, $indeps );
@@ -56,7 +61,6 @@ sub fill_database {
         }
     }
     close(TAB) or die("Cannot close $outdir/dependencies.out: $!");
-    unlink("$outdir/$dbname") if ( -e "$outdir/$dbname" );
     my $dbh = DBI->connect( "dbi:SQLite:dbname=$outdir/$dbname", "", "" ) or die("Cannot connect: $DBI::errstr");
     $dbh->do(qq{DROP TABLE IF EXISTS dependencies});
     $dbh->do(qq{CREATE TABLE dependencies (depid INTEGER PRIMARY KEY AUTOINCREMENT, relation TEXT UNIQUE, frequency INTEGER)});

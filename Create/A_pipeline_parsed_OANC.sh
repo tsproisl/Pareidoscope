@@ -21,7 +21,7 @@ export PERL5LIB="/home/linguistik/tsproisl/local/lib/perl5/site_perl:/home/lingu
 #./04_count_ngrams.sh $outdir "chunks" && \
 #./07_compile_ngrams_and_create_index.pl $outdir "ngrams" && \
 #./07_compile_ngrams_and_create_index.pl $outdir "chunks" #&& \
-#./08_tabulate_dependencies.pl $outdir $corpusname $dbname && \
+./08_tabulate_dependencies.pl $outdir $corpusname $dbname && \
 ./09_create_batch_jobs.sh $outdir $max_n
 
 printf "[%s] %s\n" $(date "+%T") "Now we need to use the cluster!"
