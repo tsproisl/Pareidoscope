@@ -26,7 +26,7 @@ my @dats;
 for my $i ( 1 .. 9 ) {
     open( $dats[$i], ">", "$dir/$file" . sprintf( "%02d", $i ) . ".dat" ) or die("Cannot open file: $!");
 }
-open( IN, "<$dir/$file.out.uniq" ) or die("Cannot open file: $!");
+open( IN, "<$dir/$file.out.uniq.filtered" ) or die("Cannot open file: $!");
 
 &common_functions::log( "Compile ngram index", 1, 1 );
 my @counter = ( undef, 0, 0, 0, 0, 0, 0, 0, 0, 0 );

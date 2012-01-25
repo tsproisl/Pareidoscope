@@ -44,7 +44,7 @@ do
 #
 # allocate 1 node (4 CPUs) for 4 hours
 # sufficient for 100,000 sentences
-#PBS -l nodes=1:ppn=4,walltime=23:50:00
+#PBS -l nodes=1:ppn=4,walltime=18:00:00
 #
 # job name 
 #PBS -N subgraphjob_$jobnr

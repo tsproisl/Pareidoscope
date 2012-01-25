@@ -35,5 +35,5 @@ printf "[%s] %s\n" $(date "+%T") "N = $n"
 printf "[%s] %s\n" $(date "+%T") "$file N = $n" >> logfile.txt
 
 printf "[%s] %s\n" $(date "+%T") "Remove hapax patterns"
-egrep -v '\t1\t' $filepath.uniq > $filepath.uniq.filtered
+egrep -v '\t1$' $filepath.uniq > $filepath.uniq.filtered
 printf "[%s] %s\n" $(date "+%T") "Finished"

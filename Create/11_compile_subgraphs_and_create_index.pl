@@ -23,7 +23,7 @@ die("Not a directory: $dir") unless ( -d $dir );
 
 for my $i ( 1 .. $max_n ) {
     &common_functions::log( "    ... $i nodes", 1, 1 );
-    open( IN, "<", "$dir/subgraphs_$i.uniq" ) or die("Cannot open file: $!");
+    open( IN, "<", "$dir/subgraphs_$i.uniq.filtered" ) or die("Cannot open file: $!");
     open( OUT, ">", "$dir/subgraphs" . sprintf( "%02d", $i ) . ".dat" ) or die("Cannot open file: $!");
     my $counter = 0;
     my $position;
