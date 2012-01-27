@@ -40,8 +40,8 @@ sub init {
 
 sub fini {
     my ($self) = @_;
-    foreach my $ngd ( @{ $self->{"NGDs"} } ) {
-        close($ngd) or die("Cannot close file: $!");
+    for (my $i = 1; $i < @{$self->{"NGDs"}}; $i++) {
+	close($self->{"NGDs"}->[$i]) or die("Cannot close file: $!");
     }
 }
 
