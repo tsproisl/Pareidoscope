@@ -19,8 +19,10 @@ sub init {
     my $class = ref($invocant) || $invocant;
     my @ngds;
     my @ngramidxs;
+    my @indices = $file eq "subgraph" ? ( 1 .. 5 ) : ( 1 .. 9 );
+
     # Subgraphs: $ngds[($i ** 2) * 2]
-    for my $i ( 1 .. 9 ) {
+    for my $i (@indices) {
         open( $ngds[$i], "<:raw", "$dir/$file" . sprintf( "%02d", $i ) . ".dat" ) or die( "Cannot open file '$dir/$file" . sprintf( "%02d", $i ) . ".dat': $!" );
         $ngramidxs[$i] = Storable::retrieve( "$dir/$file" . sprintf( "%02d", $i ) . ".idx" );
     }
@@ -29,7 +31,8 @@ sub init {
         "records"      => [],
         "firstrecords" => [],
         "lastrecords"  => [],
-        "ngramidxs"    => \@ngramidxs
+        "ngramidxs"    => \@ngramidxs,
+	"file"         => $file
     };
     bless( $self, $class );
     return $self;
@@ -37,16 +40,17 @@ sub init {
 
 sub fini {
     my ($self) = @_;
-    for my $i ( 1 .. 9 ) {
-        close( $self->{"NGDs"}->[$i] ) or die("Cannot close file: $!");
+    foreach my $ngd ( @{ $self->{"NGDs"} } ) {
+        close($ngd) or die("Cannot close file: $!");
     }
 }
 
 sub get_ngram_freq {
     my ( $self, $ngram ) = @_;
     my $length = length($ngram);
-    return $self->scan_cached_records($ngram) if ( $self->{"records"}->[$length] and ( $self->{"firstrecords"}->[$length] le $ngram ) and ( $self->{"lastrecords"}->[$length] ge $ngram ) );
-    my $max      = scalar( @{ $self->{"ngramidxs"}->[$length] } ) / 2 - 1;
+    my $index = $self->{"file"} eq "subgraph" ? sqrt($length / 2) : $length;
+    return $self->scan_cached_records($ngram) if ( $self->{"records"}->[$index] and ( $self->{"firstrecords"}->[$index] le $ngram ) and ( $self->{"lastrecords"}->[$index] ge $ngram ) );
+    my $max      = scalar( @{ $self->{"ngramidxs"}->[$index] } ) / 2 - 1;
     my $maxindex = $max;
     my $minindex = 0;
     my $success  = -1;
@@ -54,53 +58,53 @@ sub get_ngram_freq {
 
     while ( $success < 0 and $minindex <= $maxindex ) {
         my $middle = POSIX::floor( $minindex + ( ( $maxindex - $minindex ) / 2 ) );
-        if ( $ngram lt $self->{"ngramidxs"}->[$length]->[ $middle * 2 ] ) {
+        if ( $ngram lt $self->{"ngramidxs"}->[$index]->[ $middle * 2 ] ) {
             $maxindex = $middle - 1;
             next;
         }
         if ( $middle == $max ) {
-            $success = $self->{"ngramidxs"}->[$length]->[ ( $middle * 2 ) + 1 ];
-            flock( $self->{"NGDs"}->[$length], LOCK_EX );
-            seek( $self->{"NGDs"}->[$length], 0, 2 ) or die("Error while seeking index file");
-            $recordsize = tell( $self->{"NGDs"}->[$length] ) - $success;
-            flock( $self->{"NGDs"}->[$length], LOCK_UN );
+            $success = $self->{"ngramidxs"}->[$index]->[ ( $middle * 2 ) + 1 ];
+            flock( $self->{"NGDs"}->[$index], LOCK_EX );
+            seek( $self->{"NGDs"}->[$index], 0, 2 ) or die("Error while seeking index file");
+            $recordsize = tell( $self->{"NGDs"}->[$index] ) - $success;
+            flock( $self->{"NGDs"}->[$index], LOCK_UN );
             next;
         }
-        if ( $ngram ge $self->{"ngramidxs"}->[$length]->[ ( $middle + 1 ) * 2 ] ) {
+        if ( $ngram ge $self->{"ngramidxs"}->[$index]->[ ( $middle + 1 ) * 2 ] ) {
             $minindex = $middle + 1;
             next;
         }
-        $success    = $self->{"ngramidxs"}->[$length]->[ ( $middle * 2 ) + 1 ];
-        $recordsize = $self->{"ngramidxs"}->[$length]->[ ( ( $middle + 1 ) * 2 ) + 1 ] - $success;
+        $success    = $self->{"ngramidxs"}->[$index]->[ ( $middle * 2 ) + 1 ];
+        $recordsize = $self->{"ngramidxs"}->[$index]->[ ( ( $middle + 1 ) * 2 ) + 1 ] - $success;
     }
-    # Subgraphs: S*
-    die( "N-gram not found: " . join( " ", unpack( "C*", $ngram ) ) . "\n" ) if ( $success < 0 );
+
+    die( "N-gram not found: hex " . join( " ", unpack( "H*", $ngram ) ) . "\n" ) if ( $success < 0 );
     my $record;
-    flock( $self->{"NGDs"}->[$length], LOCK_EX );
-    seek( $self->{"NGDs"}->[$length], $success, 0 ) or die("Error while seeking index file");
-    my $chrs = read( $self->{"NGDs"}->[$length], $record, $recordsize );
-    flock( $self->{"NGDs"}->[$length], LOCK_UN );
-    $self->{"records"}->[$length] = $record;
-    ( $self->{"firstrecords"}->[$length] ) = substr( $self->{"records"}->[$length], 0, $length );
-    ( $self->{"lastrecords"}->[$length] ) = substr( $self->{"records"}->[$length], -( $length + 4 ), $length );
-    # Subgraphs: S*
-    die( "Error while processing n-grams: " . join( " ", grep( $_ > 0, unpack( "C*", $self->{"firstrecords"}->[$length] ) ) ) . " > " . join( " ", grep( $_ > 0, unpack( "C*", $ngram ) ) ) ) unless ( $self->{"firstrecords"}->[$length] le $ngram );
-    die( "Error while processing n-grams: " . join( " ", grep( $_ > 0, unpack( "C*", $self->{"lastrecords"}->[$length] ) ) ) . " < " . join( " ", grep( $_ > 0, unpack( "C*", $ngram ) ) ) ) unless ( $self->{"lastrecords"}->[$length] ge $ngram );
+    flock( $self->{"NGDs"}->[$index], LOCK_EX );
+    seek( $self->{"NGDs"}->[$index], $success, 0 ) or die("Error while seeking index file");
+    my $chrs = read( $self->{"NGDs"}->[$index], $record, $recordsize );
+    flock( $self->{"NGDs"}->[$index], LOCK_UN );
+    $self->{"records"}->[$index] = $record;
+    ( $self->{"firstrecords"}->[$index] ) = substr( $self->{"records"}->[$index], 0, $length );
+    ( $self->{"lastrecords"}->[$index] ) = substr( $self->{"records"}->[$index], -( $length + 4 ), $length );
+    die( "Error while processing n-grams: hex " . join( " ", grep( $_ > 0, unpack( "H*", $self->{"firstrecords"}->[$index] ) ) ) . " > hex " . join( " ", grep( $_ > 0, unpack( "H*", $ngram ) ) ) ) unless ( $self->{"firstrecords"}->[$index] le $ngram );
+    die( "Error while processing n-grams: hex " . join( " ", grep( $_ > 0, unpack( "H*", $self->{"lastrecords"}->[$index] ) ) ) . " < hex " . join( " ", grep( $_ > 0, unpack( "H*", $ngram ) ) ) ) unless ( $self->{"lastrecords"}->[$index] ge $ngram );
     return $self->scan_cached_records($ngram);
 }
 
 sub scan_cached_records {
     my ( $self, $ngram ) = @_;
     my $length   = length($ngram);
-    my $maxindex = length( $self->{"records"}->[$length] ) / ( $length + 4 ) - 1;
+    my $index = $self->{"file"} eq "subgraph" ? sqrt($length / 2) : $length;
+    my $maxindex = length( $self->{"records"}->[$index] ) / ( $length + 4 ) - 1;
     my $minindex = 0;
     my $success  = -1;
     while ( $success < 0 and $minindex <= $maxindex ) {
         my $middle = POSIX::floor( $minindex + ( ( $maxindex - $minindex ) / 2 ) );
         my $start = $middle * ( $length + 4 );
-        my $record = substr( $self->{"records"}->[$length], $start, $length );
+        my $record = substr( $self->{"records"}->[$index], $start, $length );
         if ( $ngram eq $record ) {
-            $success = unpack( "L", substr( $self->{"records"}->[$length], $start + $length, 4 ) );
+            $success = unpack( "L", substr( $self->{"records"}->[$index], $start + $length, 4 ) );
             return ($success);
         }
         elsif ( $ngram lt $record ) {
