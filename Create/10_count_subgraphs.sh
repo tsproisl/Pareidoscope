@@ -45,6 +45,7 @@ printf "[%s] %s\n" $(date "+%T") "Subgraph N = $n" >> logfile.txt
 printf "[%s] %s\n" $(date "+%T") "Remove hapax patterns"
 for (( i=1 ; i<=$max_n ; i++))
 do
-    egrep -v '\t1$' subgraphs_$n.uniq > subgraphs_$n.uniq.filtered
+    # there is a tab:
+    egrep -v '	1$' subgraphs_$i.uniq > subgraphs_$i.uniq.filtered
 done
 printf "[%s] %s\n" $(date "+%T") "Finished"
