@@ -1,0 +1,55 @@
+<h2>
+  Complex query (token level)
+</h2>
+<form method="post" action="pareidoscope.cgi" enctype="multipart/form-data">
+  [% FOREACH hidden_state IN hidden_states %]
+  <input type="hidden" name="[% hidden_state.name %]" value="[% hidden_state.value %]" />
+  [% END %]
+  [% FOREACH i IN [ 1 2 3 4 5 6 7 8 9 ] %]
+  <table style="margin: 5px 0 0;">
+    <tr style="vertical-align:bottom;">
+      <td style="border: 0px;">
+	<select name="tt[% i %]" >
+	  <option value="l">lemma [% i %]</option>
+	  <option selected="selected" value="wf">word form [% i %]</option>
+	</select>
+      </td>
+      <td style="border: 0px;">
+	<input value="" name="t[% i %]" type="text" size="30" />
+      </td>
+      <td style="border: 0px;">
+	<label>
+	  pos tag
+	</label>
+	<select name="p[% i %]" >
+	  [% FOREACH pos_tag IN pos_tags %]
+	  <option value="[% pos_tag %]">[% pos_tag %]</option>
+	  [% END %]
+	</select>
+      </td>
+      <td style="border: 0px;">or</td>
+      <td style="border: 0px;">
+	<label>
+	  word class
+	</label>
+	<select name="w[% i %]" >
+	  [% FOREACH word_class IN word_classes %]
+	  <option value="[% word_class %]">[% word_class %]</option>
+	  [% END %]
+	</select>
+      </td>
+    </tr>
+  </table>
+  [% END %]
+  <br />
+  <input checked="checked" value="1" name="i1" style="margin-left: 11px; margin-top: 10px; margin-bottom: 10px" type="checkbox" />
+  Ignore case
+  <br />
+  <input checked="checked" value="pos" name="rt" style="margin-left: 11px; margin-top: 10px;" type="radio" />
+  sequences of part-of-speech tags
+  <br />
+  <input checked="checked" value="lump" name="dt" style="margin-left: 11px; margin-top: 10px;" type="radio" />
+  lump results
+  <br />
+  <input type="submit" name="s" value="Submit" style="margin-left: 11px; margin-top: 10px; margin-bottom: 15px;" class="button" />
+</form>

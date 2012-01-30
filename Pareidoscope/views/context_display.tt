@@ -1,0 +1,12 @@
+<h2>
+  Context display
+</h2>
+[% FOREACH p IN ps %]
+<p>
+  [% p.pre %]
+  <strong class="kwic">
+    [% p.kwic %]
+  </strong>
+  [% p.post %]
+</p>
+[% END %]

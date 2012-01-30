@@ -1,0 +1,32 @@
+<h2>
+  Change corpus
+</h2>
+<table>
+  <tr>
+    <th class="first">
+      corpus
+    </th>
+    <th>
+      tokens
+    </th>
+    <th>
+      sentences
+    </th>
+    <th>
+      tagset
+    </th>
+    <th>
+      chunks
+    </th>
+  </tr>
+  [% rowa = 1 %]
+  [% FOREACH corpus IN corpora %]
+  <tr [% IF rowa == 1%]class="row-a"[% rowa = 0 %][% ELSE %]class="row-b"[% rowa = 1 %][% END %]>
+    <td>[% corpus.name %]</td>
+    <td style="text-align:right;">[% corpus.tokens %]</td>
+    <td style="text-align:right;">[% corpus.sentences %]</td>
+    <td>[% corpus.tagset %]</td>
+    <td>[% corpus.chunks %]</td>
+  </tr>
+  [% END %]
+</table>

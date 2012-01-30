@@ -1,0 +1,105 @@
+<h2>
+  [% query_type %]
+</h2>
+[% IF error %]
+<p>
+  [% error %]
+</p>
+[% ELSE %]
+<p>
+  Your query: [% query %]
+</p>
+[% IF matches == 0 or analyze_matches == 0 %]
+<p>
+  There are no matches for your query.
+</p>
+[% ELSE %]
+<p>
+  [% matches %] [% IF matches != 1 %]matches[% ELSE %]match[% END %] for your query<br />
+  [% analyze_matches %] [% IF analyze_matches != 1 %]matches[% ELSE %]match[% END %] had to be analyzed
+</p>
+<p>
+  [% IF execution_time %]
+  query execution: [% execution_times.0 %]s<br />
+  counting frequencies: [% execution_times.1 %]s
+  [% ELSE %]
+  Using cache database 
+  [% END %]
+</p>
+<h3>
+  Overview
+</h3>
+<table>
+  [% rowa = 1 %]
+  [% FOREACH row_number IN row_numbers %]
+  <tr [% IF row_number > 0 %][% IF rowa == 1%]class="row-a"[% rowa = 0 %][% ELSE %]class="row-b"[% rowa = 1 %][% END %][% END %]>
+  [% FOREACH column_number IN column_numbers %]
+  <[% IF row_number == 0 %]th[% ELSE %]td[% END %] [% IF column_number == 0 %]class="first"[% END %]>
+  [% overview_table.$column_number.$row_number %]
+  </[% IF row_number == 0 %]th[% ELSE %]td[% END %]>
+  [% END %]
+</tr>
+[% END %]
+</table>
+[% FOREACH slot IN slots %]
+<h3>
+  [% slot.name %]
+</h3>
+<table>
+  <tr>
+    <th class="first">
+      #
+    </th>
+    <th>
+      word
+    </th>
+    <th>
+      co-freq
+    </th>
+    <th>
+      ngfreq
+    </th>
+    <th>
+      G
+    </th>
+    <th>
+      navigation
+    </th>
+  </tr>
+  [% rowa = 1 %]
+  [% FOREACH row IN slot.rows %]
+  <tr [% IF rowa == 1%]class="row-a"[% rowa = 0 %][% ELSE %]class="row-b"[% rowa = 1 %][% END %]>
+    <td style="text-align:right;" class="first">[% row.number %]</td>
+    <td>[% row.word %]</td>
+    <td style="text-align:right;">
+      <a href="[% row.cofreq_href %]">[% row.cofreq %]</a>
+    </td>
+    <td style="text-align:right;">
+      [% IF row.ngfreq_href %]<a href="[% row.ngfreq_href %]">[% row.ngfreq %]</a>[% ELSE %][% row.ngfreq %][% END %]
+    </td>
+    <td style="text-align:right;">
+      <span
+        [% IF row.g >= 10.827566 %]
+        title="p ≤ 0.001"
+        [% ELSIF row.g >= 6.634897 %]
+        title="0.001 < p ≤ 0.01" style="color:#D5D555;"
+        [% ELSIF row.g >= 3.841459 %]
+        title="0.01 < p ≤ 0.05" style="color:#D59555;"
+        [% ELSE %]
+        title="p > 0.05" style="color:#D55555;"
+        [% END %]
+      >
+        [% row.g %]
+      </span>
+    </td>
+    <td style="text-align:center">
+      <a href="[% row.lex_href %]">lex</a>
+      &nbsp;&nbsp;
+      <a href="[% row.struc_href %]">struc</a>
+    </td>
+  </tr>
+  [% END %]
+</table>
+[% END %]
+[% END %]
+[% END %]
