@@ -8,7 +8,8 @@ registryfile="anc_masc"
 dbname="anc_masc.db"
 chunkdb="anc_masc_chunks.db"
 
-export PERL5LIB="/home/linguistik/tsproisl/local/lib/perl5/site_perl:/home/linguistik/tsproisl/local/lib/perl5/site_perl/x86_64-linux-thread-multi"
+export PERL5LIB="/home/linguistik/tsproisl/local/lib/perl5:/home/linguistik/tsproisl/local/lib/perl5/site_perl:$PERL5LIB"
+#export PERL5LIB="/home/linguistik/tsproisl/local/lib/perl5/site_perl:/home/linguistik/tsproisl/local/lib/perl5/site_perl/x86_64-linux-thread-multi"
 
 #./01_cwb-encode.sh $corpusindir $corpusoutdir $registryfile $corpusname $outdir && \
 # ./02_create_sqlite_db.sh $outdir $dbname && \
