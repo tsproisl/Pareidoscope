@@ -22,9 +22,85 @@ charset: "UTF-8"
 
 template: "template_toolkit"
 engines:
-  template_toolkit:
-    encoding:  'utf8'
-    start_tag: '[%'
-    end_tag:   '%]'
+    template_toolkit:
+        encoding:  'utf8'
+        start_tag: '[%'
+        end_tag:   '%]'
 
+# store session information with YAML
 session: "YAML"
+
+
+#----------------------------
+# PAREIDOSCOPE CONFIGURATION
+#----------------------------
+
+# database connections
+plugins:
+    Database:
+        driver: "SQLite"
+        database: "public/cache/cache.sqlite"
+        on_connect_do:
+            - "SELECT icu_load_collation('en_GB', 'BE')"
+            - "PRAGMA foreign_keys = ON"
+            - "PRAGMA cache_size = 50000"
+
+# paths
+query_log: "public/cache/queries.log"
+registry: "corpora/registry"
+cache_database: "public/cache/cache.sqlite"
+cqp_cache: "public/cache/cqp"
+
+# maximal cache size in MBytes
+cache_size: 4096
+# maximal storage time before query results expire (in hours)
+cache_expire: 12
+
+# corpora
+corpora:
+    - available: 1
+      display_name: "OANC"
+      tagset: "penn extended"
+      corpus: "OANC"
+      tokens: 18065587
+      sentences: 897087
+      database: "corpora/databases/oanc.sqlite"
+      ngram_length: 9
+      pos_ngrams: 9145106355
+      chunk_ngrams: 113826088
+      localdata: "/opt/pareidoscope/oanc"
+      machines:
+          - ["clue22", 4878, 8487]
+          - ["clue23", 4878, 8487]
+          - ["clue14", 4878, 8487]
+          - ["clue15", 4878, 8487]
+    - available: 1
+      display_name: "ANC MASC I"
+      tagset: "penn extended"
+      corpus: "ANC_MASC"
+      tokens: 94808
+      sentences: 5401
+      database: "corpora/databases/anc_masc.sqlite"
+      ngram_length: 9
+      pos_ngrams: 129759830
+      chunk_ngrams: 4120767
+      localdata: "/opt/pareidoscope/oanc"
+      machines:
+          - ["clue22", 4878, 8487]
+          - ["clue23", 4878, 8487]
+          - ["clue14", 4878, 8487]
+          - ["clue15", 4878, 8487]
+
+# tagsets
+tagsets:
+    penn_extended:
+        ADJ: ["CD", "JJ", "JJR", "JJS"]
+        ADV: ["RB", "RBR", "RBS", "RP", "WRB"]
+        CONJ/PREP: ["CC", "IN", "TO"]
+        DET: ["DT", "PDT"]
+        INTERJ: ["UH"]
+        PRON: ["EX", "PRP", "PRP$", "WDT", "WP", "WP$"]
+        PUNC: ["''", "(", ")", "[", "]", "{", "}", ",", ".", ":", "``", "HYPH",  "NFP"]
+        SUBST: ["NN", "NNP", "NNPS", "NNS"]
+        UNC: ["#", "$", "AFX", "FW", "LS", "POS", "SYM", "XX"]
+        VERB: ["MD", "VB", "VBD", "VBG", "VBN", "VBP", "VBZ"]
