@@ -41,7 +41,6 @@ plugins:
         driver: "SQLite"
         database: "public/cache/cache.sqlite"
         on_connect_do:
-            - "SELECT icu_load_collation('en_GB', 'BE')"
             - "PRAGMA foreign_keys = ON"
             - "PRAGMA cache_size = 50000"
 
@@ -104,3 +103,15 @@ tagsets:
         SUBST: ["NN", "NNP", "NNPS", "NNS"]
         UNC: ["#", "$", "AFX", "FW", "LS", "POS", "SYM", "XX"]
         VERB: ["MD", "VB", "VBD", "VBG", "VBN", "VBP", "VBZ"]
+    c5:
+        ADJ: ["AJ0", "AJC", "AJS", "CRD", "DT0", "ORD"]
+        ADV: ["AV0", "AVP", "AVQ", "XX0"]
+        ART: ["AT0"]
+        CONJ: ["CJC", "CJS", "CJT"]
+        INTERJ: ["ITJ"]
+        PREP: ["PRF", "PRP", "TO0"]
+        PRON: ["DPS", "DTQ", "EX0", "PNI", "PNP", "PNQ", "PNX"]
+        PUNC: ["PUL", "PUN", "PUQ", "PUR"]
+        SUBST: ["NN0", "NN1", "NN2", "NP0", "ZZ0"]
+        UNC: ["POS", "UNC"]
+        VERB: ["VBB", "VBD", "VBG", "VBI", "VBN", "VBZ", "VDB", "VDD", "VDG", "VDI", "VDN", "VDZ", "VHB", "VHD", "VHG", "VHI", "VHN", "VHZ", "VM0", "VVB", "VVD", "VVG", "VVI", "VVN", "VVZ"]
