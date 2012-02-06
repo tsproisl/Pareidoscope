@@ -14,7 +14,7 @@
   There are no matches for your query.
 </p>
 [% ELSE %]
-[% INCLUDE results_table
+[% INCLUDE results_table.tt
     vars = vars
 %]
 [% END %]
