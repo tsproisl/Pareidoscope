@@ -78,14 +78,14 @@
       <!-- start header -->
       <div id="header">
 	<h1 id="logo-text">
-	  <a href="[% home_url %]?[% state %]">Pareidoscope</a>
+	  <a href="[% home_url %][% FOREACH arg IN url_args %][% IF loop.first %]?[% ELSE %]&[% END %][% arg.key %]=[% arg.value %][% END %]">Pareidoscope</a>
 	</h1>
 	<p id="slogan">
 	  &ndash; a research tool for investigating patterns of
 	  lexicogrammatical interaction
 	</p>
 	<div id="header-links">
-	  <a href="[% home_url %]?[% state %]">Home</a>&nbsp;|&nbsp;<a href="mailto:thomas.proisl@linguistik.uni-erlangen.de">Contact</a>
+	  <a href="[% home_url %][% FOREACH arg IN url_args %][% IF loop.first %]?[% ELSE %]&[% END %][% arg.key %]=[% arg.value %][% END %]">Home</a>&nbsp;|&nbsp;<a href="mailto:thomas.proisl@linguistik.uni-erlangen.de">Contact</a>
 	</div>
       </div>
       <!-- end header -->
@@ -96,16 +96,16 @@
 	</div>
 	<ul>
 	  <li [% IF menu == "o" %]id="current"[% END %]>
-	    <a href="[% home_url %][% FOREACH arg IN url_args %][% IF loop.first %]?[% ELSE %]&[% END %][% arg.name %]=[% arg.value %][% END %]">Test</a>
+	    <a href="[% home_url %][% FOREACH arg IN url_args %][% IF loop.first %]?[% ELSE %]&[% END %][% arg.key %]=[% arg.value %][% END %]">Test</a>
 	  </li>
 	  <li [% IF menu == "o" %]id="current"[% END %]>
-	    <a href="[% home_url %]?[% state %]">Home</a>
+	    <a href="[% home_url %][% FOREACH arg IN url_args %][% IF loop.first %]?[% ELSE %]&[% END %][% arg.key %]=[% arg.value %][% END %]">Home</a>
 	  </li>
 	  <li [% IF menu == "h" %]id="current"[% END %]>
-	    <a href="[% help_url %]?[% state %]">Help</a>
+	    <a href="[% help_url %][% FOREACH arg IN url_args %][% IF loop.first %]?[% ELSE %]&[% END %][% arg.key %]=[% arg.value %][% END %]">Help</a>
 	  </li>
 	  <li class="last" [% IF menu == "a" %]id="current"[% END %]>
-	    <a href="[% about_url %]?[% state %]">About</a>
+	    <a href="[% about_url %][% FOREACH arg IN url_args %][% IF loop.first %]?[% ELSE %]&[% END %][% arg.key %]=[% arg.value %][% END %]">About</a>
 	  </li>
 	</ul>
       </div>
@@ -119,7 +119,7 @@
 	  </h3>
 	  <ul class="sidemenu">
 	    <li>
-	      [% corpus_name %] (<a href='[% change_corpus_url %]?[% state %]'>change</a>)
+	      [% corpus_name %] (<a href='[% change_corpus_url %][% FOREACH arg IN url_args %][% IF loop.first %]?[% ELSE %]&[% END %][% arg.key %]=[% arg.value %][% END %]'>change</a>)
 	    </li>
 	  </ul>
 	  <h3>
@@ -127,16 +127,16 @@
 	  </h3>
 	  <ul class="sidemenu">
 	    <li>
-	      <a href="[% word_form_query_url %]?[% state %]">word form query</a>
+	      <a href="[% word_form_query_url %][% FOREACH arg IN url_args %][% IF loop.first %]?[% ELSE %]&[% END %][% arg.key %]=[% arg.value %][% END %]">word form query</a>
 	    </li>
 	    <li>
-	      <a href="[% lemma_query_url %]?[% state %]">lemma query</a>
+	      <a href="[% lemma_query_url %][% FOREACH arg IN url_args %][% IF loop.first %]?[% ELSE %]&[% END %][% arg.key %]=[% arg.value %][% END %]">lemma query</a>
 	    </li>
 	    <li>
-	      <a href="[% complex_query_token_url %]?[% state %]">complex query (token level)</a>
+	      <a href="[% complex_query_token_url %][% FOREACH arg IN url_args %][% IF loop.first %]?[% ELSE %]&[% END %][% arg.key %]=[% arg.value %][% END %]">complex query (token level)</a>
 	    </li>
 	    <li>
-	      <a href="[% complex_query_chunk_url %]?[% state %]">complex query (chunk level)</a>
+	      <a href="[% complex_query_chunk_url %][% FOREACH arg IN url_args %][% IF loop.first %]?[% ELSE %]&[% END %][% arg.key %]=[% arg.value %][% END %]">complex query (chunk level)</a>
 	    </li>
 	  </ul>
 	  <h3>
