@@ -8,15 +8,16 @@ then
     exit -1
 fi
 
-if [ -e "$1/$2" ]
+if [ ! -e "$1/$2" ]
 then
-    echo "File $1/$2 already exists!"
+    echo "File $1/$2 does not exist!"
     exit -1
 fi
 
-echo "Create SQLite database '$1/$2'"
+printf "[%s] %s\n" $(date "+%T") "Drop table 'chunks'"
+sqlite3 "$1/$2" 'DROP TABLE IF EXISTS chunks;'
 
-echo "Create table 'chunks'"
+printf "[%s] %s\n" $(date "+%T") "Create table 'chunks'"
 sqlite3 "$1/$2" 'CREATE TABLE chunks (
     chunkid INTEGER PRIMARY KEY,
     chunk VARCHAR(5) NOT NULL,
@@ -24,11 +25,14 @@ sqlite3 "$1/$2" 'CREATE TABLE chunks (
     UNIQUE (chunk)
 );'
 
-echo "Create table 'sentences'"
+printf "[%s] %s\n" $(date "+%T") "Drop table 'sentences'"
+sqlite3 "$1/$2" 'DROP TABLE IF EXISTS sentences;'
+
+printf "[%s] %s\n" $(date "+%T") "Create table 'sentences'"
 sqlite3 "$1/$2" 'CREATE TABLE sentences (
     cpos INTEGER PRIMARY KEY,
     chunkseq TEXT NOT NULL,
     cposseq TEXT NOT NULL
 );'
 
-echo "You can now insert data into the database."
+printf "[%s] %s\n" $(date "+%T") "You can now insert data into the database."

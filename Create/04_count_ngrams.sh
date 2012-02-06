@@ -22,7 +22,7 @@ cores_per_cpu=$(grep -m1 "cpu cores" /proc/cpuinfo | cut -d' ' -f3)
 cores=$(( $packages * $cores_per_cpu ))
 
 printf "[%s] %s\n" $(date "+%T") "Sort $filepath"
-sort -S 50% --parallel=$core -T $dir -t ' ' -n -k1,1 -k2,2 -k3,3 -k4,4 -k5,5 -k6,6 -k7,7 -k8,8 -k9,9 $filepath | uniq -c > $filepath.uniq
+sort -S 50% --parallel=$cores -T $dir -t ' ' -n -k1,1 -k2,2 -k3,3 -k4,4 -k5,5 -k6,6 -k7,7 -k8,8 -k9,9 $filepath | uniq -c > $filepath.uniq
 
 printf "[%s] %s\n" $(date "+%T") "Make frequency the last column"
 perl -i -pe 's/^\s*(\d+)\s+(.+)$/$2\t$1/' $filepath.uniq

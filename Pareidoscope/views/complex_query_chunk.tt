@@ -2,7 +2,7 @@
   Complex query (chunk level)
 </h2>
 [% IF chunks %]
-<form method="post" action="pareidoscope.cgi" enctype="multipart/form-data">
+<form method="post" action="[% complex_query_results_url %]" enctype="multipart/form-data">
     [% FOREACH hidden_state IN hidden_states %]
   <input type="hidden" name="[% hidden_state.name %]" value="[% hidden_state.value %]" />
   [% END %]

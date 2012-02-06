@@ -7,13 +7,14 @@ use Fcntl ':flock';
 use data;
 
 our $VERSION = '0.8.1';
+my $data;
 
 hook 'before' => sub {
     database->sqlite_create_function( "rmfile", 1, sub { unlink map( "public/cache/$_", @_ ); } );
     database->sqlite_create_function( "logquery", 3, sub { open( OUT, ">>:encoding(utf8)", config->{query_log} ) or die("Cannot open query log: $!"); flock( OUT, LOCK_EX ); print OUT join( "\t", @_ ), "\n"; flock( OUT, LOCK_UN ); close(OUT) or die("Cannot close query log: $!"); } );
+    $data = data->new();
     my $params = params;
     $params->{"corpus"} = config->{"corpora"}->[0]->{"corpus"} unless ( defined( $params->{"corpus"} ) );
-    data->new();
 };
 
 hook 'before_template' => sub {
@@ -29,6 +30,9 @@ hook 'before_template' => sub {
     $tokens->{"lemma_query_url"}         = uri_for("/lemma_query");
     $tokens->{"complex_query_token_url"} = uri_for("/complex_query_token");
     $tokens->{"complex_query_chunk_url"} = uri_for("/complex_query_chunk");
+    $tokens->{"word_form_results_url"}     = uri_for("/results/word_form_query");
+    $tokens->{"lemma_results_url"}         = uri_for("/results/lemma_query");
+    $tokens->{"complex_query_results_url"} = uri_for("/results/complex_query");
 
     # Corpus
     $tokens->{"url_args"}->{"corpus"} = param("corpus");
@@ -52,7 +56,7 @@ get '/change_corpus' => sub {
 };
 
 get '/word_form_query' => sub {
-    template('word_form_query');
+    template('word_form_query', {});
 };
 
 get '/lemma_query' => sub {
@@ -66,6 +70,19 @@ get '/complex_query_token' => sub {
 get '/complex_query_chunk' => sub {
     template('complex_query_chunk');
 };
+
+any [ 'get', 'post' ] => '/results/word_form_query' => sub {
+    template('single_item_query_results');
+};
+
+any [ 'get', 'post' ] => '/results/lemma_query' => sub {
+    template('single_item_query_results');
+};
+
+any [ 'get', 'post' ] => '/results/complex_query' => sub {
+    template('complex_query_results');
+};
+
 
 # get '/' => sub {
 
