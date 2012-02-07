@@ -23,24 +23,35 @@ use open qw(:std :utf8);
 # word surface <-> word id
 # n-gram surface <-> n-gram id
 
-die("./03a_create_indexes.pl outdir corpus-name dbname regfile") unless ( scalar(@ARGV) == 4 );
+die("./03a_create_indexes.pl outdir corpus-name dbname regfile tagset") unless ( scalar(@ARGV) == 5 );
 my $outdir  = shift(@ARGV);
 my $corpus  = shift(@ARGV);
 my $dbname  = shift(@ARGV);
 my $regfile = shift(@ARGV);
+my $tset  = shift(@ARGV);
 die("Not a directory: $outdir") unless ( -d $outdir );
 
 my @tagset;
 {
     no warnings "qw";
 
-    # C5 tagset without ambiguity tags
-    #@tagset = qw(AJ0 AJC AJS AT0 AV0 AVP AVQ CJC CJS CJT CRD DPS DT0 DTQ EX0 ITJ NN0 NN1 NN2 NP0 ORD PNI PNP PNQ PNX POS PRF PRP PUL PUN PUQ PUR TO0 UNC VBB VBD VBG VBI VBN VBZ VDB VDD VDG VDI VDN VDZ VHB VHD VHG VHI VHN VHZ VM0 VVB VVD VVG VVI VVN VVZ XX0 ZZ0);
-    # PTB tagset plus additional tags from ANC MASC I: XX, HYPH (hyphen), AFX (affix), NFP (ellipsis: ...)
-    #@tagset = qw(AFX CC CD DT EX FW HYPH IN JJ JJR JJS LS MD NFP NN NNP NNPS NNS PDT POS PRP PRP$ RB RBR RBS RP SYM TO UH VB VBD VBG VBN VBP VBZ WDT WP WP$ WRB XX # $ , . :  `` '' ( ) [ ] { });
+    if ( $tset eq "c5" ) {
 
-    # nur PTB
-    @tagset = qw(CC CD DT EX FW IN JJ JJR JJS LS MD NN NNP NNPS NNS PDT POS PRP PRP$ RB RBR RBS RP SYM TO UH VB VBD VBG VBN VBP VBZ WDT WP WP$ WRB # $ , . :  `` '' ( ) [ ] { } -LRB- -RRB- -LSB- -RSB- -LCB- -RCB-);
+        # C5 tagset without ambiguity tags
+        @tagset = qw(AJ0 AJC AJS AT0 AV0 AVP AVQ CJC CJS CJT CRD DPS DT0 DTQ EX0 ITJ NN0 NN1 NN2 NP0 ORD PNI PNP PNQ PNX POS PRF PRP PUL PUN PUQ PUR TO0 UNC VBB VBD VBG VBI VBN VBZ VDB VDD VDG VDI VDN VDZ VHB VHD VHG VHI VHN VHZ VM0 VVB VVD VVG VVI VVN VVZ XX0 ZZ0);
+    }
+    elsif ( $tset eq "penn_extended" ) {
+
+        # PTB tagset plus additional tags from ANC MASC I: XX, HYPH (hyphen), AFX (affix), NFP (ellipsis: ...)
+        #@tagset = qw(AFX CC CD DT EX FW HYPH IN JJ JJR JJS LS MD NFP NN NNP NNPS NNS PDT POS PRP PRP$ RB RBR RBS RP SYM TO UH VB VBD VBG VBN VBP VBZ WDT WP WP$ WRB XX # $ , . :  `` '' ( ) [ ] { });
+        @tagset = qw(AFX CC CD DT EX FW HYPH IN JJ JJR JJS LS MD NFP NN NNP NNPS NNS PDT POS PRP PRP$ RB RBR RBS RP SYM TO UH VB VBD VBG VBN VBP VBZ WDT WP WP$ WRB XX # $ , . :  `` '' -LRB- -RRB- -LSB- -RSB- -LCB- -RCB-);
+    }
+    elsif ( $tset eq "penn" ) {
+
+        # nur PTB
+        #@tagset = qw(CC CD DT EX FW IN JJ JJR JJS LS MD NN NNP NNPS NNS PDT POS PRP PRP$ RB RBR RBS RP SYM TO UH VB VBD VBG VBN VBP VBZ WDT WP WP$ WRB # $ , . :  `` '' ( ) [ ] { });
+	@tagset = qw(CC CD DT EX FW IN JJ JJR JJS LS MD NN NNP NNPS NNS PDT POS PRP PRP$ RB RBR RBS RP SYM TO UH VB VBD VBG VBN VBP VBZ WDT WP WP$ WRB # $ , . :  `` '' -LRB- -RRB- -LSB- -RSB- -LCB- -RCB-);
+    }
 }
 my %tagset;
 my $tagset = join( "|", @tagset );
@@ -88,7 +99,7 @@ sub create_indexes {
     &common_functions::log( "Finished tabulating results.", 1, $maxloglevel );
 
     while ( defined( my $match = <TAB> ) ) {
-	chomp($match);
+        chomp($match);
         my ( $words, $corptags, $lemmata, $wcs, $position ) = split( /\t/, $match );
 
         #my (@tokens, @tags, @sentence);

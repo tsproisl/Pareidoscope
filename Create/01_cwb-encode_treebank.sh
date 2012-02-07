@@ -22,7 +22,6 @@ regfile=$3
 name=$4
 outdir=$5
 registry="/localhome/Databases/CWB/registry"
-files=
 
 export CORPUS_REGISTRY="$registry"
 export PERL5LIB="/home/linguistik/tsproisl/local/lib/perl5/site_perl"

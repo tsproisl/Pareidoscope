@@ -62,7 +62,7 @@ cache_expire: 12
 corpora:
     - available: 1
       display_name: "OANC"
-      tagset: "penn extended"
+      tagset: "penn"
       corpus: "OANC"
       tokens: 18065587
       sentences: 897087
@@ -102,9 +102,20 @@ tagsets:
         DET: ["DT", "PDT"]
         INTERJ: ["UH"]
         PRON: ["EX", "PRP", "PRP$", "WDT", "WP", "WP$"]
-        PUNC: ["''", "(", ")", "[", "]", "{", "}", ",", ".", ":", "``", "HYPH",  "NFP"]
+        PUNC: ["''", "(", ")", "[", "]", "{", "}", ",", ".", ":", "``", "HYPH", "NFP"]
         SUBST: ["NN", "NNP", "NNPS", "NNS"]
         UNC: ["#", "$", "AFX", "FW", "LS", "POS", "SYM", "XX"]
+        VERB: ["MD", "VB", "VBD", "VBG", "VBN", "VBP", "VBZ"]
+    penn:
+        ADJ: ["CD", "JJ", "JJR", "JJS"]
+        ADV: ["RB", "RBR", "RBS", "RP", "WRB"]
+        CONJ/PREP: ["CC", "IN", "TO"]
+        DET: ["DT", "PDT"]
+        INTERJ: ["UH"]
+        PRON: ["EX", "PRP", "PRP$", "WDT", "WP", "WP$"]
+        PUNC: ["''", "(", ")", "[", "]", "{", "}", ",", ".", ":", "``"]
+        SUBST: ["NN", "NNP", "NNPS", "NNS"]
+        UNC: ["#", "$", "FW", "LS", "POS", "SYM"]
         VERB: ["MD", "VB", "VBD", "VBG", "VBN", "VBP", "VBZ"]
     c5:
         ADJ: ["AJ0", "AJC", "AJS", "CRD", "DT0", "ORD"]

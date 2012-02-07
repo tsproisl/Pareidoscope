@@ -50,10 +50,12 @@ sub create_indexes {
     $dbh->do(qq{BEGIN TRANSACTION});
     my %typids;
     my @typids;
+    my %chunkfreq;
 
     # fill in chunks
     foreach my $chunk (@chunks) {
         $chunks{$chunk} = &insertandreturnid( $insertchunk, $fetchchunkid, [$chunk] );
+	$chunkfreq{$chunks{$chunk}} = 0;
     }
 
     # current sentence
@@ -63,7 +65,6 @@ sub create_indexes {
 
     # events: <s> </s> <$chunks> </$chunks> ELSE
     my ( $sentpos, @chunkseq, @cposseq, $activechunk );
-    my %chunkfreq;
     &common_functions::log( "Start processing", 1, $maxloglevel );
     while ( defined( my $line = <$decode> ) ) {
         chomp($line);
