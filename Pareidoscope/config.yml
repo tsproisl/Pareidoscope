@@ -68,8 +68,10 @@ corpora:
       sentences: 897087
       database: "corpora/databases/oanc.sqlite"
       ngram_length: 9
+      subgraph_size: 5
       pos_ngrams: 9145106355
       chunk_ngrams: 113826088
+      subgraphs: 28746592400
       localdata: "/opt/pareidoscope/oanc"
       machines:
           - ["clue22", 4878, 8487]
@@ -113,7 +115,8 @@ tagsets:
         DET: ["DT", "PDT"]
         INTERJ: ["UH"]
         PRON: ["EX", "PRP", "PRP$", "WDT", "WP", "WP$"]
-        PUNC: ["''", "(", ")", "[", "]", "{", "}", ",", ".", ":", "``"]
+        #PUNC: ["''", "(", ")", "[", "]", "{", "}", ",", ".", ":", "``"]
+        PUNC: ["''", "-LRB-", "-RRB-", "-LSB-", "-RSB-", "-LCB-", "-RCB-", ",", ".", ":", "``"]
         SUBST: ["NN", "NNP", "NNPS", "NNS"]
         UNC: ["#", "$", "FW", "LS", "POS", "SYM"]
         VERB: ["MD", "VB", "VBD", "VBG", "VBN", "VBP", "VBZ"]
