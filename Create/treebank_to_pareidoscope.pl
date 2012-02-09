@@ -30,7 +30,7 @@ OUTER: while ( my $line = <$in> ) {
                 die("Strange phrase structure tree") if ( scalar(@chunker_output) != scalar(@wordstagslemmata) );
                 my $len = @chunker_output;
                 $line =~ s/>\n/ len="$len">\n/;
-                @chunker_output = map { [ ( split(/\s+/), $_ )[ 6, 5, 4, 7 ] ] } @chunker_output;
+                @chunker_output = map { [ ( split(/[\t ]+/), $_ )[ 6, 5, 4, 7 ] ] } @chunker_output;
                 for ( my $i = 0; $i <= $#chunker_output; $i++ ) {
                     die( "Token mismatch: " . $chunker_output[$i]->[0] . "/" . substr( $wordstagslemmata[$i], 0, length( $chunker_output[$i]->[0] ) ) ) unless ( $chunker_output[$i]->[0] eq substr( $wordstagslemmata[$i], 0, length( $chunker_output[$i]->[0] ) ) );
                 }
