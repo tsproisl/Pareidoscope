@@ -2,9 +2,11 @@
 
 use warnings;
 use strict;
+use open qw(:std :utf8);
 
-#use XML::LibXML;
-use chunklink_2_2_2000_for_conll_tsproisl;
+use XML::LibXML;
+
+#use chunklink_2_2_2000_for_conll_tsproisl;
 
 use Data::Dumper;
 
@@ -14,10 +16,11 @@ my $counter;
 &start();
 
 sub start {
-    #open( IN,  "<:encoding(utf8)", $infile )          or die("Cannot open file $infile: $!");
+
+    open( IN,  "<:encoding(utf8)", $infile )          or die("Cannot open file $infile: $!");
     open( OUT, ">:encoding(utf8)", $infile . ".out" ) or die("Cannot open file $infile.out: $!");
 
-OUTER: while ( my $line = <STDIN> ) {
+OUTER: while ( my $line = <IN> ) {
         if ( $line =~ /^<\/?(corpus|text)[> ]/ ) {
             print OUT $line;
             next;
@@ -27,9 +30,19 @@ OUTER: while ( my $line = <STDIN> ) {
             my @wordstagslemmata;
             my @pstree;
             my @dependencies;
-            while ( my $sline = <STDIN> ) {
+            while ( my $sline = <IN> ) {
                 if ( $sline eq "</sentence>\n" ) {
-                    my @chunker_output = split( /\n/, chunk( join( " ", @pstree ) ) );
+                    my $chunker_lines;
+                    {
+
+                        #local @ARGV = (join(" ", @pstree));
+                        #$chunker_lines = do 'chunklink_2_2_2000_for_conll_tsproisl.pm';
+                        my $args = quotemeta( join( " ", @pstree ) );
+                        $chunker_lines = `perl chunklink_2_2_2000_for_conll_tsproisl.pm $args`;
+                    }
+                    my @chunker_output = split( /\n/, $chunker_lines );
+
+                    #my @chunker_output = @wordstagslemmata;
                     die("Strange phrase structure tree") if ( scalar(@chunker_output) != scalar(@wordstagslemmata) );
                     my $len = @chunker_output;
                     $line =~ s/>\n/ len="$len">\n/;
@@ -38,10 +51,10 @@ OUTER: while ( my $line = <STDIN> ) {
                         die( "Token mismatch: " . $chunker_output[$i]->[0] . "/" . substr( $wordstagslemmata[$i], 0, length( $chunker_output[$i]->[0] ) ) ) unless ( $chunker_output[$i]->[0] eq substr( $wordstagslemmata[$i], 0, length( $chunker_output[$i]->[0] ) ) );
                     }
                     &proc_s( \@chunker_output, \@wordstagslemmata );
-		    
+
                     #print Dumper(\@chunker_output);
                     my $sentence = &add_heads( $line . join( "", @wordstagslemmata ) . "</s>\n" );
-		    $sentence = &add_dependencies( $sentence, [@dependencies] );
+                    $sentence = &add_dependencies( $sentence, [@dependencies] );
                     print OUT $sentence;
                     $counter++;
 
@@ -49,7 +62,7 @@ OUTER: while ( my $line = <STDIN> ) {
                     last;
                 }
                 elsif ( $sline eq "<wordstagslemmata>\n" ) {
-                    while ( my $wline = <STDIN> ) {
+                    while ( my $wline = <IN> ) {
                         last if ( $wline eq "</wordstagslemmata>\n" );
 
                         #chomp($wline);
@@ -57,7 +70,7 @@ OUTER: while ( my $line = <STDIN> ) {
                     }
                 }
                 elsif ( $sline eq "<pstree>\n" ) {
-                    while ( my $pline = <STDIN> ) {
+                    while ( my $pline = <IN> ) {
                         last if ( $pline eq "</pstree>\n" );
                         chomp($pline);
                         push( @pstree, $pline );
@@ -65,7 +78,7 @@ OUTER: while ( my $line = <STDIN> ) {
                     }
                 }
                 elsif ( $sline eq "<dependencies>\n" ) {
-                    while ( my $dline = <STDIN> ) {
+                    while ( my $dline = <IN> ) {
                         last if ( $dline eq "</dependencies>\n" );
                         chomp($dline);
                         push( @dependencies, $dline );
@@ -75,7 +88,7 @@ OUTER: while ( my $line = <STDIN> ) {
         }
     }
 
-    #close(IN)  or die("Cannot close file $infile: $!");
+    close(IN)  or die("Cannot close file $infile: $!");
     close(OUT) or die("Cannot close file $infile.out: $!");
 }
 
@@ -105,149 +118,117 @@ sub proc_s {
 sub add_heads {
     my $sentence = shift;
     my $result;
-    #my ($reader, $writer);
-    pipe(READER, WRITER);
-    if ( my $pid = fork ) {
-        close WRITER;
-        $result = join( "", <READER> );
-        close READER;
-        waitpid( $pid, 0 );
-    }
-    else {
-        die "cannot fork: $!" unless defined $pid;
-        close READER;
-        use XML::LibXML;
-        my $dom = XML::LibXML->load_xml( string => $sentence );
-        foreach my $s ( $dom->getElementsByTagName("s") ) {
-            foreach my $phrase ( $s->childNodes() ) {
-                my $name = $phrase->nodeName();
-                next if ( substr( $name, 0, 1 ) eq "#" );
-                my @h = $phrase->getChildrenByTagName("h");
-                if ( @h == 0 ) {
-                    my @children = $phrase->childNodes();
-                    die("Too many or too few children\n") unless ( @children == 1 );
-                    my $text = $phrase->textContent;
-                    $phrase->removeChild( $children[0] );
-                    chomp($text);
-                    $text =~ s/^\n//;
-                    my @text = split( /\n/, $text );
-                    my $newhead = XML::LibXML::Element->new("h");
+    my $dom = XML::LibXML->load_xml( string => $sentence );
+    foreach my $s ( $dom->getElementsByTagName("s") ) {
+        foreach my $phrase ( $s->childNodes() ) {
+            my $name = $phrase->nodeName();
+            next if ( substr( $name, 0, 1 ) eq "#" );
+            my @h = $phrase->getChildrenByTagName("h");
+            if ( @h == 0 ) {
+                my @children = $phrase->childNodes();
+                die("Too many or too few children\n") unless ( @children == 1 );
+                my $text = $phrase->textContent;
+                $phrase->removeChild( $children[0] );
+                chomp($text);
+                $text =~ s/^\n//;
+                my @text = split( /\n/, $text );
+                my $newhead = XML::LibXML::Element->new("h");
 
-                    if ( @text > 1 ) {
-                        $newhead->appendTextNode( "\n" . $text[$#text] . "\n" );
-                        my $oldtext = join( "\n", @text[ 0 .. $#text - 1 ] );
-                        $oldtext = "\n" . $oldtext . "\n";
-                        $phrase->appendChild( XML::LibXML::Text->new($oldtext) );
-                        $phrase->appendChild($newhead);
-                        $phrase->appendChild( XML::LibXML::Text->new("\n") );
-                    }
-                    elsif ( @text < 1 ) {
-                        die("Not enough text in node\n");
-                    }
-                    else {
-                        $newhead->appendTextNode( "\n" . $text[0] . "\n" );
-                        $phrase->appendChild( XML::LibXML::Text->new("\n") );
-                        $phrase->appendChild($newhead);
-                        $phrase->appendChild( XML::LibXML::Text->new("\n") );
-                    }
+                if ( @text > 1 ) {
+                    $newhead->appendTextNode( "\n" . $text[$#text] . "\n" );
+                    my $oldtext = join( "\n", @text[ 0 .. $#text - 1 ] );
+                    $oldtext = "\n" . $oldtext . "\n";
+                    $phrase->appendChild( XML::LibXML::Text->new($oldtext) );
+                    $phrase->appendChild($newhead);
+                    $phrase->appendChild( XML::LibXML::Text->new("\n") );
                 }
-                elsif ( @h > 1 ) {
-
-                    # 1 head is okay
-                    die( "Strange phrase: more than one head! " . $s->getAttribute("id") );
+                elsif ( @text < 1 ) {
+                    die("Not enough text in node\n");
+                }
+                else {
+                    $newhead->appendTextNode( "\n" . $text[0] . "\n" );
+                    $phrase->appendChild( XML::LibXML::Text->new("\n") );
+                    $phrase->appendChild($newhead);
+                    $phrase->appendChild( XML::LibXML::Text->new("\n") );
                 }
             }
+            elsif ( @h > 1 ) {
+
+                # 1 head is okay
+                die( "Strange phrase: more than one head! " . $s->getAttribute("id") );
+            }
         }
-        print WRITER $dom->toString(0);
-        close WRITER;
-        exit;
     }
-    return $result;
+    return $dom->toString(0);
 }
 
 sub add_dependencies {
     my $sentence = shift;
     my $deps     = shift;
     my $result;
-    my ($reader, $writer);
-    pipe( $reader, $writer );
-    if ( my $pid = fork ) {
-        close $writer;
-        $result = join( "", <$reader> );
-        close $reader;
-        waitpid( $pid, 0 );
-    }
-    else {
-        die "cannot fork: $!" unless defined $pid;
-        close $reader;
-        use XML::LibXML;
-        my $dom = XML::LibXML->load_xml( string => $sentence );
-        foreach my $s ( $dom->getElementsByTagName("s") ) {
-            my @sent;
-            my $root = 0;
+    my $dom = XML::LibXML->load_xml( string => $sentence );
+    foreach my $s ( $dom->getElementsByTagName("s") ) {
+        my @sent;
+        my $root = 0;
 
-            # read dependencies
-            my @indeps;
-            my @outdeps;
-            foreach my $depline (@$deps) {
-                next if ( $depline =~ /^\s*$/ );
-                die("Does not match: $depline\n") unless ( $depline =~ m/^([^()]+)\((.+?)-(\d+)((?:&apos;)*), (.+?)-(\d+)((?:&apos;)*)\)$/ );
-                my ( $rel, $reg, $regidx, $regcopy, $dep, $depidx, $depcopy ) = ( $1, $2, $3, $4, $5, $6, $7 );
-                if ( $regidx != $depidx or $regcopy ne $depcopy ) {
-                    if ( $rel eq "root" ) {
-                        $root = $depidx;
-                    }
-                    else {
-                        push( @{ $indeps[$depidx] },  [ $rel, $reg, $regidx, $regcopy, $dep, $depidx, $depcopy ] );
-                        push( @{ $outdeps[$regidx] }, [ $rel, $reg, $regidx, $regcopy, $dep, $depidx, $depcopy ] );
-                    }
+        # read dependencies
+        my @indeps;
+        my @outdeps;
+        foreach my $depline (@$deps) {
+            next if ( $depline =~ /^\s*$/ );
+            die("Does not match: $depline\n") unless ( $depline =~ m/^([^()]+)\((.+?)-(\d+)((?:&apos;)*), (.+?)-(\d+)((?:&apos;)*)\)$/ );
+            my ( $rel, $reg, $regidx, $regcopy, $dep, $depidx, $depcopy ) = ( $1, $2, $3, $4, $5, $6, $7 );
+            if ( $regidx != $depidx or $regcopy ne $depcopy ) {
+                if ( $rel eq "root" ) {
+                    $root = $depidx;
                 }
                 else {
-                    print STDERR "ignore $depline\n";
+                    push( @{ $indeps[$depidx] },  [ $rel, $reg, $regidx, $regcopy, $dep, $depidx, $depcopy ] );
+                    push( @{ $outdeps[$regidx] }, [ $rel, $reg, $regidx, $regcopy, $dep, $depidx, $depcopy ] );
+                }
+            }
+            else {
+                print STDERR "ignore $depline\n";
 
-                    #$ignored++;
-                }
+                #$ignored++;
             }
-            my $slen    = $s->getAttribute("len");
-            my $counter = 0;
-            foreach my $phrase ( $s->childNodes() ) {
-                my $name = $phrase->nodeName();
-                next if ( substr( $name, 0, 1 ) eq "#" );
-                foreach my $head_or_text ( $phrase->childNodes() ) {
-                    my $lname = $head_or_text->nodeName();
-                    my $text  = $head_or_text->textContent;
-                    next if ( $text eq "\n" );
-                    chomp($text);
-                    $text =~ s/^\n//;
-                    my @lines = split( /\n/, $text );
-                    for my $line (@lines) {
-                        for my $deps ( \@indeps, \@outdeps ) {
-                            $line .= "\t|" . join( "|", map( $_->[0] . "(" . ( $_->[2] - ( $counter + 1 ) ) . $_->[3] . "," . ( $_->[5] - ( $counter + 1 ) ) . $_->[6] . ")", @{ $deps->[ $counter + 1 ] } ) );
-                            $line .= "|" if ( @{ $deps->[ $counter + 1 ] } );
-                        }
-                        $line .= "\t";
-                        $counter++;
-                        $line .= "root" if ( $counter == $root );
-                    }
-                    $text = "\n" . join( "\n", @lines ) . "\n";
-                    my $newnode = XML::LibXML::Text->new($text);
-                    if ( $lname eq "h" ) {
-                        $head_or_text->replaceChild( $newnode, $head_or_text->firstChild() );
-                    }
-                    elsif ( $lname eq "#text" ) {
-                        $head_or_text->replaceNode($newnode);
-                    }
-                    else {
-                        die("Unknown name: $name\n");
-                    }
-                    undef($newnode);
-                }
-            }
-            die("$slen != $counter\n") unless ( $slen == $counter );
         }
-        print $writer $dom->toString(0);
-        close $writer;
-        exit;
+        my $slen    = $s->getAttribute("len");
+        my $counter = 0;
+        foreach my $phrase ( $s->childNodes() ) {
+            my $name = $phrase->nodeName();
+            next if ( substr( $name, 0, 1 ) eq "#" );
+            foreach my $head_or_text ( $phrase->childNodes() ) {
+                my $lname = $head_or_text->nodeName();
+                my $text  = $head_or_text->textContent;
+                next if ( $text eq "\n" );
+                chomp($text);
+                $text =~ s/^\n//;
+                my @lines = split( /\n/, $text );
+                for my $line (@lines) {
+                    for my $deps ( \@indeps, \@outdeps ) {
+                        $line .= "\t|" . join( "|", map( $_->[0] . "(" . ( $_->[2] - ( $counter + 1 ) ) . $_->[3] . "," . ( $_->[5] - ( $counter + 1 ) ) . $_->[6] . ")", @{ $deps->[ $counter + 1 ] } ) );
+                        $line .= "|" if ( @{ $deps->[ $counter + 1 ] } );
+                    }
+                    $line .= "\t";
+                    $counter++;
+                    $line .= "root" if ( $counter == $root );
+                }
+                $text = "\n" . join( "\n", @lines ) . "\n";
+                my $newnode = XML::LibXML::Text->new($text);
+                if ( $lname eq "h" ) {
+                    $head_or_text->replaceChild( $newnode, $head_or_text->firstChild() );
+                }
+                elsif ( $lname eq "#text" ) {
+                    $head_or_text->replaceNode($newnode);
+                }
+                else {
+                    die("Unknown name: $name\n");
+                }
+                undef($newnode);
+            }
+        }
+        die("$slen != $counter\n") unless ( $slen == $counter );
     }
-    return $result;
+    return $dom->toString(0);
 }
