@@ -97,14 +97,15 @@ corpora:
 
 # tagsets
 tagsets:
-    penn_extended:
+    penn extended:
         ADJ: ["CD", "JJ", "JJR", "JJS"]
         ADV: ["RB", "RBR", "RBS", "RP", "WRB"]
         CONJ/PREP: ["CC", "IN", "TO"]
         DET: ["DT", "PDT"]
         INTERJ: ["UH"]
         PRON: ["EX", "PRP", "PRP$", "WDT", "WP", "WP$"]
-        PUNC: ["''", "(", ")", "[", "]", "{", "}", ",", ".", ":", "``", "HYPH", "NFP"]
+        #PUNC: ["''", "(", ")", "[", "]", "{", "}", ",", ".", ":", "``", "HYPH", "NFP"]
+        PUNC: ["''", "-LRB-", "-RRB-", "-LSB-", "-RSB-", "-LCB-", "-RCB-", ",", ".", ":", "``", "HYPH", "NFP"]
         SUBST: ["NN", "NNP", "NNPS", "NNS"]
         UNC: ["#", "$", "AFX", "FW", "LS", "POS", "SYM", "XX"]
         VERB: ["MD", "VB", "VBD", "VBG", "VBN", "VBP", "VBZ"]

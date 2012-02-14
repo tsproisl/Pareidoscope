@@ -2,9 +2,10 @@
   Word form query
 </h2>
 <form method="post" action="[% word_form_results_url %]" enctype="multipart/form-data">
-  [% FOREACH hidden_state IN hidden_states %]
-  <input type="hidden" name="[% hidden_state.name %]" value="[% hidden_state.value %]" />
+  [% FOREACH arg IN url_args %]
+  <input type="hidden" name="[% arg.key %]" value="[% arg.value %]" />
   [% END %]
+  <input type="hidden" name="tt1" value="wordform" />
   <table style="margin: 5px 0 0;">
     <tr style="">
       <td style="border: 0px;"><label>

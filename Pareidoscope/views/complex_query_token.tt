@@ -2,8 +2,8 @@
   Complex query (token level)
 </h2>
 <form method="post" action="[% complex_query_results_url %]" enctype="multipart/form-data">
-  [% FOREACH hidden_state IN hidden_states %]
-  <input type="hidden" name="[% hidden_state.name %]" value="[% hidden_state.value %]" />
+  [% FOREACH arg IN url_args %]
+  <input type="hidden" name="[% arg.key %]" value="[% arg.value %]" />
   [% END %]
   [% FOREACH i IN [ 1 2 3 4 5 6 7 8 9 ] %]
   <table style="margin: 5px 0 0;">
