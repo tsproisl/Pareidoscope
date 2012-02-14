@@ -62,6 +62,7 @@ sub fill_database {
     }
     close(TAB) or die("Cannot close $outdir/dependencies.out: $!");
     my $dbh = DBI->connect( "dbi:SQLite:dbname=$outdir/$dbname", "", "" ) or die("Cannot connect: $DBI::errstr");
+    $dbh->do(qq{PRAGMA encoding = 'UTF-8'});
     $dbh->do(qq{DROP TABLE IF EXISTS dependencies});
     $dbh->do(qq{CREATE TABLE dependencies (depid INTEGER PRIMARY KEY AUTOINCREMENT, relation TEXT UNIQUE, frequency INTEGER)});
     my $insert_dependency = $dbh->prepare(qq{INSERT INTO dependencies (relation, frequency) VALUES (?, ?)});

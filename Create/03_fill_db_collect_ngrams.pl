@@ -28,7 +28,7 @@ my $outdir  = shift(@ARGV);
 my $corpus  = shift(@ARGV);
 my $dbname  = shift(@ARGV);
 my $regfile = shift(@ARGV);
-my $tset  = shift(@ARGV);
+my $tset    = shift(@ARGV);
 die("Not a directory: $outdir") unless ( -d $outdir );
 
 my @tagset;
@@ -50,7 +50,7 @@ my @tagset;
 
         # nur PTB
         #@tagset = qw(CC CD DT EX FW IN JJ JJR JJS LS MD NN NNP NNPS NNS PDT POS PRP PRP$ RB RBR RBS RP SYM TO UH VB VBD VBG VBN VBP VBZ WDT WP WP$ WRB # $ , . :  `` '' ( ) [ ] { });
-	@tagset = qw(CC CD DT EX FW IN JJ JJR JJS LS MD NN NNP NNPS NNS PDT POS PRP PRP$ RB RBR RBS RP SYM TO UH VB VBD VBG VBN VBP VBZ WDT WP WP$ WRB # $ , . :  `` '' -LRB- -RRB- -LSB- -RSB- -LCB- -RCB-);
+        @tagset = qw(CC CD DT EX FW IN JJ JJR JJS LS MD NN NNP NNPS NNS PDT POS PRP PRP$ RB RBR RBS RP SYM TO UH VB VBD VBG VBN VBP VBZ WDT WP WP$ WRB # $ , . :  `` '' -LRB- -RRB- -LSB- -RSB- -LCB- -RCB-);
     }
 }
 my %tagset;
@@ -61,6 +61,16 @@ my %types;      # %types = (type => {grami => {lemid => [id, freq, ngfreq]}})
 my $maxloglevel = 3;
 
 my $dbh = DBI->connect("dbi:SQLite:$outdir/$dbname") or die("Cannot connect: $DBI::errstr");
+#$dbh->do("PRAGMA foreign_keys = ON");
+$dbh->do("PRAGMA encoding = 'UTF-8'");
+$dbh->do(qq{DROP TABLE IF EXISTS lemmata});
+$dbh->do(qq{DROP TABLE IF EXISTS types});
+$dbh->do(qq{DROP TABLE IF EXISTS gramis});
+$dbh->do(qq{DROP INDEX IF EXISTS lemididx});
+$dbh->do(qq{CREATE TABLE lemmata (lemid INTEGER PRIMARY KEY, lemma VARCHAR(255) NOT NULL, wc VARCHAR(10) NOT NULL, freq INTEGER NOT NULL, UNIQUE (lemma, wc))});
+$dbh->do(qq{CREATE TABLE types (typid INTEGER PRIMARY KEY, lemid INTEGER NOT NULL, type VARCHAR(255) NOT NULL, gramid INTEGER NOT NULL, freq INTEGER NOT NULL, posseq INTEGER, chunkseq INTEGER, FOREIGN KEY (lemid) REFERENCES lemmata (lemid), FOREIGN KEY (gramid) REFERENCES gramis (gramid), UNIQUE (type, gramid, lemid))});
+$dbh->do(qq{CREATE TABLE gramis (gramid INTEGER PRIMARY KEY, grami VARCHAR(25) NOT NULL, UNIQUE (grami))});
+$dbh->do(qq{CREATE INDEX lemididx ON types (lemid)});
 open( NG, ">:encoding(utf8)", "$outdir/ngrams.out" ) or die("Cannot open $outdir/ngrams.out: $!");
 &create_indexes;
 $dbh->disconnect();

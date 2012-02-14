@@ -55,6 +55,7 @@ sub init_corpus {
     $self->{"active"} = shift @corpora;
     $self->{"dbh"} = DBI->connect( "dbi:SQLite:" . $self->{"active"}->{"database"} ) or die("Cannot connect: $DBI::errstr");
     $self->{"dbh"}->do("PRAGMA foreign_keys = ON");
+    $self->{"dbh"}->do("PRAGMA encoding = 'UTF-8'");
 
     # tags -> numbers
     my $fetchpos = $self->{"dbh"}->prepare(qq{SELECT gramid, grami FROM gramis});

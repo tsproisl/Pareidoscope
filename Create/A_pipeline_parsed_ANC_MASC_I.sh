@@ -13,7 +13,6 @@ max_n=5
 export PERL5LIB="/home/linguistik/tsproisl/local/lib/perl5:/home/linguistik/tsproisl/local/lib/perl5/site_perl:$PERL5LIB"
 
 ./01_cwb-encode.sh $corpus $corpusoutdir $registryfile $corpusname $outdir && \
-./02_create_sqlite_db.sh $outdir $dbname && \
 ./03_fill_db_collect_ngrams.pl $outdir $corpusname $dbname $registryfile $tagset && \
 ./04_count_ngrams.sh $outdir "ngrams" && \
 ./05_create_chunk_db.sh $outdir $dbname && \
