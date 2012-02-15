@@ -5,8 +5,9 @@ use Dancer::Plugin::Database;
 use Fcntl ':flock';
 
 use data;
+use executequeries;
 
-our $VERSION = '0.8.1';
+use version; our $VERSION = qv('0.8.1');
 my $data;
 
 hook 'before' => sub {
@@ -37,6 +38,7 @@ hook 'before_template' => sub {
 
     # Corpus
     $tokens->{"url_args"}->{"corpus"} = param("corpus");
+    $tokens->{"corpus_name"} = $data->{"active"}->{"display_name"};
 };
 
 get '/' => sub {
@@ -101,10 +103,15 @@ get '/complex_query_chunk' => sub {
 };
 
 any [ 'get', 'post' ] => '/results/word_form_query' => sub {
-    template('single_item_query_results');
+    my %vars;
+    $vars{"query_type"} = "Word form query";
+    %vars = ( %vars, &executequeries::single_item_query( $data ) );
+    template('single_item_query_results', \%vars);
 };
 
 any [ 'get', 'post' ] => '/results/lemma_query' => sub {
+    my %vars;
+    $vars{"query_type"} = "Word form query";
     template('single_item_query_results');
 };
 

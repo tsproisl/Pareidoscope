@@ -13,7 +13,7 @@ sub new {
     my $invocant = shift;
     my ($cgi)    = @_;
     my $class    = ref($invocant) || $invocant;
-    my $self = {};
+    my $self     = {};
 
     #-----------
     # START CQP
@@ -39,6 +39,17 @@ sub new {
     # cache requested attribute handles ($Attributes{$name})
     # set non-standard registry directory
     $CWB::CL::Registry = config->{"registry"};
+
+    #---------------------
+    # TAGS TO WORD CLASSES
+    #---------------------
+    foreach my $tagset ( keys %{ config->{"tagsets"} } ) {
+        foreach my $wc ( keys %{ config->{"tagsets"}->{$tagset} } ) {
+            foreach my $tag ( @{ config->{"tagsets"}->{$tagset}->{$wc} } ) {
+                $self->{"tags_to_word_classes"}->{$tagset}->{$tag} = $wc;
+            }
+        }
+    }
 
     bless( $self, $class );
     return $self;

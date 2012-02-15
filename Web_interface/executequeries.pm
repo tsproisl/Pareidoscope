@@ -9,7 +9,7 @@ use strict;
 #use lib "/srv/www/homepages/tsproisl/pareidoscope/local/lib/perl5/site_perl/5.10.0/x86_64-linux-thread-multi";
 
 use statistics;
-use CGI::Carp qw(fatalsToBrowser);
+use Carp;
 use Data::Dumper;
 use URI::Escape;
 use Storable;
