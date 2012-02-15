@@ -1,6 +1,7 @@
 package executequeries;
 use Dancer ':syntax';
 
+use Dancer::Plugin::Database;
 use statistics;
 use Carp;
 use Data::Dumper;
@@ -17,8 +18,6 @@ use localdata_client;
 #-------------------
 sub single_item_query {
     my ($data) = @_;
-
-    #my $localdata = localdata_client->init( $data->{"active"}->{"localdata"}, @{ $data->{"active"}->{"machines"} } );
 
     # variable declarations
     my ( $return_vars, $query, $id, $size, @matches, %wordclasses, %postags, $dthash, @wordforms );
@@ -37,6 +36,7 @@ sub single_item_query {
     $return_vars->{"query"} =~ s/>/&gt;/g;
     $return_vars->{"query"} =~ s/'/&apos;/g;
     $return_vars->{"query"} =~ s/"/&quot;/g;
+    debug("query: $query");
 
     # execute query
     $id = $data->{"cache"}->query( -corpus => $data->{"active"}->{"corpus"}, -query => $query );
@@ -52,10 +52,10 @@ sub single_item_query {
         my ( $word, $pos, $wc, $lemma ) = split( /\t/, $match );
         $word = lc($word) if ( param('i1') );
         $postags{$word}->{$pos}++;
-        if ( param("tt1") eq "wf" ) {
+        if ( param("tt1") eq "wordform" ) {
             $wordclasses{$word}->{$wc}++;
         }
-        elsif ( param("tt1") eq "l" ) {
+        elsif ( param("tt1") eq "lemma" ) {
             $wordclasses{$lemma}->{$wc}++;
         }
     }
@@ -69,7 +69,7 @@ sub single_item_query {
     }
     foreach my $token ( keys %{$dthash} ) {
         foreach my $annotation ( keys %{ $dthash->{$token} } ) {
-            if ( params("dt") eq "split" ) {
+            if ( param("dt") eq "split" ) {
                 my $wc = $data->{'tags_to_word_classes'}->{ $data->{"active"}->{"tagset"} }->{$annotation};
                 croak("Cannot find word class for tag: $annotation") unless ( defined($wc) );
                 push( @wordforms, [ $token, $annotation, $dthash->{$token}->{$annotation}, $wc ] );
@@ -79,29 +79,30 @@ sub single_item_query {
             }
         }
     }
+
     @wordforms = sort { $b->[2] <=> $a->[2] } @wordforms;
     $return_vars->{"word_forms"} = \@wordforms;
 
     # anonyme Funktion zum weiterverarbeiten
     my $call_strucn = sub {
         my ($wfline) = @_;
-	my $old_tt1 = param("tt1");
+        my $old_tt1 = param("tt1");
         foreach my $p qw(t tt p w) {
             foreach my $nr ( 1 .. 9 ) {
-		params->{$p . $nr} = "";
+                params->{ $p . $nr } = "";
             }
         }
         my $freq = $wfline->[2];
         params->{'t1'} = $wfline->[0];
         if ( param("dt") eq "split" ) {
             params->{'p1'}  = $wfline->[1];
-            params->{'tt1'} = "wf";
+            params->{'tt1'} = "wordform";
         }
         elsif ( param("dt") eq "lump" ) {
-            params->{'w1'} = $wfline->[1];
-	    params->{'tt1'} = $old_tt1;
+            params->{'w1'}  = $wfline->[1];
+            params->{'tt1'} = $old_tt1;
         }
-        ###return &strucn( $cgi, $config, $localdata, $freq );
+        return &strucn( $data, $freq );
     };
     $return_vars->{"call_strucn"} = $call_strucn;
     return $return_vars;
@@ -132,22 +133,27 @@ sub single_item_query {
 #     return $vars;
 # }
 
-# #---------------
-# # STRUCN QUERY
-# #---------------
-# sub strucn_query {
-#     my ( $cgi, $config, $localdata ) = @_;
-#     my ( $query, $pos_only_query, $title, $anchor, $query_length, $ngramref );
-#     my ( $id, $freq );
-#     my $vars;
-#     $vars->{"query_type"} = "Structural n-gram query";
-#     ( $query, $pos_only_query, $title, $anchor, $query_length, $ngramref ) = &build_query();
-#     $vars->{"query"} => $cgi->escapeHTML($query);
-#     $id = $config->{"cache"}->query( -corpus => $config->{"active"}->{"corpus"}, -query => $query );
-#     ($freq) = $config->{'cqp'}->exec("size $id");
-#     $vars->{"vars"} = &strucn( $cgi, $config, $localdata, $freq );
-#     return $vars;
-# }
+#---------------
+# STRUCN QUERY
+#---------------
+sub strucn_query {
+    my ( $data ) = @_;
+    my ( $query, $pos_only_query, $title, $anchor, $query_length, $ngramref );
+    my ( $id, $freq );
+    my $return_vars;
+    $return_vars->{"query_type"} = "Structural n-gram query";
+    ( $query, $pos_only_query, $title, $anchor, $query_length, $ngramref ) = &build_query();
+    $return_vars->{"query"} = $query;
+    $return_vars->{"query"} =~ s/&/&amp;/g;
+    $return_vars->{"query"} =~ s/</&lt;/g;
+    $return_vars->{"query"} =~ s/>/&gt;/g;
+    $return_vars->{"query"} =~ s/'/&apos;/g;
+    $return_vars->{"query"} =~ s/"/&quot;/g;
+    $id = $data->{"cache"}->query( -corpus => $data->{"active"}->{"corpus"}, -query => $query );
+    ($freq) = $data->{'cqp'}->exec("size $id");
+    $return_vars->{"vars"} = &strucn( $data, $freq );
+    return $return_vars;
+}
 
 # #--------------
 # # LEXN QUERY
@@ -323,14 +329,15 @@ sub single_item_query {
 # BUILD QUERY
 #-------------
 sub build_query {
+
     #my ($config) = @_;
     my ( @query, @unlex_query, $query, $unlex_query );
     my ( $anchor, @title, $title, $length, @ngram, $ngram );
     foreach my $nr ( 1 .. 9 ) {
         my ( $token, $head, $poswc, $query_elem, $unlex_elem, $title_elem, $token_title, $head_title, $ng_elem );
-        my ( $ct,    $h,    $ht,    $i,          $p,          $t,          $tt,          $w,          $unlex );
+        my ( $ct, $h, $ht, $i, $p, $t, $tt, $w, $unlex );
         foreach my $pair ( [ \$t, "t" ], [ \$tt, "tt" ], [ \$p, "p" ], [ \$w, "w" ], [ \$ct, "ct" ], [ \$h, "h" ], [ \$ht, "ht" ], [ \$i, "i" ] ) {
-            ${ $pair->[0] } = param($pair->[1] . $nr);
+            ${ $pair->[0] } = param( $pair->[1] . $nr );
             ${ $pair->[0] } = undef if ( defined( ${ $pair->[0] } ) and ${ $pair->[0] } eq "" );
         }
         foreach ( \$h, \$p, \$t, \$w ) {
@@ -342,14 +349,14 @@ sub build_query {
         $poswc = "pos='$p'" if ( defined($p) );
         if ( defined($h) ) {
             $head = "[";
-            $head .= "word="  if ( $ht eq "wf" );
-            $head .= "lemma=" if ( $ht eq "l" );
+            $head .= "word="  if ( $ht eq "wordform" );
+            $head .= "lemma=" if ( $ht eq "lemma" );
             $head .= "'$h'";
         }
         if ( defined($t) ) {
             $token = "[";
-            $token .= "word="  if ( $tt eq "wf" );
-            $token .= "lemma=" if ( $tt eq "l" );
+            $token .= "word="  if ( $tt eq "wordform" );
+            $token .= "lemma=" if ( $tt eq "lemma" );
             $token .= "'$t'";
         }
         if ( defined($h) and defined($t) ) {
@@ -553,180 +560,168 @@ sub build_query {
     return ( $query, $unlex_query, $title, $anchor, $length, \@ngram );
 }
 
-# #---------
-# # STRUC N
-# #---------
-# sub strucn {
-#     my ( $cgi, $config, $localdata, $freq ) = @_;
-#     my ($cached_query_id);
-#     my ( $qids, $ngtypes );
-#     my ( $t0, $t1, $t2, $t3, $t4 );
-#     my $skipped          = 0;
-#     my $check_cache      = $config->{"cache_dbh"}->prepare(qq{SELECT qid, r1, n FROM queries WHERE corpus=? AND class=? AND query=?});
-#     my $insert_query     = $config->{"cache_dbh"}->prepare(qq{INSERT INTO queries (corpus, class, query, qlen, time, r1, n) VALUES (?, ?, ?, ?, strftime('%s','now'), ?, ?)});
-#     my $update_timestamp = $config->{"cache_dbh"}->prepare(qq{UPDATE queries SET time=strftime('%s','now') WHERE qid=?});
-#     my $vars;
-#     my $frequency_threshold   = 200000;
-#     my $ngram_types_threshold = 750000;
+#---------
+# STRUC N
+#---------
+sub strucn {
+    my ( $data, $freq ) = @_;
+    my ($cached_query_id);
+    my ( $qids, $ngtypes );
+    my ( $t0, $t1, $t2, $t3, $t4 );
+    my $skipped          = 0;
+    my $check_cache      = database->prepare(qq{SELECT qid, r1, n FROM queries WHERE corpus=? AND class=? AND query=?});
+    my $insert_query     = database->prepare(qq{INSERT INTO queries (corpus, class, query, qlen, time, r1, n) VALUES (?, ?, ?, ?, strftime('%s','now'), ?, ?)});
+    my $update_timestamp = database->prepare(qq{UPDATE queries SET time=strftime('%s','now') WHERE qid=?});
+    my $return_vars;
+    my $frequency_threshold   = 200000;
+    my $ngram_types_threshold = 750000;
+    my $localdata = localdata_client->init( $data->{"active"}->{"localdata"}, @{ $data->{"active"}->{"machines"} } );
 
-#     # build query
-#     my ( $query, $unlex_query, $title, $anchor, $query_length ) = &build_query($config);
-#     $vars->{"query_anchor"} = $anchor;
-#     $vars->{"query_title"}  = $title;
-#     my %specifics;
-#     if ( $config->{"params"}->{"rt"} eq "pos" ) {
-#         %specifics = (
-#             "name"  => "pos",
-#             "class" => "strucp"
-#         );
-#     }
-#     elsif ( $config->{"params"}->{"rt"} eq "chunk" ) {
-#         %specifics = (
-#             "name"  => "chunk",
-#             "class" => "strucc"
-#         );
-#     }
-#     $vars->{"return_type"}        = $specifics{"name"};
-#     $vars->{"frequency"}          = $freq;
-#     $vars->{"frequency_too_high"} = $freq >= $frequency_threshold;
-#     return $vars if ( $freq == 0 );
-#     return $vars if ( $freq >= $frequency_threshold );
+    # build query
+    my ( $query, $unlex_query, $title, $anchor, $query_length ) = &build_query();
+    $return_vars->{"query_anchor"} = $anchor;
+    $return_vars->{"query_title"}  = $title;
+    my %specifics;
+    if ( param("rt") eq "pos" ) {
+        %specifics = (
+            "name"  => "pos",
+            "class" => "strucp"
+        );
+    }
+    elsif ( param("rt") eq "chunk" ) {
+        %specifics = (
+            "name"  => "chunk",
+            "class" => "strucc"
+        );
+    }
+    $return_vars->{"return_type"}        = $specifics{"name"};
+    $return_vars->{"frequency"}          = $freq;
+    $return_vars->{"frequency_too_high"} = $freq >= $frequency_threshold;
+    return $return_vars if ( $freq == 0 );
+    return $return_vars if ( $freq >= $frequency_threshold );
 
-#     #print "query: $query", $cgi->br;
-#     # check cache database
-#     $check_cache->execute( $config->{"active"}->{"corpus"}, $specifics{"class"}, $query );
-#     $qids    = $check_cache->fetchall_arrayref;
-#     $ngtypes = 0;
-#     if ( scalar(@$qids) == 1 ) {
-#         my $qid = $qids->[0]->[0];
-#         $update_timestamp->execute($qid);
-#         my $dbh = DBI->connect("dbi:SQLite:user_data/$qid") or die("Cannot connect: $DBI::errstr");
-#         $dbh->do("SELECT icu_load_collation('en_GB', 'BE')");
-#         my $get_ngram_types = $dbh->prepare(qq{SELECT COUNT(*) FROM results WHERE qid=?});
-#         $get_ngram_types->execute($qid);
-#         $ngtypes                        = ( $get_ngram_types->fetchrow_array )[0];
-#         $vars->{"ngram_tokens"}         = $qids->[0]->[1];
-#         $vars->{"ngram_types"}          = $ngtypes;
-#         $vars->{"too_many_ngram_types"} = $ngtypes >= $ngram_types_threshold;
-#     }
-#     elsif ( scalar(@$qids) == 0 ) {
-#         my ( $qid, @matches, %ngrams );
-#         my $r1 = 0;
-#         $t0              = [ &Time::HiRes::gettimeofday() ];
-#         $cached_query_id = $config->{"cache"}->query( -corpus => $config->{"active"}->{"corpus"}, -query => $query );
-#         $t1              = [ &Time::HiRes::gettimeofday() ];
-#         my $sentence = $config->get_attribute("s");
-#         @matches = $config->{"cqp"}->exec("tabulate $cached_query_id match, matchend");
-#         $t2      = [ &Time::HiRes::gettimeofday() ];
+    # check cache database
+    $check_cache->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $query );
+    $qids    = $check_cache->fetchall_arrayref;
+    $ngtypes = 0;
+    if ( scalar(@$qids) == 1 ) {
+        my $qid = $qids->[0]->[0];
+        $update_timestamp->execute($qid);
+        my $dbh = DBI->connect("dbi:SQLite:" . config->{"user_data"} . "/$qid") or die("Cannot connect: $DBI::errstr");
+	$dbh->do("PRAGMA encoding = 'UTF-8'");
+        my $get_ngram_types = $dbh->prepare(qq{SELECT COUNT(*) FROM results WHERE qid=?});
+        $get_ngram_types->execute($qid);
+        $ngtypes                        = ( $get_ngram_types->fetchrow_array )[0];
+        $return_vars->{"ngram_tokens"}         = $qids->[0]->[1];
+        $return_vars->{"ngram_types"}          = $ngtypes;
+        $return_vars->{"too_many_ngram_types"} = $ngtypes >= $ngram_types_threshold;
+    }
+    elsif ( scalar(@$qids) == 0 ) {
+        my ( $qid, @matches, %ngrams );
+        my $r1 = 0;
+        $t0              = [ &Time::HiRes::gettimeofday() ];
+        $cached_query_id = $data->{"cache"}->query( -corpus => $data->{"active"}->{"corpus"}, -query => $query );
+        $t1              = [ &Time::HiRes::gettimeofday() ];
+        my $sentence = $data->get_attribute("s");
+        @matches = $data->{"cqp"}->exec("tabulate $cached_query_id match, matchend");
+        $t2      = [ &Time::HiRes::gettimeofday() ];
+        my $pos = $data->get_attribute("pos") if ( param("rt") eq "pos" );
+        my $get_chunk_seq = $data->{"dbh"}->prepare(qq{SELECT chunkseq, cposseq FROM sentences WHERE cpos = ?}) if ( param("rt") eq "chunk" );
+        foreach my $m (@matches) {
+            my ( $match, $matchend ) = split( /\t/, $m );
+            my $match_length;    # = ($matchend - $match) + 1;
+                                 # get cpos of sentence start and end
+            my ( $start, $end ) = $sentence->cpos2struc2cpos($match);
+            my ( @cseq, @pseq, @rseq );
+            my $core_query;
+            if ( param("rt") eq "pos" ) {
 
-#         my $pos = $config->get_attribute("pos") if ( $config->{"params"}->{"rt"} eq "pos" );
+                # fetch POS info via CWB::CL
+                @cseq = map( $data->{"tag_to_number"}->{$_}, $pos->cpos2str( $start .. $end ) );
+                @pseq = ( 0 .. $end - $start );
+            }
+            elsif ( param("rt") eq "chunk" ) {
 
-#         #my $head = $config->get_attribute("h") if($config->{"params"}->{"rt"} eq "pos");
-#         my $get_chunk_seq = $config->{"chunk_dbh"}->prepare(qq{SELECT chunkseq, cposseq FROM sentences WHERE cpos = ?}) if ( $config->{"params"}->{"rt"} eq "chunk" );
-#         foreach my $m (@matches) {
-#             my ( $match, $matchend ) = split( /\t/, $m );
-#             my $match_length;    # = ($matchend - $match) + 1;
-#                                  # get cpos of sentence start and end
-#             my ( $start, $end ) = $sentence->cpos2struc2cpos($match);
-#             my ( @cseq, @pseq, @rseq );
-#             my $core_query;
-#             if ( $config->{"params"}->{"rt"} eq "pos" ) {
+                # get sequence of chunks and sequence of cpos from db
+                $get_chunk_seq->execute($start);
+                my $resref = $get_chunk_seq->fetchall_arrayref;
+                croak( "Error while checking chunk sequences: " . scalar(@$resref) . "." ) if ( @$resref != 1 );
+                my ( $chunkseq, $cposseq ) = @{ $resref->[0] };
+                @cseq = split( / /, $chunkseq );
+                @pseq = split( / /, $cposseq );
+            }
+            my ( $cstart, $cend );
+            for ( my $i = $#cseq; $i >= 0; $i-- ) {
+                $cend   = $i if ( ( $pseq[$i] + $start <= $matchend ) and not defined($cend) );
+                $cstart = $i if ( ( $pseq[$i] + $start <= $match )    and not defined($cstart) );
+            }
+            $match_length = ( $cend - $cstart ) + 1;
 
-#                 # fetch POS info via CWB::CL
-#                 @cseq = map( $config->{"tag_to_number"}->{$_}, $pos->cpos2str( $start .. $end ) );
-#                 @pseq = ( 0 .. $end - $start );
+            @rseq = ( 0 .. $cend - $cstart );
+            my $max_start = $cstart - ( $data->{"active"}->{"ngram_length"} - $match_length ) > 0 ? $cstart - ( $data->{"active"}->{"ngram_length"} - $match_length ) : 0;
+            my $max_end   = $cstart + ( $data->{"active"}->{"ngram_length"} - 1 ) < $#cseq        ? $cstart + ( $data->{"active"}->{"ngram_length"} - 1 )             : $#cseq;
+            my $position  = $cstart - $max_start;
+            my @max_ngram = @cseq[ $max_start .. $max_end ];
+            $r1 += &retrieve_ngrams( \@max_ngram, \%ngrams, $data->{"active"}->{"ngram_length"}, $match_length, $position );
+        }
+        ## handle skipped matches
+        #print "$skipped matches of length > 9 had to be discarded", $cgi->br if($skipped);
+        $return_vars->{"ngram_tokens"} = $r1;
+        return $return_vars if ( $r1 == 0 );
 
-#                 #if($config->{"params"}->{"m"} eq "cqcl"){
-#                 #    @hseq = $head->cpos2struc($start .. $end);
-#                 #}
-#             }
-#             elsif ( $config->{"params"}->{"rt"} eq "chunk" ) {
+        # insert into cache database
+        $insert_query->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $query, $query_length, $r1, $data->{"active"}->{ $specifics{"name"} . "_ngrams" } );
+        $check_cache->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $query );
+        $qid = ( $check_cache->fetchrow_array )[0];
+        $t3  = [ &Time::HiRes::gettimeofday() ];
 
-#                 # get sequence of chunks and sequence of cpos from db
-#                 $get_chunk_seq->execute($start);
-#                 my $resref = $get_chunk_seq->fetchall_arrayref;
-#                 croak( "Error while checking chunk sequences: " . scalar(@$resref) . "." ) if ( @$resref != 1 );
-#                 my ( $chunkseq, $cposseq ) = @{ $resref->[0] };
-#                 @cseq = split( / /, $chunkseq );
-#                 @pseq = split( / /, $cposseq );
-#             }
-#             my ( $cstart, $cend );
-#             for ( my $i = $#cseq; $i >= 0; $i-- ) {
-#                 $cend   = $i if ( ( $pseq[$i] + $start <= $matchend ) and not defined($cend) );
-#                 $cstart = $i if ( ( $pseq[$i] + $start <= $match )    and not defined($cstart) );
-#             }
-#             $match_length = ( $cend - $cstart ) + 1;
+        # foreach n-gram type retrieve c1 from ngrams.db and calculate association measure; store results in database
+        my $dbh = &create_new_db($qid);
+        $dbh->disconnect();
+        undef($dbh);
+        my $serialized_ngrams = $localdata->serialize( \%ngrams );
+        $ngtypes                        = scalar(@$serialized_ngrams);
+        $return_vars->{"ngram_types"}          = $ngtypes;
+        $return_vars->{"too_many_ngram_types"} = $ngtypes >= $ngram_types_threshold;
+        return $return_vars if ( $ngtypes >= $ngram_types_threshold );
+        $localdata->add_freq_and_am( $serialized_ngrams, $r1, $data->{"active"}->{ $specifics{"name"} . "_ngrams" }, $qid );
+        $t4 = [ &Time::HiRes::gettimeofday() ];
+        $return_vars->{"execution_times"} = [ map( sprintf( "%.2f", $_ ), ( &Time::HiRes::tv_interval( $t0, $t1 ), &Time::HiRes::tv_interval( $t1, $t2 ), &Time::HiRes::tv_interval( $t2, $t3 ), &Time::HiRes::tv_interval( $t3, $t4 ) ) ) ];
+    }
+    else {
+        croak("Feel proud: you witness an extremely unlikely behaviour of this website.");
+    }
+    ###%$return_vars = ( %$return_vars, %{ &new_print_table( $cgi, $config, $query ) } );
+    ###my $state = $data->keep_states_href( {}, qw(m c t tt p w ct id flen frel ftag fwc fpos i dt rt) );
+    my $state = "dummystate=1";
+    $return_vars->{"previous_href"} = "pareidoscope.cgi?start=" . max( param("start") - 40, 0 ) . "&s=Link&$state" if ( param("start") > 0 );
+    $return_vars->{"next_href"} = "pareidoscope.cgi?start=" . ( param("start") + 40 ) . "&s=Link&$state" unless ( param("start") + 40 >= $ngtypes );
+    return $return_vars;
+}
 
-#             # mark positions of elements (potentially) bearing restrictions
-#             #if($config->{"params"}->{"m"} eq "cqcl" and $config->{"params"}->{"rt"} eq "pos"){
-#             #@rseq = map($_ - $cstart, grep(defined($hseq[$_]), ($cstart .. $cend)));
-#             #}else{
-#             #@rseq = (0 .. $cend - $cstart);
-#             #}
-#             @rseq = ( 0 .. $cend - $cstart );
-#             my $max_start = $cstart - ( $config->{"active"}->{"ngram_length"} - $match_length ) > 0 ? $cstart - ( $config->{"active"}->{"ngram_length"} - $match_length ) : 0;
-#             my $max_end   = $cstart + ( $config->{"active"}->{"ngram_length"} - 1 ) < $#cseq        ? $cstart + ( $config->{"active"}->{"ngram_length"} - 1 )             : $#cseq;
-#             my $position  = $cstart - $max_start;
-#             my @max_ngram = @cseq[ $max_start .. $max_end ];
-#             $r1 += &retrieve_ngrams( \@max_ngram, \%ngrams, $config->{"active"}->{"ngram_length"}, $match_length, $position );
-#         }
-#         ## handle skipped matches
-#         #print "$skipped matches of length > 9 had to be discarded", $cgi->br if($skipped);
-#         $vars->{"ngram_tokens"} = $r1;
-#         return $vars if ( $r1 == 0 );
-
-#         # insert into cache database
-#         $insert_query->execute( $config->{"active"}->{"corpus"}, $specifics{"class"}, $query, $query_length, $r1, $config->{"active"}->{ $specifics{"name"} . "_ngrams" } );
-#         $check_cache->execute( $config->{"active"}->{"corpus"}, $specifics{"class"}, $query );
-#         $qid = ( $check_cache->fetchrow_array )[0];
-#         $t3  = [ &Time::HiRes::gettimeofday() ];
-
-#         # foreach n-gram type retrieve c1 from ngrams.db and calculate association measure; store results in database
-#         my $dbh = &create_new_db($qid);
-#         $dbh->disconnect();
-#         undef($dbh);
-#         my $serialized_ngrams = $localdata->serialize( \%ngrams );
-#         $ngtypes                        = scalar(@$serialized_ngrams);
-#         $vars->{"ngram_types"}          = $ngtypes;
-#         $vars->{"too_many_ngram_types"} = $ngtypes >= $ngram_types_threshold;
-#         return $vars if ( $ngtypes >= $ngram_types_threshold );
-#         $localdata->add_freq_and_am( $config, $serialized_ngrams, $r1, $config->{"active"}->{ $specifics{"name"} . "_ngrams" }, $qid );
-#         $t4 = [ &Time::HiRes::gettimeofday() ];
-#         $vars->{"execution_times"} = [ map( sprintf( "%.2f", $_ ), ( &Time::HiRes::tv_interval( $t0, $t1 ), &Time::HiRes::tv_interval( $t1, $t2 ), &Time::HiRes::tv_interval( $t2, $t3 ), &Time::HiRes::tv_interval( $t3, $t4 ) ) ) ];
-#     }
-#     else {
-#         croak("Feel proud: you witness an extremely unlikely behaviour of this website.");
-#     }
-#     %$vars = ( %$vars, %{ &new_print_table( $cgi, $config, $query ) } );
-#     my $state = $config->keep_states_href( {}, qw(m c t tt p w ct id flen frel ftag fwc fpos i dt rt) );
-#     $vars->{"previous_href"} = "pareidoscope.cgi?start=" . max( $config->{"params"}->{"start"} - 40, 0 ) . "&s=Link&$state" if ( $config->{"params"}->{"start"} > 0 );
-#     $vars->{"next_href"} = "pareidoscope.cgi?start=" . ( $config->{"params"}->{"start"} + 40 ) . "&s=Link&$state" unless ( $config->{"params"}->{"start"} + 40 >= $ngtypes );
-#     return $vars;
-# }
-
-# #---------------
-# # CREATE NEW DB
-# #---------------
-# sub create_new_db {
-#     my ($qid) = @_;
-#     my $dbh = DBI->connect("dbi:SQLite:user_data/$qid") or die("Cannot connect: $DBI::errstr");
-#     $dbh->do("SELECT icu_load_collation('en_GB', 'BE')");
-#     $dbh->do("PRAGMA cache_size = 50000");
-#     $dbh->do(
-#         qq{CREATE TABLE results (
-# 			 rid INTEGER PRIMARY KEY,
-# 			 qid INTEGER NOT NULL,
-# 			 result TEXT NOT NULL,
-# 			 position INTEGER NOT NULL,
-#                          mlen INTEGER NOT NULL,
-# 			 o11 INTEGER NOT NULL,
-# 			 c1 INTEGER NOT NULL,
-# 			 am REAL,
-# 			 UNIQUE (qid, result, position)
-# 		     )}
-#     );
-#     return $dbh;
-# }
+#---------------
+# CREATE NEW DB
+#---------------
+sub create_new_db {
+    my ($qid) = @_;
+    my $dbh = DBI->connect("dbi:SQLite:" . config->{"user_data"} . "/$qid") or die("Cannot connect: $DBI::errstr");
+    $dbh->do("PRAGMA encoding = 'UTF-8'");
+    $dbh->do("PRAGMA cache_size = 50000");
+    $dbh->do(
+        qq{CREATE TABLE results (
+			 rid INTEGER PRIMARY KEY,
+			 qid INTEGER NOT NULL,
+			 result TEXT NOT NULL,
+			 position INTEGER NOT NULL,
+                         mlen INTEGER NOT NULL,
+			 o11 INTEGER NOT NULL,
+			 c1 INTEGER NOT NULL,
+			 am REAL,
+			 UNIQUE (qid, result, position)
+		     )}
+    );
+    return $dbh;
+}
 
 # #---------------------
 # # CREATE N LINK STRUC
@@ -939,7 +934,7 @@ sub build_query {
 #     croak("Error while processing cache database.") unless ( scalar(@$qids) == 1 );
 #     $qid          = $qids->[0]->[0];
 #     $query_length = $qids->[0]->[1];
-#     my $dbh = DBI->connect("dbi:SQLite:user_data/$qid") or die("Cannot connect: $DBI::errstr");
+#     my $dbh = DBI->connect("dbi:SQLite:" . config->{"user_data"} . "/$qid") or die("Cannot connect: $DBI::errstr");
 #     $dbh->do("SELECT icu_load_collation('en_GB', 'BE')");
 #     $dbh->do("PRAGMA cache_size = 50000");
 #     $filter_length = 'AND length(result) ' . $filter_relations{ $config->{"params"}->{"frel"} } . ' ' . ( $config->{"params"}->{"flen"} * 2 + 2 ) if ( defined( $config->{"params"}->{"flen"} ) and defined( $config->{"params"}->{"frel"} ) );
@@ -1013,36 +1008,37 @@ sub build_query {
 #     return $vars;
 # }
 
-# #------------------
-# # RETRIEVE N-GRAMS
-# #------------------
-# sub retrieve_ngrams {
-#     my ( $tagsref, $nghashref, $maxlength, $match_length, $position ) = @_;
-#     my $localr1     = 0;
-#     my $endposition = $position + $match_length - 1;
-#     for ( my $start = 0; $start <= $position; $start++ ) {
+#------------------
+# RETRIEVE N-GRAMS
+#------------------
+sub retrieve_ngrams {
+    my ( $tagsref, $nghashref, $maxlength, $match_length, $position ) = @_;
+    my $localr1     = 0;
+    my $endposition = $position + $match_length - 1;
+    for ( my $start = 0; $start <= $position; $start++ ) {
 
-#         #my $minlength = $endposition - $start + 1 < $match_length + 1 ? $match_length + 1 : $endposition - $start + 1;
-#         my $minlength = $endposition - $start + 1 < $match_length ? $match_length : $endposition - $start + 1;
-#         my $maxlength = $#$tagsref - $start + 1 > $maxlength      ? $maxlength    : $#$tagsref - $start + 1;
-#         my $localposition = $position - $start;
-#         for ( my $length = $minlength; $length <= $maxlength; $length++ ) {
-#             my ( @ngram, $ngram );
-#             @ngram = @$tagsref[ $start .. $start + $length - 1 ];
-#             $ngram = pack( "C*", @ngram );
-#             $nghashref->{$ngram}->{$localposition}->{$match_length}++;
-#             $localr1++;
-#         }
-#     }
-#     return $localr1;
-# }
+        #my $minlength = $endposition - $start + 1 < $match_length + 1 ? $match_length + 1 : $endposition - $start + 1;
+        my $minlength = $endposition - $start + 1 < $match_length ? $match_length : $endposition - $start + 1;
+        my $maxlength = $#$tagsref - $start + 1 > $maxlength      ? $maxlength    : $#$tagsref - $start + 1;
+        my $localposition = $position - $start;
+        for ( my $length = $minlength; $length <= $maxlength; $length++ ) {
+            my ( @ngram, $ngram );
+            @ngram = @$tagsref[ $start .. $start + $length - 1 ];
+            $ngram = pack( "C*", @ngram );
+            $nghashref->{$ngram}->{$localposition}->{$match_length}++;
+            $localr1++;
+        }
+    }
+    return $localr1;
+}
+
 
 # #--------------------------
 # # PRINT NGRAM QUERY TABLES
 # #--------------------------
 # sub print_ngram_query_tables {
 #     my ( $cgi, $config, $qid, $ngramref, $general ) = @_;
-#     my $dbh = DBI->connect("dbi:SQLite:user_data/$qid") or die("Cannot connect: $DBI::errstr");
+#     my $dbh = DBI->connect("dbi:SQLite:" . config->{"user_data"} . "/$qid") or die("Cannot connect: $DBI::errstr");
 #     print $cgi->end_table, $cgi->end_p;
 #     $dbh->do("SELECT icu_load_collation('en_GB', 'BE')");
 #     my $get_top_50    = $dbh->prepare(qq{SELECT result, position, o11, c1, am FROM results WHERE position=? ORDER BY am DESC, o11 DESC LIMIT 0, 40});
@@ -1090,7 +1086,7 @@ sub build_query {
 # sub print_ngram_overview_table {
 #     my ( $cgi, $config, $qid, $ngramref ) = @_;
 #     my $vars;
-#     my $dbh = DBI->connect("dbi:SQLite:user_data/$qid") or die("Cannot connect: $DBI::errstr");
+#     my $dbh = DBI->connect("dbi:SQLite:" . config->{"user_data"} . "/$qid") or die("Cannot connect: $DBI::errstr");
 #     $dbh->do("SELECT icu_load_collation('en_GB', 'BE')");
 #     my $get_top_10    = $dbh->prepare(qq{SELECT result, position, o11, c1, am FROM results WHERE position=? ORDER BY am DESC, o11 DESC LIMIT 0, 10});
 #     my $get_positions = $dbh->prepare(qq{SELECT DISTINCT position FROM results ORDER BY position ASC});

@@ -1,7 +1,7 @@
 package data;
-
 use Dancer ':syntax';
 
+use Carp;
 use DBI;
 
 use CWB;
@@ -91,6 +91,26 @@ sub init_corpus {
     # corpus handle
     $self->{"corpus_handle"} = new CWB::CL::Corpus $self->{"active"}->{"corpus"};
     croak( "Error: can't open corpus " . $self->{"active"}->{"corpus"} . ", aborted." ) unless ( defined( $self->{"corpus_handle"} ) );
+}
+
+
+# $att_handle = config::get_attribute($name);
+#   - get CL attribute handle for specified attribute $name (returns CWB::CL::Attribute object)
+sub get_attribute{
+  croak('Usage:  $att_handle = $config->get_attribute($name);') unless(scalar(@_) == 2);
+  my ($self, $name) = @_;
+  # retrieve attribute handle from cache
+  return $self->{"attributes"}->{$name} if(exists($self->{"attributes"}->{$name}));
+  # try p-attribute first ...
+  my $att = $self->{"corpus_handle"}->attribute($name, "p");
+  # ... then try s-attribute
+  $att = $self->{"corpus_handle"}->attribute($name, "s") unless(defined($att));
+  # ... finally try a-attribute
+  $att = $self->{"corpus_handle"}->attribute($name, "a") unless(defined($att));
+  croak "Can't open attribute ". $self->{"corpus"} . ".$name, sorry." unless(defined($att));
+  # store attribute handle in cache
+  $self->{"attributes"}->{$name} = $att;
+  return $att;
 }
 
 sub DESTROY {

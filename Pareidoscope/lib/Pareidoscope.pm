@@ -3,6 +3,7 @@ use Dancer ':syntax';
 
 use Dancer::Plugin::Database;
 use Fcntl ':flock';
+use Data::Dumper;
 
 use data;
 use executequeries;
@@ -14,8 +15,8 @@ hook 'before' => sub {
     database->sqlite_create_function( "rmfile", 1, sub { unlink map( "public/cache/$_", @_ ); } );
     database->sqlite_create_function( "logquery", 3, sub { open( OUT, ">>:encoding(utf8)", config->{query_log} ) or die("Cannot open query log: $!"); flock( OUT, LOCK_EX ); print OUT join( "\t", @_ ), "\n"; flock( OUT, LOCK_UN ); close(OUT) or die("Cannot close query log: $!"); } );
     $data = data->new();
-    my $params = params;
-    $params->{"corpus"} = config->{"corpora"}->[0]->{"corpus"} unless ( defined( $params->{"corpus"} ) );
+    params->{"corpus"} = config->{"corpora"}->[0]->{"corpus"} unless ( defined( param("corpus") ) );
+    params->{"start"} = 0 unless ( defined( param("start") ) );
     $data->init_corpus( param("corpus") );
 };
 
@@ -105,8 +106,10 @@ get '/complex_query_chunk' => sub {
 any [ 'get', 'post' ] => '/results/word_form_query' => sub {
     my %vars;
     $vars{"query_type"} = "Word form query";
-    %vars = ( %vars, &executequeries::single_item_query( $data ) );
-    template('single_item_query_results', \%vars);
+    %vars = ( %vars, %{ &executequeries::single_item_query($data) } );
+
+    #debug( Dumper( \%vars ) );
+    template( 'single_item_query_results', \%vars );
 };
 
 any [ 'get', 'post' ] => '/results/lemma_query' => sub {

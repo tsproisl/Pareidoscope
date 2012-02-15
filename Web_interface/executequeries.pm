@@ -153,7 +153,7 @@ sub strucn_query {
     my $vars;
     $vars->{"query_type"} = "Structural n-gram query";
     ( $query, $pos_only_query, $title, $anchor, $query_length, $ngramref ) = &build_query($config);
-    $vars->{"query"} => $cgi->escapeHTML($query);
+    $vars->{"query"} = $cgi->escapeHTML($query);
     $id = $config->{"cache"}->query( -corpus => $config->{"active"}->{"corpus"}, -query => $query );
     ($freq) = $config->{'cqp'}->exec("size $id");
     $vars->{"vars"} = &strucn( $cgi, $config, $localdata, $freq );

@@ -1,7 +1,5 @@
 package localdata_client;
-
-use warnings;
-use strict;
+use Dancer ':syntax';
 
 #use threads;
 #use threads::shared;
@@ -76,7 +74,8 @@ sub serialize {
 	my $ngram = unpack("H*", $packed_ngram);
 	foreach my $position (keys %{$ngref->{$packed_ngram}}){
 	    foreach my $match_length (keys %{$ngref->{$packed_ngram}->{$position}}){
-		push(@queue, [$ngram, $position, $match_length, $ngref->{$packed_ngram}->{$position}->{$match_length}]);
+		#push(@queue, [$ngram, $position, $match_length, $ngref->{$packed_ngram}->{$position}->{$match_length}]);
+		push(@queue, [$ngram, $position, $match_length, $ngref->{$packed_ngram}->{$position}->{$match_length}]) if ($ngref->{$packed_ngram}->{$position}->{$match_length} >= 2);
 	    }
 	}
     }
@@ -85,20 +84,21 @@ sub serialize {
 
 
 sub add_freq_and_am {
-    my ($self, $config, $queueref, $r1, $n, $dbname) = @_;
+    my ($self, $queueref, $r1, $n, $dbname) = @_;
     my %ngret;
     my @sockets ;
     my $queue_length = scalar(@$queueref);
-    my $dbh = DBI->connect("dbi:SQLite:user_data/$dbname") or die("Cannot connect: $DBI::errstr");
-    $dbh->do("SELECT icu_load_collation('en_GB', 'BE')");
+    return if($queue_length == 0);
+    my $dbh = DBI->connect("dbi:SQLite:" . config->{"user_data"} . "/$dbname") or die("Cannot connect: $DBI::errstr");
+    $dbh->do("PRAGMA encoding = 'UTF-8'");
     $dbh->do("PRAGMA cache_size = 50000");
     my $insert_result = $dbh->prepare(qq{INSERT INTO results (qid, result, position, mlen, o11, c1, am) VALUES (?, ?, ?, ?, ?, ?, ?)});
     my $cons = scalar(@{$self->{"con"}});
     my %specifics;
-    if($config->{"params"}->{"rt"} eq "pos"){
+    if(param("rt") eq "pos"){
 	%specifics = ("prefix" => "ngrams");
     }
-    elsif($config->{"params"}->{"rt"} eq "chunk"){
+    elsif(param("rt") eq "chunk"){
 	%specifics = ("prefix" => "chunks");
     }
     foreach my $con (@{$self->{"con"}}){

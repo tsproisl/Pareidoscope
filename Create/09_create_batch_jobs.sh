@@ -14,7 +14,7 @@ relations=$outdir/dependency_relations.dump
 
 relations_basename=$(basename $relations)
 
-mkdir $outdir/batch
+mkdir -p $outdir/batch
 cp $relations $outdir/batch/$relations_basename
 
 # split dependencies.out into smaller files of 25,000 lines

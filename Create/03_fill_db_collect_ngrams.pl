@@ -121,7 +121,7 @@ sub create_indexes {
         @lemmata  = split( / /, $lemmata );
         @wcs      = split( / /, $wcs );
         $ergcounter++;
-        &common_functions::log( sprintf( "%d/%d (%.2f%%)", $ergcounter, $size, ( ( $ergcounter / $size ) * 100 ) ), 1, $maxloglevel ) unless ( $ergcounter % 6000 );
+        &common_functions::log( sprintf( "%d/%d (%.2f%%)", $ergcounter, $size, ( ( $ergcounter / $size ) * 100 ) ), 1, $maxloglevel ) unless ( $ergcounter % 100000 );
         die("Damn, tabulate does not seem to work as expected!") unless ( scalar(@words) == scalar(@corptags) and scalar(@words) == scalar(@lemmata) and scalar(@words) == scalar(@wcs) );
         $slen = $Slen->cpos2str($position);
         die("Different lengths for tabulate and s_len attribute") unless ( $slen == scalar(@words) );

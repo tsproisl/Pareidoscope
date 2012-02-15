@@ -51,7 +51,8 @@ plugins:
 query_log: "public/cache/queries.log"
 registry: "corpora/registry"
 cache_database: "public/cache/cache.sqlite"
-cqp_cache: "~/Diss/trunk/Resources/Pareidoscope/Pareidoscope/public/cache/cqp"
+cqp_cache: "public/cache/cqp"
+user_data: "public/cache"
 
 # maximal cache size in MBytes
 cache_size: 4096
@@ -69,15 +70,15 @@ corpora:
       database: "corpora/databases/oanc.sqlite"
       ngram_length: 9
       subgraph_size: 5
-      pos_ngrams: 9037677843 #9145106355
+      pos_ngrams: 9037677843
       chunk_ngrams: 113826088
       subgraphs: 28746592400
       localdata: "/opt/pareidoscope/oanc"
       machines:
           - ["clue22", 4878, 8487]
-          - ["clue23", 4878, 8487]
-          - ["clue14", 4878, 8487]
-          - ["clue15", 4878, 8487]
+#          - ["clue23", 4878, 8487]
+#          - ["clue14", 4878, 8487]
+#          - ["clue15", 4878, 8487]
     - available: 1
       display_name: "ANC MASC I"
       tagset: "penn extended"
