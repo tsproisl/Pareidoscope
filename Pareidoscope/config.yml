@@ -73,9 +73,11 @@ corpora:
       pos_ngrams: 9037677843
       chunk_ngrams: 113826088
       subgraphs: 28746592400
-      localdata: "/opt/pareidoscope/oanc"
+#      localdata: "/opt/pareidoscope/oanc"
+      localdata: "oanc"
       machines:
-          - ["clue22", 4878, 8487]
+          - ["127.0.0.1", 4878, 8487]
+#          - ["clue22", 4878, 8487]
 #          - ["clue23", 4878, 8487]
 #          - ["clue14", 4878, 8487]
 #          - ["clue15", 4878, 8487]

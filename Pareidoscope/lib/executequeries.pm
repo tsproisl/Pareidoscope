@@ -691,7 +691,7 @@ sub strucn {
     else {
         croak("Feel proud: you witness an extremely unlikely behaviour of this website.");
     }
-    ###%$return_vars = ( %$return_vars, %{ &new_print_table( $cgi, $config, $query ) } );
+    %$return_vars = ( %$return_vars, %{ &new_print_table( $data, $query ) } );
     ###my $state = $data->keep_states_href( {}, qw(m c t tt p w ct id flen frel ftag fwc fpos i dt rt) );
     my $state = "dummystate=1";
     $return_vars->{"previous_href"} = "pareidoscope.cgi?start=" . max( param("start") - 40, 0 ) . "&s=Link&$state" if ( param("start") > 0 );
@@ -906,107 +906,107 @@ sub create_new_db {
 #     return $cgi->escapeHTML($href);
 # }
 
-# #-----------------
-# # NEW PRINT TABLE
-# #-----------------
-# sub new_print_table {
-#     my ( $cgi, $config, $query ) = @_;
-#     my ( $qids, $qid, $query_length );
-#     my ( $filter_length, $filter_pos ) = ( "", "" );
-#     my $vars;
-#     my %filter_relations = ( 1 => ">=", 2 => "<=", 3 => "=" );
-#     my %specifics;
-#     if ( $config->{"params"}->{"rt"} eq "pos" ) {
-#         %specifics = (
-#             "map"   => "number_to_tag",
-#             "class" => "strucp"
-#         );
-#     }
-#     elsif ( $config->{"params"}->{"rt"} eq "chunk" ) {
-#         %specifics = (
-#             "map"   => "number_to_chunk",
-#             "class" => "strucc"
-#         );
-#     }
-#     my $check_cache = $config->{"cache_dbh"}->prepare(qq{SELECT qid, qlen, r1, n FROM queries WHERE corpus=? AND class=? AND query=?});
-#     $check_cache->execute( $config->{"active"}->{"corpus"}, $specifics{"class"}, $query );
-#     $qids = $check_cache->fetchall_arrayref;
-#     croak("Error while processing cache database.") unless ( scalar(@$qids) == 1 );
-#     $qid          = $qids->[0]->[0];
-#     $query_length = $qids->[0]->[1];
-#     my $dbh = DBI->connect("dbi:SQLite:" . config->{"user_data"} . "/$qid") or die("Cannot connect: $DBI::errstr");
-#     $dbh->do("SELECT icu_load_collation('en_GB', 'BE')");
-#     $dbh->do("PRAGMA cache_size = 50000");
-#     $filter_length = 'AND length(result) ' . $filter_relations{ $config->{"params"}->{"frel"} } . ' ' . ( $config->{"params"}->{"flen"} * 2 + 2 ) if ( defined( $config->{"params"}->{"flen"} ) and defined( $config->{"params"}->{"frel"} ) );
+#-----------------
+# NEW PRINT TABLE
+#-----------------
+sub new_print_table {
+    my ( $data, $query ) = @_;
+    my ( $qids, $qid, $query_length );
+    my ( $filter_length, $filter_pos ) = ( "", "" );
+    my $vars;
+    my %filter_relations = ( 1 => ">=", 2 => "<=", 3 => "=" );
+    my %specifics;
+    if ( param("rt") eq "pos" ) {
+        %specifics = (
+            "map"   => "number_to_tag",
+            "class" => "strucp"
+        );
+    }
+    elsif ( param("rt") eq "chunk" ) {
+        %specifics = (
+            "map"   => "number_to_chunk",
+            "class" => "strucc"
+        );
+    }
+    my $check_cache = database->prepare(qq{SELECT qid, qlen, r1, n FROM queries WHERE corpus=? AND class=? AND query=?});
+    $check_cache->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $query );
+    $qids = $check_cache->fetchall_arrayref;
+    croak("Error while processing cache database.") unless ( scalar(@$qids) == 1 );
+    $qid          = $qids->[0]->[0];
+    $query_length = $qids->[0]->[1];
+    my $dbh = DBI->connect("dbi:SQLite:" . config->{"user_data"} . "/$qid") or die("Cannot connect: $DBI::errstr");
+    $dbh->do("PRAGMA encoding = 'UTF-8'");
+    $dbh->do("PRAGMA cache_size = 50000");
+    $filter_length = 'AND length(result) ' . $filter_relations{ param("frel") } . ' ' . ( param("flen") * 2 + 2 ) if ( defined( param("flen") ) and defined( param("frel") ) );
 
-#     if ( ( ( defined( $config->{"params"}->{"ftag"} ) and $config->{"params"}->{"ftag"} ne "" ) or ( defined( $config->{"params"}->{"fwc"} ) and $config->{"params"}->{"fwc"} ne "" ) or ( defined( $config->{"params"}->{"fch"} ) and $config->{"params"}->{"fch"} ne "" ) ) and ( defined( $config->{"params"}->{"fpos"} ) and $config->{"params"}->{"fpos"} ne "" ) ) {
-#         my $ftaghex;
-#         if ( defined( $config->{"params"}->{"ftag"} ) and $config->{"params"}->{"ftag"} ne "" ) {
-#             $ftaghex = sprintf( "%02x", $config->{"tag_to_number"}->{ $config->{"params"}->{"ftag"} } );
-#         }
-#         elsif ( defined( $config->{"params"}->{"fwc"} ) and $config->{"params"}->{"fwc"} ne "" ) {
-#             $ftaghex = '(' . join( '|', map( sprintf( "%02x", $config->{"tag_to_number"}->{$_} ), @{ $config->{"word_classes_to_tags"}->{ $config->{"active"}->{"tagset"} }->{ $config->{"params"}->{"fwc"} } } ) ) . ')';
-#         }
-#         elsif ( defined( $config->{"params"}->{"fch"} ) and $config->{"params"}->{"fch"} ne "" ) {
-#             $ftaghex = sprintf( "%02x", $config->{"chunk_to_number"}->{ $config->{"params"}->{"fch"} } );
-#         }
-#         else {
-#             croak("How comes?");
-#         }
-#         $filter_pos = 'AND result REGEXP \'';
+    if ( ( ( defined( param("ftag") ) and param("ftag") ne "" ) or ( defined( param("fwc") ) and param("fwc") ne "" ) or ( defined( param("fch") ) and param("fch") ne "" ) ) and ( defined( param("fpos") ) and param("fpos") ne "" ) ) {
+        my $ftaghex;
+        if ( defined( param("ftag") ) and param("ftag") ne "" ) {
+            $ftaghex = sprintf( "%02x", $data->{"tag_to_number"}->{ param("ftag") } );
+        }
+        elsif ( defined( param("fwc") ) and param("fwc") ne "" ) {
+            $ftaghex = '(' . join( '|', map( sprintf( "%02x", $data->{"tag_to_number"}->{$_} ), @{ $data->{"word_classes_to_tags"}->{ $data->{"active"}->{"tagset"} }->{ param("fwc") } } ) ) . ')';
+        }
+        elsif ( defined( param("fch") ) and param("fch") ne "" ) {
+            $ftaghex = sprintf( "%02x", $data->{"chunk_to_number"}->{ param("fch") } );
+        }
+        else {
+            croak("How comes?");
+        }
+        $filter_pos = 'AND result REGEXP \'';
 
-#         # on the right side
-#         if ( $config->{"params"}->{"fpos"} == 1 ) {
-#             $filter_pos .= ">([0-9a-f]{2})*$ftaghex([0-9a-f]{2})*\$";
-#         }
+        # on the right side
+        if ( param("fpos") == 1 ) {
+            $filter_pos .= ">([0-9a-f]{2})*$ftaghex([0-9a-f]{2})*\$";
+        }
 
-#         # on the left side
-#         elsif ( $config->{"params"}->{"fpos"} == 2 ) {
-#             $filter_pos .= "^([0-9a-f]{2})*$ftaghex([0-9a-f]{2})*<";
-#         }
+        # on the left side
+        elsif ( param("fpos") == 2 ) {
+            $filter_pos .= "^([0-9a-f]{2})*$ftaghex([0-9a-f]{2})*<";
+        }
 
-#         # on either side
-#         elsif ( $config->{"params"}->{"fpos"} == 3 ) {
-#             $filter_pos .= "(^([0-9a-f]{2})*$ftaghex([0-9a-f]{2})*<)|(>([0-9a-f]{2})*$ftaghex([0-9a-f]{2})*\$)";
-#         }
-#         $filter_pos .= '\'';
-#     }
-#     my $get_top_50 = $dbh->prepare(qq{SELECT result, position, mlen, o11, c1, am FROM results WHERE qid=? $filter_length $filter_pos ORDER BY am DESC, o11 DESC LIMIT $config->{"params"}->{"start"}, 40});
-#     $get_top_50->execute($qid);
-#     my $rows = $get_top_50->fetchall_arrayref;
-#     $vars->{"hidden_states"} = $config->keep_states_listref_of_hashrefs( $cgi, {}, qw(m c rt dt start t tt p w i ht h ct) );
-#     $vars->{"pos_tags"}      = $config->{"number_to_tag"};
-#     $vars->{"word_classes"}  = [ "", sort keys %{ $config->{"word_classes_to_tags"}->{ $config->{"active"}->{"tagset"} } } ];
-#     my $counter = $config->{"params"}->{"start"};
+        # on either side
+        elsif ( param("fpos") == 3 ) {
+            $filter_pos .= "(^([0-9a-f]{2})*$ftaghex([0-9a-f]{2})*<)|(>([0-9a-f]{2})*$ftaghex([0-9a-f]{2})*\$)";
+        }
+        $filter_pos .= '\'';
+    }
+    my $get_top_50 = $dbh->prepare(qq{SELECT result, position, mlen, o11, c1, am FROM results WHERE qid=? $filter_length $filter_pos ORDER BY am DESC, o11 DESC LIMIT } . param("start") . qq{, 40});
+    $get_top_50->execute($qid);
+    my $rows = $get_top_50->fetchall_arrayref;
+    ###$vars->{"hidden_states"} = $config->keep_states_listref_of_hashrefs( $cgi, {}, qw(m c rt dt start t tt p w i ht h ct) );
+    $vars->{"pos_tags"}      = $data->{"number_to_tag"};
+    $vars->{"word_classes"}  = [ "", sort keys %{ $data->{"word_classes_to_tags"}->{ $data->{"active"}->{"tagset"} } } ];
+    my $counter = param("start");
 
-#     foreach my $row (@$rows) {
-#         my ( $result, $position, $mlen, $o11, $c1, $g2 ) = @$row;
-#         $row             = {};
-#         $g2              = sprintf( "%.5f", $g2 );
-#         $row->{"g"}      = $g2;
-#         $row->{"cofreq"} = $o11;
-#         $row->{"ngfreq"} = $c1;
-#         my ( $strucnlink, $lexnlink, $freqlink, $ngfreqlink, $g2span );
-#         my ( @result, @ngram, @display_ngram, $display_ngram, );
-#         $result =~ s/[<>]//g;
-#         @ngram                    = map( $config->{ $specifics{"map"} }->[$_], map( hex($_), unpack( "(a2)*", $result ) ) );
-#         @display_ngram            = @ngram;
-#         $display_ngram[$position] = "<em>$display_ngram[$position]";
-#         $display_ngram[ $position + $mlen - 1 ] .= "</em>";
-#         $display_ngram = join( " ", @display_ngram );
-#         $row->{"display_ngram"} = $display_ngram;
+    foreach my $row (@$rows) {
+        my ( $result, $position, $mlen, $o11, $c1, $g2 ) = @$row;
+        $row             = {};
+        $g2              = sprintf( "%.5f", $g2 );
+        $row->{"g"}      = $g2;
+        $row->{"cofreq"} = $o11;
+        $row->{"ngfreq"} = $c1;
+        my ( $strucnlink, $lexnlink, $freqlink, $ngfreqlink, $g2span );
+        my ( @result, @ngram, @display_ngram, $display_ngram, );
+        $result =~ s/[<>]//g;
+        @ngram                    = map( $data->{ $specifics{"map"} }->[$_], map( hex($_), unpack( "(a2)*", $result ) ) );
+        @display_ngram            = @ngram;
+        $display_ngram[$position] = "<em>$display_ngram[$position]";
+        $display_ngram[ $position + $mlen - 1 ] .= "</em>";
+        $display_ngram = join( " ", @display_ngram );
+        $row->{"display_ngram"} = $display_ngram;
 
-#         # CREATE LEX AND STRUC LINKS
-#         $row->{"struc_href"} = &create_n_link_struc( $cgi, $config, "sn", \@ngram, $position );
-#         $row->{"lex_href"}   = &create_n_link_struc( $cgi, $config, "ln", \@ngram, $position );
-#         $row->{"cofreq_href"} = &create_freq_link_struc( $cgi, $config, $o11, $position, @ngram );
-#         $row->{"ngfreq_href"} = &create_ngfreq_link_struc( $cgi, $config, $c1, @ngram );
-#         $counter++;
-#         $row->{"number"} = $counter;
-#     }
-#     $vars->{"rows"} = $rows;
-#     return $vars;
-# }
+        # CREATE LEX AND STRUC LINKS
+        ###$row->{"struc_href"} = &create_n_link_struc( $cgi, $config, "sn", \@ngram, $position );
+        ###$row->{"lex_href"}   = &create_n_link_struc( $cgi, $config, "ln", \@ngram, $position );
+        ###$row->{"cofreq_href"} = &create_freq_link_struc( $cgi, $config, $o11, $position, @ngram );
+        ###$row->{"ngfreq_href"} = &create_ngfreq_link_struc( $cgi, $config, $c1, @ngram );
+        $counter++;
+        $row->{"number"} = $counter;
+    }
+    $vars->{"rows"} = $rows;
+    return $vars;
+}
 
 #------------------
 # RETRIEVE N-GRAMS
