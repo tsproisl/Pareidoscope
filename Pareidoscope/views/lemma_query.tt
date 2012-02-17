@@ -25,6 +25,27 @@
 	</select>
       </td>
     </tr>
+    <tr style="">
+      <td style="border: 0px;">
+        <br />
+        <label>
+          frequency threshold
+        </label>
+        <select name="threshold">
+          <option value="2">2</option>  
+          <option value="3">3</option>  
+          <option value="4">4</option>  
+          <option value="5">5</option>  
+          <option value="10">10</option>  
+          <option value="15">15</option>  
+          <option value="20">20</option>  
+          <option value="25">25</option>  
+          <option value="50">50</option>  
+          <option value="100">100</option>  
+        </select>
+      </td>
+      <td style="border: 0px;"></td>
+    </tr>
   </table>
   <input checked="checked" value="1" name="i1" style="margin-left: 11px; margin-top: 10px;" type="checkbox" />
   Ignore case
