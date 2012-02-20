@@ -2,6 +2,7 @@
     query_title = vars.query_title
     frequency = vars.frequency
     frequency_too_high = vars.frequency_too_high
+    frequency_too_low = vars.frequency_too_low
     ngram_tokens = vars.ngram_tokens
     ngram_types = vars.ngram_types
     return_type = vars.return_type
@@ -21,7 +22,7 @@
 </h3>
 <p>
   frequency: [% frequency %]
-  [% IF frequency > 0 and !frequency_too_high %]
+  [% IF !frequency_too_low and !frequency_too_high %]
   <br />
   occurs in [% ngram_tokens %] [% return_type %] n-gram tokens
   [% IF ngram_tokens > 0 %]
@@ -33,8 +34,12 @@
   <br />
   Unfortunately, your query is too demanding for the hardware the Pareidoscope currently runs on.
   [% END %]
+  [% IF frequency_too_low %]
+  <br />
+  Too few matches.
+  [% END %]
 </p>
-[% IF frequency > 0 and ngram_tokens > 0 and !frequency_too_high and !too_many_ngram_types %]
+[% IF !frequency_too_low and ngram_tokens > 0 and !frequency_too_high and !too_many_ngram_types %]
 <p>
   [% IF execution_times %]
   corpus query: [% execution_times.0 %]s<br />

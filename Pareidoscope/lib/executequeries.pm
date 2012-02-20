@@ -29,7 +29,7 @@ sub single_item_query {
     }
 
     # build query
-    ($query) = &build_query();
+    ($query) = &build_query($data);
     $return_vars->{"query"} = $query;
     $return_vars->{"query"} =~ s/&/&amp;/g;
     $return_vars->{"query"} =~ s/</&lt;/g;
@@ -124,7 +124,7 @@ sub single_item_query {
 #     foreach my $nr ( 1 .. 9 ) {
 #         $config->{"params"}->{"i"}->{$nr} = $config->{"params"}->{"i"}->{1};
 #     }
-#     my ( $query, $pos_only_query, $title, $anchor, $query_length, $ngramref ) = &build_query();
+#     my ( $query, $pos_only_query, $title, $anchor, $query_length, $ngramref ) = &build_query($data);
 #     my $id = $config->{"cache"}->query( -corpus => $config->{"active"}->{"corpus"}, -query => $query );
 #     my ($size) = $config->{"cqp"}->exec("size $id");
 #     $vars->{"query_type"} = "Structural " . $specifics{"name"} . " n-gram query";
@@ -142,7 +142,7 @@ sub strucn_query {
     my ( $id, $freq );
     my $return_vars;
     $return_vars->{"query_type"} = "Structural n-gram query";
-    ( $query, $pos_only_query, $title, $anchor, $query_length, $ngramref ) = &build_query();
+    ( $query, $pos_only_query, $title, $anchor, $query_length, $ngramref ) = &build_query($data);
     $return_vars->{"query"} = $query;
     $return_vars->{"query"} =~ s/&/&amp;/g;
     $return_vars->{"query"} =~ s/</&lt;/g;
@@ -193,7 +193,7 @@ sub strucn_query {
 #         );
 #     }
 #     $vars->{"query_type"} = "Lexical " . $specifics{"name"} . " n-gram query";
-#     ( $smallquery, $query, $title, $anchor, $query_length, $ngramref ) = &build_query();
+#     ( $smallquery, $query, $title, $anchor, $query_length, $ngramref ) = &build_query($data);
 #     $vars->{"query"} = $cgi->escapeHTML($smallquery);
 
 #     # check cache database
@@ -329,8 +329,7 @@ sub strucn_query {
 # BUILD QUERY
 #-------------
 sub build_query {
-
-    #my ($config) = @_;
+    my ($data) = @_;
     my ( @query, @unlex_query, $query, $unlex_query );
     my ( $anchor, @title, $title, $length, @ngram, $ngram );
     foreach my $nr ( 1 .. 9 ) {
@@ -536,13 +535,15 @@ sub build_query {
     }
     $query       = join( " ", @query );
     $unlex_query = join( " ", @unlex_query );
+    my $opening_chunks = join("|", map("<$_>", grep(defined($_), @{$data->{"number_to_chunk"}})));
+    my $closing_chunks = join("|", map("</$_>", grep(defined($_), @{$data->{"number_to_chunk"}})));
     foreach ( \$query, \$unlex_query ) {
         ${$_} =~ s/^(\[\] )*//;
         ${$_} =~ s/( \[\])*$//;
         ${$_} =~ s!^(<any> \[\]\* </any> )*!!;
         ${$_} =~ s!( <any> \[\]\* </any>)*$!!;
-        ${$_} =~ s/<any>/(<adjp>|<advp>|<conjp>|<intj>|<lst>|<np>|<o>|<pp>|<prt>|<sbar>|<ucp>|<vp>)/g;
-        ${$_} =~ s!</any>!(</adjp>|</advp>|</conjp>|</intj>|</lst>|</np>|</o>|</pp>|</prt>|</sbar>|</ucp>|</vp>)!g;
+        ${$_} =~ s/<any>/($opening_chunks)/g;
+        ${$_} =~ s!</any>!($closing_chunks)!g;
         ${$_} .= " within s";
         ${$_} =~ s/\s+/ /;
     }
@@ -578,7 +579,7 @@ sub strucn {
     my $localdata = localdata_client->init( $data->{"active"}->{"localdata"}, @{ $data->{"active"}->{"machines"} } );
 
     # build query
-    my ( $query, $unlex_query, $title, $anchor, $query_length ) = &build_query();
+    my ( $query, $unlex_query, $title, $anchor, $query_length ) = &build_query($data);
     $return_vars->{"query_anchor"} = $anchor;
     $return_vars->{"query_title"}  = $title;
     my %specifics;
@@ -597,8 +598,10 @@ sub strucn {
     $return_vars->{"return_type"}        = $specifics{"name"};
     $return_vars->{"frequency"}          = $freq;
     $return_vars->{"frequency_too_high"} = $freq >= $frequency_threshold;
+    $return_vars->{"frequency_too_low"} = $freq < param("threshold");
     return $return_vars if ( $freq == 0 );
-    return $return_vars if ( $freq >= $frequency_threshold );
+    return $return_vars if ( $return_vars->{"frequency_too_high"} );
+    return $return_vars if ( $return_vars->{"frequency_too_low"} );
 
     # check cache database
     $check_cache->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $query );
