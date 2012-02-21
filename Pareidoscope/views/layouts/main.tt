@@ -95,13 +95,13 @@
 	  version [% version %]
 	</div>
 	<ul>
-	  <li [% IF menu == "o" %]id="current"[% END %]>
+	  <li [% IF current == home_url %]id="current"[% END %]>
 	    <a href="[% home_url %][% FOREACH arg IN url_args %][% IF loop.first %]?[% ELSE %]&[% END %][% arg.key %]=[% arg.value %][% END %]">Home</a>
 	  </li>
-	  <li [% IF menu == "h" %]id="current"[% END %]>
+	  <li [% IF current == help_url %]id="current"[% END %]>
 	    <a href="[% help_url %][% FOREACH arg IN url_args %][% IF loop.first %]?[% ELSE %]&[% END %][% arg.key %]=[% arg.value %][% END %]">Help</a>
 	  </li>
-	  <li class="last" [% IF menu == "a" %]id="current"[% END %]>
+	  <li class="last" [% IF current == about_url %]id="current"[% END %]>
 	    <a href="[% about_url %][% FOREACH arg IN url_args %][% IF loop.first %]?[% ELSE %]&[% END %][% arg.key %]=[% arg.value %][% END %]">About</a>
 	  </li>
 	</ul>

@@ -44,15 +44,15 @@ hook 'before_template' => sub {
 
 get '/' => sub {
     debug( "corpus=" . param("corpus") );
-    template('home');
+    template( 'home', { "current" => uri_for("/") } );
 };
 
 get '/help' => sub {
-    template('help');
+    template( 'help', { "current" => uri_for("/help") } );
 };
 
 get '/about' => sub {
-    template('about');
+    template( 'about', { "current" => uri_for("/about") } );
 };
 
 get '/change_corpus' => sub {
@@ -68,27 +68,39 @@ get '/change_corpus' => sub {
             "subgraphs" => $yesno->( $_->{"subgraphs"} )
         },
         grep( $_->{"available"}, @{ config->{"corpora"} } ) );
-    template( 'change_corpus', { "corpora" => \@corpora } );
+    template(
+        'change_corpus',
+        {   "corpora" => \@corpora,
+            "current" => uri_for("/about")
+        }
+    );
 };
 
 get '/word_form_query' => sub {
     template(
         'word_form_query',
         {   "word_classes" => [ "", sort keys %{ config->{"tagsets"}->{ $data->{"active"}->{"tagset"} } } ],
-            "pos_tags"     => $data->{"number_to_tag"}
+            "pos_tags"     => $data->{"number_to_tag"},
+            "current"      => uri_for("/about"),
         }
     );
 };
 
 get '/lemma_query' => sub {
-    template( 'lemma_query', { "word_classes" => [ sort keys %{ config->{"tagsets"}->{ $data->{"active"}->{"tagset"} } } ] } );
+    template(
+        'lemma_query',
+        {   "word_classes" => [ sort keys %{ config->{"tagsets"}->{ $data->{"active"}->{"tagset"} } } ],
+            "current"      => uri_for("/lemma_query"),
+        }
+    );
 };
 
 get '/complex_query_token' => sub {
     template(
         'complex_query_token',
         {   "word_classes" => [ "", sort keys %{ config->{"tagsets"}->{ $data->{"active"}->{"tagset"} } } ],
-            "pos_tags"     => $data->{"number_to_tag"}
+            "pos_tags"     => $data->{"number_to_tag"},
+            "current"      => uri_for("/complex_query_token"),
         }
     );
 };
@@ -98,7 +110,8 @@ get '/complex_query_chunk' => sub {
         'complex_query_chunk',
         {   "word_classes" => [ "", sort keys %{ config->{"tagsets"}->{ $data->{"active"}->{"tagset"} } } ],
             "pos_tags"     => $data->{"number_to_tag"},
-            "chunk_types"  => $data->{"number_to_chunk"}
+            "chunk_types"  => $data->{"number_to_chunk"},
+            "current"      => uri_for("/complex_query_chunk")
         }
     );
 };
@@ -107,6 +120,7 @@ any [ 'get', 'post' ] => '/results/word_form_query' => sub {
     my %vars;
     $vars{"query_type"} = "Word form query";
     %vars = ( %vars, %{ &executequeries::single_item_query($data) } );
+    $vars{"current"} = uri_for("/results/word_form_query");
 
     #debug( Dumper( \%vars ) );
     template( 'single_item_query_results', \%vars );
@@ -114,12 +128,14 @@ any [ 'get', 'post' ] => '/results/word_form_query' => sub {
 
 any [ 'get', 'post' ] => '/results/lemma_query' => sub {
     my %vars;
-    $vars{"query_type"} = "Word form query";
-    template('single_item_query_results');
+    $vars{"query_type"} = "Lemma query";
+    %vars = ( %vars, %{ &executequeries::single_item_query($data) } );
+    $vars{"current"} = uri_for("/results/lemma_query");
+    template( 'single_item_query_results', \%vars );
 };
 
 any [ 'get', 'post' ] => '/results/complex_query' => sub {
-    template('complex_query_results');
+    template( 'complex_query_results', { "current" => uri_for("/results/complex_query") } );
 };
 
 # get '/' => sub {

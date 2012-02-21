@@ -11,6 +11,7 @@ use kwic;
 use Time::HiRes;
 use DBI;
 use List::Util qw(max);
+use List::MoreUtils qw(any);
 use localdata_client;
 
 #-------------------
@@ -50,7 +51,7 @@ sub single_item_query {
     @matches = $data->{"cqp"}->exec("tabulate $id match word, match pos, match wc, match lemma");
     foreach my $match (@matches) {
         my ( $word, $pos, $wc, $lemma ) = split( /\t/, $match );
-        $word = lc($word) if ( param('i1') );
+        $word = lc($word) if ( param('ignore_case') );
         $postags{$word}->{$pos}++;
         if ( param("tt1") eq "wordform" ) {
             $wordclasses{$word}->{$wc}++;
@@ -61,20 +62,20 @@ sub single_item_query {
     }
 
     # split or lump
-    if ( param("dt") eq "split" ) {
+    if ( param("display_type") eq "split" ) {
         $dthash = \%postags;
     }
-    elsif ( param("dt") eq "lump" ) {
+    elsif ( param("display_type") eq "lump" ) {
         $dthash = \%wordclasses;
     }
     foreach my $token ( keys %{$dthash} ) {
         foreach my $annotation ( keys %{ $dthash->{$token} } ) {
-            if ( param("dt") eq "split" ) {
+            if ( param("display_type") eq "split" ) {
                 my $wc = $data->{'tags_to_word_classes'}->{ $data->{"active"}->{"tagset"} }->{$annotation};
                 croak("Cannot find word class for tag: $annotation") unless ( defined($wc) );
                 push( @wordforms, [ $token, $annotation, $dthash->{$token}->{$annotation}, $wc ] );
             }
-            elsif ( param("dt") eq "lump" ) {
+            elsif ( param("display_type") eq "lump" ) {
                 push( @wordforms, [ $token, $annotation, $dthash->{$token}->{$annotation} ] );
             }
         }
@@ -94,15 +95,15 @@ sub single_item_query {
         }
         my $freq = $wfline->[2];
         params->{'t1'} = $wfline->[0];
-        if ( param("dt") eq "split" ) {
+        if ( param("display_type") eq "split" ) {
             params->{'p1'}  = $wfline->[1];
             params->{'tt1'} = "wordform";
         }
-        elsif ( param("dt") eq "lump" ) {
+        elsif ( param("display_type") eq "lump" ) {
             params->{'w1'}  = $wfline->[1];
             params->{'tt1'} = $old_tt1;
         }
-        return &strucn( $data, $freq );
+        return &_strucn( $data, $freq );
     };
     $return_vars->{"call_strucn"} = $call_strucn;
     return $return_vars;
@@ -129,7 +130,7 @@ sub single_item_query {
 #     my ($size) = $config->{"cqp"}->exec("size $id");
 #     $vars->{"query_type"} = "Structural " . $specifics{"name"} . " n-gram query";
 #     $vars->{"query"}      = $cgi->escapeHTML($query);
-#     $vars->{"vars"}       = &strucn( $cgi, $config, $localdata, $size );
+#     $vars->{"vars"}       = &_strucn( $cgi, $config, $localdata, $size );
 #     return $vars;
 # }
 
@@ -137,7 +138,7 @@ sub single_item_query {
 # STRUCN QUERY
 #---------------
 sub strucn_query {
-    my ( $data ) = @_;
+    my ($data) = @_;
     my ( $query, $pos_only_query, $title, $anchor, $query_length, $ngramref );
     my ( $id, $freq );
     my $return_vars;
@@ -151,7 +152,7 @@ sub strucn_query {
     $return_vars->{"query"} =~ s/"/&quot;/g;
     $id = $data->{"cache"}->query( -corpus => $data->{"active"}->{"corpus"}, -query => $query );
     ($freq) = $data->{'cqp'}->exec("size $id");
-    $return_vars->{"vars"} = &strucn( $data, $freq );
+    $return_vars->{"vars"} = &_strucn( $data, $freq );
     return $return_vars;
 }
 
@@ -334,8 +335,8 @@ sub build_query {
     my ( $anchor, @title, $title, $length, @ngram, $ngram );
     foreach my $nr ( 1 .. 9 ) {
         my ( $token, $head, $poswc, $query_elem, $unlex_elem, $title_elem, $token_title, $head_title, $ng_elem );
-        my ( $ct, $h, $ht, $i, $p, $t, $tt, $w, $unlex );
-        foreach my $pair ( [ \$t, "t" ], [ \$tt, "tt" ], [ \$p, "p" ], [ \$w, "w" ], [ \$ct, "ct" ], [ \$h, "h" ], [ \$ht, "ht" ], [ \$i, "i" ] ) {
+        my ( $ct, $h, $ht, $p, $t, $tt, $w, $unlex );
+        foreach my $pair ( [ \$t, "t" ], [ \$tt, "tt" ], [ \$p, "p" ], [ \$w, "w" ], [ \$ct, "ct" ], [ \$h, "h" ], [ \$ht, "ht" ] ) {
             ${ $pair->[0] } = param( $pair->[1] . $nr );
             ${ $pair->[0] } = undef if ( defined( ${ $pair->[0] } ) and ${ $pair->[0] } eq "" );
         }
@@ -359,15 +360,15 @@ sub build_query {
             $token .= "'$t'";
         }
         if ( defined($h) and defined($t) ) {
-            $token .= ' %c' if ($i);
+            $token .= ' %c' if ( param("ignore_case") );
             $token .= " & $poswc" if ( defined($poswc) );
         }
         elsif ( defined($h) and ( not defined($t) ) ) {
-            $head .= ' %c' if ($i);
+            $head .= ' %c' if ( param("ignore_case") );
             $head .= " & $poswc" if ( defined($poswc) );
         }
         elsif ( ( not defined($h) ) and defined($t) ) {
-            $token .= ' %c' if ($i);
+            $token .= ' %c' if ( param("ignore_case") );
             $token .= " & $poswc" if ( defined($poswc) );
         }
         elsif ( ( not defined($h) ) and ( not defined($t) ) ) {
@@ -520,8 +521,6 @@ sub build_query {
             elsif ( ( not defined($head) ) and ( not defined($token) ) ) {
                 $query_elem = "[]";
                 $title_elem = "x";
-
-                #croak("neither head nor token defined: $i\n");
             }
             $unlex_elem = "[";
             $unlex_elem .= $poswc if ( defined($poswc) );
@@ -535,8 +534,8 @@ sub build_query {
     }
     $query       = join( " ", @query );
     $unlex_query = join( " ", @unlex_query );
-    my $opening_chunks = join("|", map("<$_>", grep(defined($_), @{$data->{"number_to_chunk"}})));
-    my $closing_chunks = join("|", map("</$_>", grep(defined($_), @{$data->{"number_to_chunk"}})));
+    my $opening_chunks = join( "|", map( "<$_>",  grep( defined($_), @{ $data->{"number_to_chunk"} } ) ) );
+    my $closing_chunks = join( "|", map( "</$_>", grep( defined($_), @{ $data->{"number_to_chunk"} } ) ) );
     foreach ( \$query, \$unlex_query ) {
         ${$_} =~ s/^(\[\] )*//;
         ${$_} =~ s/( \[\])*$//;
@@ -564,19 +563,19 @@ sub build_query {
 #---------
 # STRUC N
 #---------
-sub strucn {
+sub _strucn {
     my ( $data, $freq ) = @_;
     my ($cached_query_id);
     my ( $qids, $ngtypes );
     my ( $t0, $t1, $t2, $t3, $t4 );
     my $skipped          = 0;
-    my $check_cache      = database->prepare(qq{SELECT qid, r1, n FROM queries WHERE corpus=? AND class=? AND query=?});
-    my $insert_query     = database->prepare(qq{INSERT INTO queries (corpus, class, query, qlen, time, r1, n) VALUES (?, ?, ?, ?, strftime('%s','now'), ?, ?)});
+    my $check_cache      = database->prepare(qq{SELECT qid, r1, n FROM queries WHERE corpus=? AND class=? AND query=? AND threshold=?});
+    my $insert_query     = database->prepare(qq{INSERT INTO queries (corpus, class, query, threshold, qlen, time, r1, n) VALUES (?, ?, ?, ?, ?, strftime('%s','now'), ?, ?)});
     my $update_timestamp = database->prepare(qq{UPDATE queries SET time=strftime('%s','now') WHERE qid=?});
     my $return_vars;
     my $frequency_threshold   = 200000;
     my $ngram_types_threshold = 750000;
-    my $localdata = localdata_client->init( $data->{"active"}->{"localdata"}, @{ $data->{"active"}->{"machines"} } );
+    my $localdata             = localdata_client->init( $data->{"active"}->{"localdata"}, @{ $data->{"active"}->{"machines"} } );
 
     # build query
     my ( $query, $unlex_query, $title, $anchor, $query_length ) = &build_query($data);
@@ -598,23 +597,23 @@ sub strucn {
     $return_vars->{"return_type"}        = $specifics{"name"};
     $return_vars->{"frequency"}          = $freq;
     $return_vars->{"frequency_too_high"} = $freq >= $frequency_threshold;
-    $return_vars->{"frequency_too_low"} = $freq < param("threshold");
+    $return_vars->{"frequency_too_low"}  = $freq < param("threshold");
     return $return_vars if ( $freq == 0 );
     return $return_vars if ( $return_vars->{"frequency_too_high"} );
     return $return_vars if ( $return_vars->{"frequency_too_low"} );
 
     # check cache database
-    $check_cache->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $query );
+    $check_cache->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $query, param("threshold") );
     $qids    = $check_cache->fetchall_arrayref;
     $ngtypes = 0;
     if ( scalar(@$qids) == 1 ) {
         my $qid = $qids->[0]->[0];
         $update_timestamp->execute($qid);
-        my $dbh = DBI->connect("dbi:SQLite:" . config->{"user_data"} . "/$qid") or die("Cannot connect: $DBI::errstr");
-	$dbh->do("PRAGMA encoding = 'UTF-8'");
+        my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$qid" ) or die("Cannot connect: $DBI::errstr");
+        $dbh->do("PRAGMA encoding = 'UTF-8'");
         my $get_ngram_types = $dbh->prepare(qq{SELECT COUNT(*) FROM results WHERE qid=?});
         $get_ngram_types->execute($qid);
-        $ngtypes                        = ( $get_ngram_types->fetchrow_array )[0];
+        $ngtypes                               = ( $get_ngram_types->fetchrow_array )[0];
         $return_vars->{"ngram_tokens"}         = $qids->[0]->[1];
         $return_vars->{"ngram_types"}          = $ngtypes;
         $return_vars->{"too_many_ngram_types"} = $ngtypes >= $ngram_types_threshold;
@@ -630,6 +629,7 @@ sub strucn {
         $t2      = [ &Time::HiRes::gettimeofday() ];
         my $pos = $data->get_attribute("pos") if ( param("rt") eq "pos" );
         my $get_chunk_seq = $data->{"dbh"}->prepare(qq{SELECT chunkseq, cposseq FROM sentences WHERE cpos = ?}) if ( param("rt") eq "chunk" );
+
         foreach my $m (@matches) {
             my ( $match, $matchend ) = split( /\t/, $m );
             my $match_length;    # = ($matchend - $match) + 1;
@@ -673,8 +673,8 @@ sub strucn {
         return $return_vars if ( $r1 == 0 );
 
         # insert into cache database
-        $insert_query->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $query, $query_length, $r1, $data->{"active"}->{ $specifics{"name"} . "_ngrams" } );
-        $check_cache->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $query );
+        $insert_query->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $query, param("threshold"), $query_length, $r1, $data->{"active"}->{ $specifics{"name"} . "_ngrams" } );
+        $check_cache->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $query, param("threshold") );
         $qid = ( $check_cache->fetchrow_array )[0];
         $t3  = [ &Time::HiRes::gettimeofday() ];
 
@@ -683,7 +683,7 @@ sub strucn {
         $dbh->disconnect();
         undef($dbh);
         my $serialized_ngrams = $localdata->serialize( \%ngrams );
-        $ngtypes                        = scalar(@$serialized_ngrams);
+        $ngtypes                               = scalar(@$serialized_ngrams);
         $return_vars->{"ngram_types"}          = $ngtypes;
         $return_vars->{"too_many_ngram_types"} = $ngtypes >= $ngram_types_threshold;
         return $return_vars if ( $ngtypes >= $ngram_types_threshold );
@@ -695,10 +695,18 @@ sub strucn {
         croak("Feel proud: you witness an extremely unlikely behaviour of this website.");
     }
     %$return_vars = ( %$return_vars, %{ &new_print_table( $data, $query ) } );
-    ###my $state = $data->keep_states_href( {}, qw(m c t tt p w ct id flen frel ftag fwc fpos i dt rt) );
-    my $state = "dummystate=1";
-    $return_vars->{"previous_href"} = "pareidoscope.cgi?start=" . max( param("start") - 40, 0 ) . "&s=Link&$state" if ( param("start") > 0 );
-    $return_vars->{"next_href"} = "pareidoscope.cgi?start=" . ( param("start") + 40 ) . "&s=Link&$state" unless ( param("start") + 40 >= $ngtypes );
+
+    #my $state = $data->keep_states_href( {}, qw(m c t tt p w ct id flen frel ftag fwc fpos i dt rt) );
+    #$return_vars->{"previous_href"} = "pareidoscope.cgi?start=" . max( param("start") - 40, 0 ) . "&s=Link&$state" if ( param("start") > 0 );
+    #$return_vars->{"next_href"} = "pareidoscope.cgi?start=" . ( param("start") + 40 ) . "&s=Link&$state" unless ( param("start") + 40 >= $ngtypes );
+
+    # fch q h ht
+    foreach my $param ( keys %{ params() } ) {
+        next if ( param($param) eq q{} );
+        $return_vars->{"previous_href"}->{$param} = $return_vars->{"next_href"}->{$param} = param($param);
+    }
+    $return_vars->{"previous_href"}->{"start"} = param("start") - 40;
+    $return_vars->{"next_href"}->{"start"}     = param("start") + 40;
     return $return_vars;
 }
 
@@ -707,7 +715,7 @@ sub strucn {
 #---------------
 sub create_new_db {
     my ($qid) = @_;
-    my $dbh = DBI->connect("dbi:SQLite:" . config->{"user_data"} . "/$qid") or die("Cannot connect: $DBI::errstr");
+    my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$qid" ) or die("Cannot connect: $DBI::errstr");
     $dbh->do("PRAGMA encoding = 'UTF-8'");
     $dbh->do("PRAGMA cache_size = 50000");
     $dbh->do(
@@ -931,13 +939,13 @@ sub new_print_table {
             "class" => "strucc"
         );
     }
-    my $check_cache = database->prepare(qq{SELECT qid, qlen, r1, n FROM queries WHERE corpus=? AND class=? AND query=?});
-    $check_cache->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $query );
+    my $check_cache = database->prepare(qq{SELECT qid, qlen, r1, n FROM queries WHERE corpus=? AND class=? AND query=? AND threshold=?});
+    $check_cache->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $query, param("threshold") );
     $qids = $check_cache->fetchall_arrayref;
     croak("Error while processing cache database.") unless ( scalar(@$qids) == 1 );
     $qid          = $qids->[0]->[0];
     $query_length = $qids->[0]->[1];
-    my $dbh = DBI->connect("dbi:SQLite:" . config->{"user_data"} . "/$qid") or die("Cannot connect: $DBI::errstr");
+    my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$qid" ) or die("Cannot connect: $DBI::errstr");
     $dbh->do("PRAGMA encoding = 'UTF-8'");
     $dbh->do("PRAGMA cache_size = 50000");
     $filter_length = 'AND length(result) ' . $filter_relations{ param("frel") } . ' ' . ( param("flen") * 2 + 2 ) if ( defined( param("flen") ) and defined( param("frel") ) );
@@ -948,7 +956,7 @@ sub new_print_table {
             $ftaghex = sprintf( "%02x", $data->{"tag_to_number"}->{ param("ftag") } );
         }
         elsif ( defined( param("fwc") ) and param("fwc") ne "" ) {
-            $ftaghex = '(' . join( '|', map( sprintf( "%02x", $data->{"tag_to_number"}->{$_} ), @{ $data->{"word_classes_to_tags"}->{ $data->{"active"}->{"tagset"} }->{ param("fwc") } } ) ) . ')';
+            $ftaghex = '(' . join( '|', map( sprintf( "%02x", $data->{"tag_to_number"}->{$_} ), @{ config->{"tagsets"}->{ $data->{"active"}->{"tagset"} }->{ param("fwc") } } ) ) . ')';
         }
         elsif ( defined( param("fch") ) and param("fch") ne "" ) {
             $ftaghex = sprintf( "%02x", $data->{"chunk_to_number"}->{ param("fch") } );
@@ -974,12 +982,20 @@ sub new_print_table {
         }
         $filter_pos .= '\'';
     }
-    my $get_top_50 = $dbh->prepare(qq{SELECT result, position, mlen, o11, c1, am FROM results WHERE qid=? $filter_length $filter_pos ORDER BY am DESC, o11 DESC LIMIT } . param("start") . qq{, 40});
+    my $get_top_50 = $dbh->prepare( qq{SELECT result, position, mlen, o11, c1, am FROM results WHERE qid=? $filter_length $filter_pos ORDER BY am DESC, o11 DESC LIMIT } . param("start") . qq{, 40} );
     $get_top_50->execute($qid);
     my $rows = $get_top_50->fetchall_arrayref;
+
     ###$vars->{"hidden_states"} = $config->keep_states_listref_of_hashrefs( $cgi, {}, qw(m c rt dt start t tt p w i ht h ct) );
-    $vars->{"pos_tags"}      = $data->{"number_to_tag"};
-    $vars->{"word_classes"}  = [ "", sort keys %{ $data->{"word_classes_to_tags"}->{ $data->{"active"}->{"tagset"} } } ];
+    # id fch flen frel ftag fwc fpos q rt
+    foreach my $param ( keys %{ params() } ) {
+        next if ( param($param) eq q{} );
+        next if any { $_ eq $param } qw(fch flen frel ftag fwc fpos);
+        $vars->{"hidden_states"}->{$param} = param($param);
+    }
+
+    $vars->{"pos_tags"} = $data->{"number_to_tag"};
+    $vars->{"word_classes"} = [ "", sort keys %{ config->{"tagsets"}->{ $data->{"active"}->{"tagset"} } } ];
     my $counter = param("start");
 
     foreach my $row (@$rows) {
@@ -1034,7 +1050,6 @@ sub retrieve_ngrams {
     }
     return $localr1;
 }
-
 
 # #--------------------------
 # # PRINT NGRAM QUERY TABLES

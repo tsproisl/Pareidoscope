@@ -75,7 +75,7 @@ sub serialize {
 	foreach my $position (keys %{$ngref->{$packed_ngram}}){
 	    foreach my $match_length (keys %{$ngref->{$packed_ngram}->{$position}}){
 		#push(@queue, [$ngram, $position, $match_length, $ngref->{$packed_ngram}->{$position}->{$match_length}]);
-		push(@queue, [$ngram, $position, $match_length, $ngref->{$packed_ngram}->{$position}->{$match_length}]) if ($ngref->{$packed_ngram}->{$position}->{$match_length} >= 2);
+		push(@queue, [$ngram, $position, $match_length, $ngref->{$packed_ngram}->{$position}->{$match_length}]) if ($ngref->{$packed_ngram}->{$position}->{$match_length} >= param("threshold"));
 	    }
 	}
     }

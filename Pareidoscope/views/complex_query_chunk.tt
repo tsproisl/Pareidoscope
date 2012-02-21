@@ -78,13 +78,13 @@
       <td style="border: 0px;"></td>
     </tr>
   </table>
-  <input checked="checked" value="1" name="i1" style="margin-left: 11px; margin-top: 10px; margin-bottom: 10px" type="checkbox" />
+  <input checked="checked" value="1" name="ignore_case" style="margin-left: 11px; margin-top: 10px; margin-bottom: 10px" type="checkbox" />
   Ignore case
   <br />
   <input checked="checked" value="chunk" name="rt" style="margin-left: 11px; margin-top: 10px;" type="radio" />
   sequences of syntactic chunks
   <br />
-  <input checked="checked" value="lump" name="dt" style="margin-left: 11px; margin-top: 10px;" type="radio" />
+  <input checked="checked" value="lump" name="display_type" style="margin-left: 11px; margin-top: 10px;" type="radio" />
   lump results
   <br />
   <input type="submit" name="s" value="Submit" style="margin-left: 11px; margin-top: 10px; margin-bottom: 15px;" class="button" />

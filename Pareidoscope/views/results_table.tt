@@ -50,10 +50,10 @@
   Using cache database
   [% END %]
 </p>
-<form method="post" action="pareidoscope.cgi" enctype="multipart/form-data">
+<form method="post" action="[% current %]" enctype="multipart/form-data">
   <p style="padding: 10px;">
     [% FOREACH hidden_state IN hidden_states %]
-    <input type="hidden" name="[% hidden_state.name %]" value="[% hidden_state.value %]" />
+    <input type="hidden" name="[% hidden_state.key %]" value="[% hidden_state.value %]" />
     [% END %]
     n-gram with n
     <select name="frel" >
@@ -147,14 +147,14 @@
   [% END %]
 </table>
 <p style="margin-top: -10px;">
-  [% IF previous_href %]
-  <a href="[% previous_href %]">previous</a>
+  [% IF previous_href.start >= 0 %]
+  <a href="[% current %][% FOREACH arg IN previous_href %][% IF loop.first %]?[% ELSE %]&[% END %][% arg.key %]=[% arg.value %][% END %]">previous</a>
   [% ELSE %]
   previous
   [% END %]
   &nbsp;&nbsp;
-  [% IF next_href %]
-  <a href="[% next_href %]">next</a>
+  [% IF next_href.start <= ngram_types %]
+  <a href="[% current %][% FOREACH arg IN next_href %][% IF loop.first %]?[% ELSE %]&[% END %][% arg.key %]=[% arg.value %][% END %]">next</a>
   [% ELSE %]
   next
   [% END %]

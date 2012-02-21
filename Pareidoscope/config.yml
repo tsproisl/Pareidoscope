@@ -44,7 +44,7 @@ plugins:
             - "PRAGMA foreign_keys = ON"
             - "PRAGMA cache_size = 50000"
             - "PRAGMA encoding = 'UTF-8'"
-            - "CREATE TABLE IF NOT EXISTS queries (qid INTEGER PRIMARY KEY, corpus TEXT NOT NULL, class VARCHAR(10) NOT NULL, query TEXT NOT NULL, qlen INTEGER NOT NULL, time INTEGER NOT NULL, r1 INTEGER NOT NULL, n INTEGER NOT NULL, UNIQUE (corpus, class, query))"
+            - "CREATE TABLE IF NOT EXISTS queries (qid INTEGER PRIMARY KEY, corpus TEXT NOT NULL, class VARCHAR(10) NOT NULL, query TEXT NOT NULL, threshold INTEGER NOT NULL, qlen INTEGER NOT NULL, time INTEGER NOT NULL, r1 INTEGER NOT NULL, n INTEGER NOT NULL, UNIQUE (corpus, class, query, threshold))"
             - "CREATE TRIGGER IF NOT EXISTS clean AFTER INSERT ON queries BEGIN SELECT logquery(class, query, datetime(time, 'unixepoch', 'localtime')) FROM queries WHERE qid = new.qid; SELECT rmfile(qid) FROM queries WHERE time < new.time - 1800; DELETE FROM queries WHERE time < new.time - 1800; END;"
 
 # paths
