@@ -64,7 +64,7 @@ sub init_corpus {
     my @corpora = grep( $_->{"corpus"} eq $corpus, @{ config->{"corpora"} } );
     error("Unknown corpus: $corpus") unless ( @corpora == 1 );
     $self->{"active"} = shift @corpora;
-    $self->{"dbh"} = DBI->connect( "dbi:SQLite:" . $self->{"active"}->{"database"} ) or die("Cannot connect: $DBI::errstr");
+    $self->{"dbh"} = DBI->connect( "dbi:SQLite:" . $self->{"active"}->{"database"} ) or croak("Cannot connect: $DBI::errstr");
     $self->{"dbh"}->do("PRAGMA foreign_keys = ON");
     $self->{"dbh"}->do("PRAGMA encoding = 'UTF-8'");
 

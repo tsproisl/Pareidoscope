@@ -75,7 +75,8 @@ sub serialize {
 	foreach my $position (keys %{$ngref->{$packed_ngram}}){
 	    foreach my $match_length (keys %{$ngref->{$packed_ngram}->{$position}}){
 		#push(@queue, [$ngram, $position, $match_length, $ngref->{$packed_ngram}->{$position}->{$match_length}]);
-		push(@queue, [$ngram, $position, $match_length, $ngref->{$packed_ngram}->{$position}->{$match_length}]) if ($ngref->{$packed_ngram}->{$position}->{$match_length} >= param("threshold"));
+		my $frequency = scalar(keys %{$ngref->{$packed_ngram}->{$position}->{$match_length}});
+		push(@queue, [$ngram, $position, $match_length, $frequency]) if ($frequency >= param("threshold"));
 	    }
 	}
     }
@@ -89,7 +90,7 @@ sub add_freq_and_am {
     my @sockets ;
     my $queue_length = scalar(@$queueref);
     return if($queue_length == 0);
-    my $dbh = DBI->connect("dbi:SQLite:" . config->{"user_data"} . "/$dbname") or die("Cannot connect: $DBI::errstr");
+    my $dbh = DBI->connect("dbi:SQLite:" . config->{"user_data"} . "/$dbname") or croak("Cannot connect: $DBI::errstr");
     $dbh->do("PRAGMA encoding = 'UTF-8'");
     $dbh->do("PRAGMA cache_size = 50000");
     my $insert_result = $dbh->prepare(qq{INSERT INTO results (qid, result, position, mlen, o11, c1, am) VALUES (?, ?, ?, ?, ?, ?, ?)});
@@ -103,14 +104,14 @@ sub add_freq_and_am {
     }
     foreach my $con (@{$self->{"con"}}){
 	my ($remote_host, $remote_port, $local_port) = @$con;
-	die("I need some information to connect to the remote server") unless(defined($remote_host) and defined($remote_port) and defined($local_port));
+	croak("I need some information to connect to the remote server") unless(defined($remote_host) and defined($remote_port) and defined($local_port));
 	my $socket = IO::Socket::INET->new(PeerAddr  => $remote_host,
 					   PeerPort  => $remote_port,
 					   #LocalPort => $local_port,
 					   Proto     => "tcp",
 					   ReuseAddr => 1,
 					   Type      => SOCK_STREAM)
-	    or die "Couldn't connect to $remote_host:$remote_port : $@\n";
+	    or croak "Couldn't connect to $remote_host:$remote_port : $@\n";
 	print $socket "dir:" . $self->{"dir"} . "\n";
 	print $socket "fil:" . $specifics{"prefix"} . "\n";
 	push(@sockets, $socket);
@@ -151,7 +152,7 @@ sub add_freq_and_am {
 	    foreach my $wr (@$localresultsref){
 		my $c1 = shift(@line);
 		my $g2 = shift(@line);
-		die("NICHT DEFINIERT: $c1, $g2") unless(defined($c1) and defined($g2));
+		croak("NICHT DEFINIERT: $c1, $g2") unless(defined($c1) and defined($g2));
 		$insert_result->execute($dbname, @$wr, $c1, $g2);
 	    }
 	    $dbh->do(qq{COMMIT});

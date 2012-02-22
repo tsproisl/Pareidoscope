@@ -10,7 +10,7 @@ use Storable;
 use kwic;
 use Time::HiRes;
 use DBI;
-use List::Util qw(max);
+use List::Util qw(max min);
 use List::MoreUtils;
 use localdata_client;
 
@@ -636,7 +636,7 @@ sub _strucn {
             my $match_length;    # = ($matchend - $match) + 1;
                                  # get cpos of sentence start and end
             my ( $start, $end ) = $sentence->cpos2struc2cpos($match);
-            my ( @cseq, @pseq, @rseq );
+            my ( @cseq, @pseq );
             my $core_query;
             if ( param("rt") eq "pos" ) {
 
@@ -661,12 +661,12 @@ sub _strucn {
             }
             $match_length = ( $cend - $cstart ) + 1;
 
-            @rseq = ( 0 .. $cend - $cstart );
-            my $max_start = $cstart - ( $data->{"active"}->{"ngram_length"} - $match_length ) > 0 ? $cstart - ( $data->{"active"}->{"ngram_length"} - $match_length ) : 0;
-            my $max_end   = $cstart + ( $data->{"active"}->{"ngram_length"} - 1 ) < $#cseq        ? $cstart + ( $data->{"active"}->{"ngram_length"} - 1 )             : $#cseq;
+            my $max_start = max( $cstart - ( $data->{"active"}->{"ngram_length"} - $match_length ), 0);
+            my $max_end   = min( $cstart + ( $data->{"active"}->{"ngram_length"} - 1 ), $#cseq );
             my $position  = $cstart - $max_start;
             my @max_ngram = @cseq[ $max_start .. $max_end ];
-            $r1 += &retrieve_ngrams( \@max_ngram, \%ngrams, $data->{"active"}->{"ngram_length"}, $match_length, $position );
+            #$r1 += &retrieve_ngrams( \@max_ngram, \%ngrams, $data->{"active"}->{"ngram_length"}, $match_length, $position );
+            $r1 += &retrieve_ngrams( \@max_ngram, \%ngrams, $data->{"active"}->{"ngram_length"}, $match_length, $position, $pseq[$max_start] + $start);
         }
         ## handle skipped matches
         #print "$skipped matches of length > 9 had to be discarded", $cgi->br if($skipped);
@@ -1028,7 +1028,8 @@ sub new_print_table {
 # RETRIEVE N-GRAMS
 #------------------
 sub retrieve_ngrams {
-    my ( $tagsref, $nghashref, $maxlength, $match_length, $position ) = @_;
+    #my ( $tagsref, $nghashref, $maxlength, $match_length, $position ) = @_;
+    my ( $tagsref, $nghashref, $maxlength, $match_length, $position, $absolute_pos ) = @_;
     my $localr1     = 0;
     my $endposition = $position + $match_length - 1;
     for ( my $start = 0; $start <= $position; $start++ ) {
@@ -1041,7 +1042,8 @@ sub retrieve_ngrams {
             my ( @ngram, $ngram );
             @ngram = @$tagsref[ $start .. $start + $length - 1 ];
             $ngram = pack( "C*", @ngram );
-            $nghashref->{$ngram}->{$localposition}->{$match_length}++;
+            #$nghashref->{$ngram}->{$localposition}->{$match_length}++;
+            $nghashref->{$ngram}->{$localposition}->{$match_length}->{$absolute_pos}++;
             $localr1++;
         }
     }

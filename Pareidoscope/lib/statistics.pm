@@ -2,6 +2,7 @@ package statistics;
 
 use strict;
 use warnings;
+use Carp;
 use Math::BigInt; #lib => 'GMP';
 use Math::BigRat; #lib => 'GMP';
 use Math::BigFloat; #lib => 'GMP';
@@ -113,6 +114,8 @@ sub g($$$$){
     my ($o11, $r1, $c1, $n);
     my ($o, $e, $r, $c, $G);
     ($o11, $r1, $c1, $n) = @_;
+    croak("O11 > R1! ($o11, $r1, $c1, $n)") if ($o11 > $r1);
+    croak("O11 > C1! ($o11, $r1, $c1, $n)") if ($o11 > $c1);
     return $case1 if(defined($case1) and $o11 == 1 and $c1 == 1);
     $G = 0;
     ($o, $e, $r, $c, $n) = &_contintable($o11, $r1-$o11, $c1-$o11, ($n-$r1)-($c1-$o11));
