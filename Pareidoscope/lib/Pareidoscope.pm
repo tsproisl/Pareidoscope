@@ -36,10 +36,12 @@ hook 'before_template' => sub {
     $tokens->{"word_form_results_url"}     = uri_for("/results/word_form_query");
     $tokens->{"lemma_results_url"}         = uri_for("/results/lemma_query");
     $tokens->{"complex_query_results_url"} = uri_for("/results/complex_query");
+    $tokens->{"concordance_url"} = uri_for("/results/concordance");
 
     # Corpus
     $tokens->{"url_args"}->{"corpus"} = param("corpus");
     $tokens->{"corpus_name"} = $data->{"active"}->{"display_name"};
+    $tokens->{"chunks"} = $data->{"active"}->{"chunk_ngrams"};
 };
 
 get '/' => sub {
@@ -136,6 +138,12 @@ any [ 'get', 'post' ] => '/results/lemma_query' => sub {
 
 any [ 'get', 'post' ] => '/results/complex_query' => sub {
     template( 'complex_query_results', { "current" => uri_for("/results/complex_query") } );
+};
+
+get '/results/concordance' => sub {
+    my %vars;
+    %vars = ( %vars, %{ &executequeries::cqp_query( $data ) } );
+    template( 'kwic', \%vars );
 };
 
 # get '/' => sub {

@@ -120,9 +120,9 @@
   <tr [% IF rowa == 1%]class="row-a"[% rowa = 0 %][% ELSE %]class="row-b"[% rowa = 1 %][% END %]>
     <td style="text-align:right;" class="first">[% row.number %]</td>
     <td>[% row.display_ngram %]</td>
-    <td style="text-align:right;"><a href="[% row.cofreq_href %]">[% row.cofreq %]</a>
+    <td style="text-align:right;"><a href="[% concordance_url %][% FOREACH arg IN row.cofreq_href %][% IF loop.first %]?[% ELSE %]&[% END %][% arg.key %]=[% arg.value %][% END %]">[% row.cofreq %]</a>
     </td>
-    <td style="text-align:right;"><a href="[% row.ngfreq_href %]">[% row.ngfreq %]</a>
+    <td style="text-align:right;"><a href="[% concordance_url %][% FOREACH arg IN row.ngfreq_href %][% IF loop.first %]?[% ELSE %]&[% END %][% arg.key %]=[% arg.value %][% END %]">[% row.ngfreq %]</a>
     </td>
     <td style="text-align:right;"><span
       [% IF row.g >= 10.827566 %]

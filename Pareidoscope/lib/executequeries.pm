@@ -11,7 +11,7 @@ use kwic;
 use Time::HiRes;
 use DBI;
 use List::Util qw(max);
-use List::MoreUtils qw(any);
+use List::MoreUtils;
 use localdata_client;
 
 #-------------------
@@ -330,14 +330,15 @@ sub strucn_query {
 # BUILD QUERY
 #-------------
 sub build_query {
-    my ($data) = @_;
+    my ($data, $parameter) = @_;
+    $parameter = defined $parameter ? $parameter : params;
     my ( @query, @unlex_query, $query, $unlex_query );
     my ( $anchor, @title, $title, $length, @ngram, $ngram );
     foreach my $nr ( 1 .. 9 ) {
         my ( $token, $head, $poswc, $query_elem, $unlex_elem, $title_elem, $token_title, $head_title, $ng_elem );
         my ( $ct, $h, $ht, $p, $t, $tt, $w, $unlex );
         foreach my $pair ( [ \$t, "t" ], [ \$tt, "tt" ], [ \$p, "p" ], [ \$w, "w" ], [ \$ct, "ct" ], [ \$h, "h" ], [ \$ht, "ht" ] ) {
-            ${ $pair->[0] } = param( $pair->[1] . $nr );
+            ${ $pair->[0] } = $parameter->{ $pair->[1] . $nr };
             ${ $pair->[0] } = undef if ( defined( ${ $pair->[0] } ) and ${ $pair->[0] } eq "" );
         }
         foreach ( \$h, \$p, \$t, \$w ) {
@@ -360,23 +361,23 @@ sub build_query {
             $token .= "'$t'";
         }
         if ( defined($h) and defined($t) ) {
-            $token .= ' %c' if ( param("ignore_case") );
+            $token .= ' %c' if ( $parameter->{"ignore_case"} );
             $token .= " & $poswc" if ( defined($poswc) );
         }
         elsif ( defined($h) and ( not defined($t) ) ) {
-            $head .= ' %c' if ( param("ignore_case") );
+            $head .= ' %c' if ( $parameter->{"ignore_case"} );
             $head .= " & $poswc" if ( defined($poswc) );
         }
         elsif ( ( not defined($h) ) and defined($t) ) {
-            $token .= ' %c' if ( param("ignore_case") );
+            $token .= ' %c' if ( $parameter->{"ignore_case"} );
             $token .= " & $poswc" if ( defined($poswc) );
         }
         elsif ( ( not defined($h) ) and ( not defined($t) ) ) {
-            if ( param("rt") eq "pos" ) {
+            if ( $parameter->{"rt"} eq "pos" ) {
                 $token = "[";
                 $token .= "$poswc" if ( defined($poswc) );
             }
-            elsif ( param("rt") eq "chunk" ) {
+            elsif ( $parameter->{"rt"} eq "chunk" ) {
                 $head = "[$poswc" if ( defined($poswc) );
             }
         }
@@ -849,73 +850,69 @@ sub create_new_db {
 #     return $cgi->escapeHTML($href);
 # }
 
-# #------------------------
-# # CREATE FREQ LINK STRUC
-# #------------------------
-# sub create_freq_link_struc {
-#     my ( $cgi, $config, $freq, $position, @ngram ) = @_;
-#     my $state       = $config->keep_states_href( {}, qw(c) );
-#     my $href        = "pareidoscope.cgi?m=c&q=";
-#     my $localparams = Storable::dclone( $config->{"params"} );
-#     my @deletions   = qw(ct t tt w ht h p);
-#     foreach my $param (@deletions) {
-#         foreach my $i ( 1 .. 9 ) {
-#             undef( $localparams->{$param}->{$i} );
-#         }
-#     }
-#     for ( my $i = 0; $i <= $#ngram; $i++ ) {
-#         my $j = $i + 1 - $position;
-#         if ( $j > 0 ) {
-#             foreach my $param qw(t tt h ht) {
-#                 $localparams->{$param}->{ $i + 1 } = $config->{"params"}->{$param}->{$j};
-#             }
-#         }
-#         if ( $config->{"params"}->{"rt"} eq "pos" ) {
-#             $localparams->{"p"}->{ $i + 1 } = $ngram[$i];
-#         }
-#         elsif ( $config->{"params"}->{"rt"} eq "chunk" ) {
-#             $localparams->{"ct"}->{ $i + 1 } = $ngram[$i];
-#             $localparams->{"p"}->{ $i + 1 }  = $config->{"params"}->{"p"}->{$j};
-#             $localparams->{"w"}->{ $i + 1 }  = $config->{"params"}->{"w"}->{$j};
-#         }
-#     }
-#     my ($query) = &build_query( { "params" => $localparams } );
-#     $href .= URI::Escape::uri_escape($query) . "&s=Link";
-#     $href .= "&$state";
+#------------------------
+# CREATE FREQ LINK STRUC
+#------------------------
+sub create_freq_link_struc {
+    my ( $data, $freq, $position, @ngram ) = @_;
+    my %argument;
+    $argument{"corpus"} = param("corpus");
+    my $localparams = Storable::dclone( params );
+    my @deletions   = qw(ct t tt w ht h p);
+    foreach my $param (@deletions) {
+        foreach my $i ( 1 .. 9 ) {
+            undef( $localparams->{$param . $i} );
+        }
+    }
+    for ( my $i = 0; $i <= $#ngram; $i++ ) {
+        my $j = $i + 1 - $position;
+        if ( $j > 0 ) {
+            foreach my $param qw(t tt h ht) {
+                $localparams->{$param . ($i + 1) } = param($param . $j);
+            }
+        }
+        if ( param("rt") eq "pos" ) {
+            $localparams->{"p" . ($i + 1) } = $ngram[$i];
+        }
+        elsif ( param("rt") eq "chunk" ) {
+            $localparams->{"ct" . ($i + 1) } = $ngram[$i];
+            $localparams->{"p" . ($i + 1) }  = param("p" . $j);
+            $localparams->{"w" . ($i + 1) }  = param("w" . $j);
+        }
+    }
+    my ($query) = &build_query( $data, $localparams );
+    $argument{"query"} = URI::Escape::uri_escape($query);
+    $argument{"s"} = "Link";
+    return \%argument;
+}
 
-#     #return $cgi->a( { 'href' => $href }, $freq );
-#     return $cgi->escapeHTML($href);
-# }
-
-# #--------------------------
-# # CREATE NGFREQ LINK STRUC
-# #--------------------------
-# sub create_ngfreq_link_struc {
-#     my ( $cgi, $config, $ngfreq, @ngram ) = @_;
-#     my $state       = $config->keep_states_href( {}, qw(c) );
-#     my $href        = "pareidoscope.cgi?m=c&q=";
-#     my $localparams = Storable::dclone( $config->{"params"} );
-#     my @deletions   = qw(ct t tt w ht h p);
-#     foreach my $param (@deletions) {
-#         foreach my $i ( 1 .. 9 ) {
-#             undef( $localparams->{$param}->{$i} );
-#         }
-#     }
-#     for ( my $i = 0; $i <= $#ngram; $i++ ) {
-#         if ( $config->{"params"}->{"rt"} eq "pos" ) {
-#             $localparams->{"p"}->{ $i + 1 } = $ngram[$i];
-#         }
-#         elsif ( $config->{"params"}->{"rt"} eq "chunk" ) {
-#             $localparams->{"ct"}->{ $i + 1 } = $ngram[$i];
-#         }
-#     }
-#     my ($query) = &build_query( { "params" => $localparams } );
-#     $href .= URI::Escape::uri_escape($query) . "&s=Link";
-#     $href .= "&$state";
-
-#     #return $cgi->a( { 'href' => $href }, $ngfreq );
-#     return $cgi->escapeHTML($href);
-# }
+#--------------------------
+# CREATE NGFREQ LINK STRUC
+#--------------------------
+sub create_ngfreq_link_struc {
+    my ( $data, $ngfreq, @ngram ) = @_;
+    my %argument;
+    $argument{"corpus"} = param("corpus");
+    my $localparams = Storable::dclone( params );
+    my @deletions   = qw(ct t tt w ht h p);
+    foreach my $param (@deletions) {
+        foreach my $i ( 1 .. 9 ) {
+            undef( $localparams->{$param . $i} );
+        }
+    }
+    for ( my $i = 0; $i <= $#ngram; $i++ ) {
+        if ( param("rt") eq "pos" ) {
+            $localparams->{"p" . ($i + 1) } = $ngram[$i];
+        }
+        elsif ( param("rt") eq "chunk" ) {
+            $localparams->{"ct" . ($i + 1) } = $ngram[$i];
+        }
+    }
+    my ($query) = &build_query( $data, $localparams );
+    $argument{"query"} = URI::Escape::uri_escape($query);
+    $argument{"s"} = "Link";
+    return \%argument;
+}
 
 #-----------------
 # NEW PRINT TABLE
@@ -990,7 +987,7 @@ sub new_print_table {
     # id fch flen frel ftag fwc fpos q rt
     foreach my $param ( keys %{ params() } ) {
         next if ( param($param) eq q{} );
-        next if any { $_ eq $param } qw(fch flen frel ftag fwc fpos);
+        next if List::MoreUtils::any { $_ eq $param } qw(fch flen frel ftag fwc fpos);
         $vars->{"hidden_states"}->{$param} = param($param);
     }
 
@@ -1018,8 +1015,8 @@ sub new_print_table {
         # CREATE LEX AND STRUC LINKS
         ###$row->{"struc_href"} = &create_n_link_struc( $cgi, $config, "sn", \@ngram, $position );
         ###$row->{"lex_href"}   = &create_n_link_struc( $cgi, $config, "ln", \@ngram, $position );
-        ###$row->{"cofreq_href"} = &create_freq_link_struc( $cgi, $config, $o11, $position, @ngram );
-        ###$row->{"ngfreq_href"} = &create_ngfreq_link_struc( $cgi, $config, $c1, @ngram );
+        $row->{"cofreq_href"} = &create_freq_link_struc( $data, $o11, $position, @ngram );
+        $row->{"ngfreq_href"} = &create_ngfreq_link_struc( $data, $c1, @ngram );
         $counter++;
         $row->{"number"} = $counter;
     }
@@ -1138,66 +1135,5 @@ sub retrieve_ngrams {
 # # OLD FUNCTIONS
 # #---------------
 
-# #-------------
-# # BUILD QUERY
-# #-------------
-# sub old_build_query {
-#     my ($config) = @_;
-#     my ( @query, @pos_only_query, $query, $pos_only_query );
-#     my ( $anchor, @title, $title, @length, $length, @ngram, $ngram );
-#     foreach my $i ( 1 .. 9 ) {
-#         my ( $q_alt, $t_elem, $q_elem, $poq_elem, $ng_elem );
-#         my $t = $config->{"params"}->{"t"}->{$i};
-#         my $q = $config->{"params"}->{"q"}->{$i};
-#         $t = undef if ( defined($t) and $t eq "" );
-#         $q = undef if ( defined($q) and $q eq "" );
-#         $q_alt = $q;
-#         $q_alt =~ s/([][.?*+|(){}^\$'])/\\$1/g if ( defined($q) );
-#         croak("Invalid query.") if ( defined($q) and not defined($t) );
-#         $poq_elem = defined($t) ? "[pos='$t']" : "[]";
-#         $ng_elem  = defined($t) ? $t           : "x";
-#         $q_elem   = "[";
-#         $q_elem .= defined($q) ? "word='$q_alt'" : "";
-#         $q_elem .= ( defined($q) and defined( $config->{'params'}->{'i'} ) and $config->{'params'}->{'i'} == 1 ) ? ' %c' : '';
-#         $q_elem .= " & " if ( defined($q) and defined($t) );
-
-#         if ( defined($t) ) {
-#             $q_elem .= "pos='$t'";
-#             $t_elem = defined($q) ? "$q_alt/$t" : "x/$t";
-#         }
-#         else {
-#             $t_elem = defined($q) ? "$q_alt" : "x";
-#         }
-#         $q_elem .= "]";
-
-#         #my $t_elem = defined($q) or defined($t) ? "$q_alt/$t" : "x";
-#         push( @query,          $q_elem );
-#         push( @pos_only_query, $poq_elem );
-#         push( @title,          $t_elem );
-#         push( @ngram,          $ng_elem );
-#     }
-#     $query          = join( " ", @query );
-#     $pos_only_query = join( " ", @pos_only_query );
-#     $title          = join( " ", @title );
-#     $query =~ s/^(\[\] )*//;
-#     $query =~ s/( \[\])*$//;
-#     $query .= " within s";
-#     $query          =~ s/\s+/ /;
-#     $pos_only_query =~ s/^(\[\] )*//;
-#     $pos_only_query =~ s/( \[\])*$//;
-#     $pos_only_query .= " within s";
-#     $pos_only_query =~ s/\s+/ /;
-#     $title          =~ s/^(x )*//;
-#     $title          =~ s/( x(?!\/))*$//;
-#     $anchor = $title;
-#     $anchor =~ s/ /_/g;
-#     @length = split( / /, $title );
-#     $length = scalar(@length);
-#     $ngram  = join( " ", @ngram );
-#     $ngram =~ s/^(x )*//;
-#     $ngram =~ s/( x)*$//;
-#     @ngram = split( " ", $ngram );
-#     return ( $query, $pos_only_query, $title, $anchor, $length, \@ngram );
-# }
 
 1;
