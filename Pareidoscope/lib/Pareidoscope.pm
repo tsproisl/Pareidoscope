@@ -37,6 +37,8 @@ hook 'before_template' => sub {
     $tokens->{"lemma_results_url"}         = uri_for("/results/lemma_query");
     $tokens->{"complex_query_results_url"} = uri_for("/results/complex_query");
     $tokens->{"concordance_url"} = uri_for("/results/concordance");
+    $tokens->{lex_url} = uri_for("/results/lexical_ngram_query");
+    $tokens->{struc_url} = uri_for("/results/structural_ngram_query");
 
     # Corpus
     $tokens->{"url_args"}->{"corpus"} = param("corpus");
@@ -142,8 +144,20 @@ any [ 'get', 'post' ] => '/results/complex_query' => sub {
 
 get '/results/concordance' => sub {
     my %vars;
-    %vars = ( %vars, %{ &executequeries::cqp_query( $data ) } );
-    template( 'kwic', \%vars );
+    ###%vars = ( %vars, %{ &executequeries::cqp_query( $data ) } );
+    ###template( 'kwic', \%vars );
+};
+
+get '/results/lexical_ngram_query' => sub {
+    my %vars;
+    ###%vars = ( %vars, %{ &executequeries::ngram_query( $data ) } );
+    ###template( 'complex_query_results', \%vars );
+};
+
+get '/results/structural_ngram_query' => sub {
+    my %vars;
+    ###%vars = ( %vars, %{ &executequeries::strucn_query( $data ) } );
+    ###template( 'complex_query_results', \%vars );
 };
 
 # get '/' => sub {

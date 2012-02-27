@@ -96,10 +96,10 @@ sub add_freq_and_am {
     my $insert_result = $dbh->prepare(qq{INSERT INTO results (qid, result, position, mlen, o11, c1, am) VALUES (?, ?, ?, ?, ?, ?, ?)});
     my $cons = scalar(@{$self->{"con"}});
     my %specifics;
-    if(param("rt") eq "pos"){
+    if(param("return_type") eq "pos"){
 	%specifics = ("prefix" => "ngrams");
     }
-    elsif(param("rt") eq "chunk"){
+    elsif(param("return_type") eq "chunk"){
 	%specifics = ("prefix" => "chunks");
     }
     foreach my $con (@{$self->{"con"}}){

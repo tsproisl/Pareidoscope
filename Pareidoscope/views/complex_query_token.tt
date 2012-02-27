@@ -68,7 +68,7 @@
   <input checked="checked" value="1" name="ignore_case" style="margin-left: 11px; margin-top: 10px; margin-bottom: 10px" type="checkbox" />
   Ignore case
   <br />
-  <input checked="checked" value="pos" name="rt" style="margin-left: 11px; margin-top: 10px;" type="radio" />
+  <input checked="checked" value="pos" name="return_type" style="margin-left: 11px; margin-top: 10px;" type="radio" />
   sequences of part-of-speech tags
   <br />
   <input checked="checked" value="lump" name="display_type" style="margin-left: 11px; margin-top: 10px;" type="radio" />

@@ -139,9 +139,9 @@
     </span>
     </td>
     <td style="text-align:center;">
-      <a href="[% row.lex_href %]">lex</a>
+      <a href="[% lex_url %][% FOREACH arg IN row.lex_href %][% IF loop.first %]?[% ELSE %]&[% END %][% arg.key %]=[% arg.value %][% END %]">lex</a>
       &nbsp;&nbsp;
-      <a href="[% row.struc_href %]">struc</a>
+      <a href="[% struc_url %][% FOREACH arg IN row.struc_href %][% IF loop.first %]?[% ELSE %]&[% END %][% arg.key %]=[% arg.value %][% END %]">struc</a>
     </td>
   </tr>
   [% END %]

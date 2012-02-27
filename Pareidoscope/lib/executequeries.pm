@@ -116,10 +116,10 @@ sub single_item_query {
 #     my ( $cgi, $config, $localdata ) = @_;
 #     my $vars;
 #     my %specifics;
-#     if ( $config->{"params"}->{"rt"} eq "pos" ) {
+#     if ( $config->{"params"}->{"return_type"} eq "pos" ) {
 #         %specifics = ( "name" => "pos" );
 #     }
-#     elsif ( $config->{"params"}->{"rt"} eq "chunk" ) {
+#     elsif ( $config->{"params"}->{"return_type"} eq "chunk" ) {
 #         %specifics = ( "name" => "chunk" );
 #     }
 #     foreach my $nr ( 1 .. 9 ) {
@@ -181,13 +181,13 @@ sub strucn_query {
 #     my $update_timestamp = $config->{"cache_dbh"}->prepare(qq{UPDATE queries SET time=strftime('%s','now') WHERE qid=?});
 #     my %specifics;
 
-#     if ( $config->{"params"}->{"rt"} eq "pos" ) {
+#     if ( $config->{"params"}->{"return_type"} eq "pos" ) {
 #         %specifics = (
 #             "name"  => "pos",
 #             "class" => "lexp"
 #         );
 #     }
-#     elsif ( $config->{"params"}->{"rt"} eq "chunk" ) {
+#     elsif ( $config->{"params"}->{"return_type"} eq "chunk" ) {
 #         %specifics = (
 #             "name"  => "chunk",
 #             "class" => "lexc"
@@ -236,7 +236,7 @@ sub strucn_query {
 #         # get overall frequencies in n-gram
 #         @matches = $config->{"cqp"}->exec("tabulate $id match, matchend") unless ( $query eq $smallquery );
 #         my $word = $config->get_attribute("word");
-#         my $head = $config->get_attribute("h") if ( $config->{"params"}->{"rt"} eq "chunk" );
+#         my $head = $config->get_attribute("h") if ( $config->{"params"}->{"return_type"} eq "chunk" );
 #         foreach my $ms ( [ \@cooccurrencematches, \@cofreq ], [ \@matches, \@frequencies ] ) {
 #             foreach my $m ( @{ $ms->[0] } ) {
 #                 my ( $match, $matchend ) = split( /\t/, $m );
@@ -244,12 +244,12 @@ sub strucn_query {
 #                 # get cpos of sentence start and end
 #                 my @words;
 #                 my $core_query;
-#                 if ( $config->{"params"}->{"rt"} eq "pos" ) {
+#                 if ( $config->{"params"}->{"return_type"} eq "pos" ) {
 
 #                     # fetch word forms info via CWB::CL
 #                     @words = $word->cpos2str( $match .. $matchend );
 #                 }
-#                 elsif ( $config->{"params"}->{"rt"} eq "chunk" ) {
+#                 elsif ( $config->{"params"}->{"return_type"} eq "chunk" ) {
 
 #                     # fetch heads info via CWB::CL
 #                     @words = $word->cpos2str( grep( defined( $head->cpos2struc($_) ), ( $match .. $matchend ) ) );
@@ -330,7 +330,7 @@ sub strucn_query {
 # BUILD QUERY
 #-------------
 sub build_query {
-    my ($data, $parameter) = @_;
+    my ( $data, $parameter ) = @_;
     $parameter = defined $parameter ? $parameter : params;
     my ( @query, @unlex_query, $query, $unlex_query );
     my ( $anchor, @title, $title, $length, @ngram, $ngram );
@@ -373,11 +373,11 @@ sub build_query {
             $token .= " & $poswc" if ( defined($poswc) );
         }
         elsif ( ( not defined($h) ) and ( not defined($t) ) ) {
-            if ( $parameter->{"rt"} eq "pos" ) {
+            if ( $parameter->{"return_type"} eq "pos" ) {
                 $token = "[";
                 $token .= "$poswc" if ( defined($poswc) );
             }
-            elsif ( $parameter->{"rt"} eq "chunk" ) {
+            elsif ( $parameter->{"return_type"} eq "chunk" ) {
                 $head = "[$poswc" if ( defined($poswc) );
             }
         }
@@ -583,13 +583,13 @@ sub _strucn {
     $return_vars->{"query_anchor"} = $anchor;
     $return_vars->{"query_title"}  = $title;
     my %specifics;
-    if ( param("rt") eq "pos" ) {
+    if ( param("return_type") eq "pos" ) {
         %specifics = (
             "name"  => "pos",
             "class" => "strucp"
         );
     }
-    elsif ( param("rt") eq "chunk" ) {
+    elsif ( param("return_type") eq "chunk" ) {
         %specifics = (
             "name"  => "chunk",
             "class" => "strucc"
@@ -628,8 +628,8 @@ sub _strucn {
         my $sentence = $data->get_attribute("s");
         @matches = $data->{"cqp"}->exec("tabulate $cached_query_id match, matchend");
         $t2      = [ &Time::HiRes::gettimeofday() ];
-        my $pos = $data->get_attribute("pos") if ( param("rt") eq "pos" );
-        my $get_chunk_seq = $data->{"dbh"}->prepare(qq{SELECT chunkseq, cposseq FROM sentences WHERE cpos = ?}) if ( param("rt") eq "chunk" );
+        my $pos = $data->get_attribute("pos") if ( param("return_type") eq "pos" );
+        my $get_chunk_seq = $data->{"dbh"}->prepare(qq{SELECT chunkseq, cposseq FROM sentences WHERE cpos = ?}) if ( param("return_type") eq "chunk" );
 
         foreach my $m (@matches) {
             my ( $match, $matchend ) = split( /\t/, $m );
@@ -638,13 +638,13 @@ sub _strucn {
             my ( $start, $end ) = $sentence->cpos2struc2cpos($match);
             my ( @cseq, @pseq );
             my $core_query;
-            if ( param("rt") eq "pos" ) {
+            if ( param("return_type") eq "pos" ) {
 
                 # fetch POS info via CWB::CL
                 @cseq = map( $data->{"tag_to_number"}->{$_}, $pos->cpos2str( $start .. $end ) );
                 @pseq = ( 0 .. $end - $start );
             }
-            elsif ( param("rt") eq "chunk" ) {
+            elsif ( param("return_type") eq "chunk" ) {
 
                 # get sequence of chunks and sequence of cpos from db
                 $get_chunk_seq->execute($start);
@@ -661,12 +661,13 @@ sub _strucn {
             }
             $match_length = ( $cend - $cstart ) + 1;
 
-            my $max_start = max( $cstart - ( $data->{"active"}->{"ngram_length"} - $match_length ), 0);
+            my $max_start = max( $cstart - ( $data->{"active"}->{"ngram_length"} - $match_length ), 0 );
             my $max_end   = min( $cstart + ( $data->{"active"}->{"ngram_length"} - 1 ), $#cseq );
             my $position  = $cstart - $max_start;
             my @max_ngram = @cseq[ $max_start .. $max_end ];
+
             #$r1 += &retrieve_ngrams( \@max_ngram, \%ngrams, $data->{"active"}->{"ngram_length"}, $match_length, $position );
-            $r1 += &retrieve_ngrams( \@max_ngram, \%ngrams, $data->{"active"}->{"ngram_length"}, $match_length, $position, $pseq[$max_start] + $start);
+            $r1 += &retrieve_ngrams( \@max_ngram, \%ngrams, $data->{"active"}->{"ngram_length"}, $match_length, $position, $pseq[$max_start] + $start );
         }
         ## handle skipped matches
         #print "$skipped matches of length > 9 had to be discarded", $cgi->br if($skipped);
@@ -697,11 +698,6 @@ sub _strucn {
     }
     %$return_vars = ( %$return_vars, %{ &new_print_table( $data, $query ) } );
 
-    #my $state = $data->keep_states_href( {}, qw(m c t tt p w ct id flen frel ftag fwc fpos i dt rt) );
-    #$return_vars->{"previous_href"} = "pareidoscope.cgi?start=" . max( param("start") - 40, 0 ) . "&s=Link&$state" if ( param("start") > 0 );
-    #$return_vars->{"next_href"} = "pareidoscope.cgi?start=" . ( param("start") + 40 ) . "&s=Link&$state" unless ( param("start") + 40 >= $ngtypes );
-
-    # fch q h ht
     foreach my $param ( keys %{ params() } ) {
         next if ( param($param) eq q{} );
         $return_vars->{"previous_href"}->{$param} = $return_vars->{"next_href"}->{$param} = param($param);
@@ -735,45 +731,32 @@ sub create_new_db {
     return $dbh;
 }
 
-# #---------------------
-# # CREATE N LINK STRUC
-# #---------------------
-# sub create_n_link_struc {
-#     my ( $cgi, $config, $mode, $ngramref, $position ) = @_;
-#     my %mode2text = ( "ln" => "lex", "sn" => "struc" );
-#     my $href      = "pareidoscope.cgi?m=$mode";
-#     my $params    = {};
-#     my @keep      = qw(c rt);
-#     if ( $config->{"params"}->{"rt"} eq "pos" ) {
-#         push( @keep, qw(p) );
-#     }
-#     elsif ( $config->{"params"}->{"rt"} eq "chunk" ) {
-#         push( @keep, qw(ct) );
-#     }
-#     my @params = qw(t tt i);
-#     push( @params, qw(p w h ht) ) if ( $config->{"params"}->{"rt"} eq "chunk" );
-#     foreach my $nr ( 0 .. $#$ngramref ) {
-#         foreach my $param (@params) {
-#             $params->{ $param . ( $nr + 1 ) } = "";
-#         }
-#     }
-#     foreach my $nr ( 0 .. $#$ngramref ) {
-#         foreach my $param (@params) {
-#             $params->{ $param . ( $nr + $position + 1 ) } = $config->{"params"}->{$param}->{ $nr + 1 } if ( defined( $config->{"params"}->{$param}->{ $nr + 1 } ) and $config->{"params"}->{$param}->{ $nr + 1 } ne "" );
-#         }
-#         if ( $config->{"params"}->{"rt"} eq "pos" ) {
-#             $params->{ "p" . ( $nr + 1 ) } = $ngramref->[$nr];
-#         }
-#         elsif ( $config->{"params"}->{"rt"} eq "chunk" ) {
-#             $params->{ "ct" . ( $nr + 1 ) } = $ngramref->[$nr];
-#         }
-#     }
-#     my $state = $config->keep_states_href( $params, ( @keep, @params ) );
-#     $href .= "&s=Link&$state";
-
-#     #return $cgi->a( { 'href' => $href }, $mode2text{$mode} );
-#     return $cgi->escapeHTML($href);
-# }
+#---------------------
+# CREATE N LINK STRUC
+#---------------------
+sub create_n_link_struc {
+    my ( $ngramref, $position ) = @_;
+    my %argument;
+    $argument{"corpus"} = param("corpus");
+    $argument{"return_type"} = param("return_type");
+    my @params   = qw(t tt);
+    if ( param("return_type") eq "chunk" ) {
+        push @params, qw(p w h ht);
+    }
+    for ( my $i = 0; $i <= $#$ngramref; $i++ ) {
+        foreach my $param (@params) {
+            $argument{ $param . ( $i + $position + 1 ) } = param( $param . ( $i + 1 ) ) if ( defined( param( $param . ( $i + 1 ) ) ) and param( $param . ( $i + 1 ) ) ne "" );
+        }
+        if ( param("return_type") eq "pos" ) {
+            $argument{ "p" . ( $i + 1 ) } = $ngramref->[$i];
+        }
+        elsif ( param("return_type") eq "chunk" ) {
+            $argument{ "ct" . ( $i + 1 ) } = $ngramref->[$i];
+        }
+    }
+    $argument{"s"} = "Link";
+    return \%argument;
+}
 
 # #-------------------
 # # CREATE N LINK LEX
@@ -782,10 +765,10 @@ sub create_new_db {
 #     my ( $cgi, $config, $mode, $ngramref, $position, $head ) = @_;
 #     my %mode2text = ( "ln" => "lex", "sn" => "struc" );
 #     my $state;
-#     if ( $config->{"params"}->{"rt"} eq "pos" ) {
+#     if ( $config->{"params"}->{"return_type"} eq "pos" ) {
 #         $state = $config->keep_states_href( { "t" . ( $position + 1 ) => $head, "tt" . ( $position + 1 ) => "wf", "i" . ( $position + 1 ) => 0 }, qw(c rt p w i t tt) );
 #     }
-#     elsif ( $config->{"params"}->{"rt"} eq "chunk" ) {
+#     elsif ( $config->{"params"}->{"return_type"} eq "chunk" ) {
 #         $state = $config->keep_states_href( { "h" . ( $position + 1 ) => $head, "ht" . ( $position + 1 ) => "wf", "i" . ( $position + 1 ) => 0 }, qw(c rt t tt p w i ct h ht) );
 #     }
 #     my $href = "pareidoscope.cgi?m=$mode&s=link&$state";
@@ -802,11 +785,11 @@ sub create_new_db {
 #     my $state       = $config->keep_states_href( {}, qw(c) );
 #     my $href        = "pareidoscope.cgi?m=c&q=";
 #     my $localparams = Storable::dclone( $config->{"params"} );
-#     if ( $config->{"params"}->{"rt"} eq "pos" ) {
+#     if ( $config->{"params"}->{"return_type"} eq "pos" ) {
 #         $localparams->{"t"}->{ $position + 1 }  = $head;
 #         $localparams->{"tt"}->{ $position + 1 } = "wf";
 #     }
-#     elsif ( $config->{"params"}->{"rt"} eq "chunk" ) {
+#     elsif ( $config->{"params"}->{"return_type"} eq "chunk" ) {
 #         $localparams->{"h"}->{ $position + 1 }  = $head;
 #         $localparams->{"ht"}->{ $position + 1 } = "wf";
 #     }
@@ -828,17 +811,17 @@ sub create_new_db {
 #     my $href        = "pareidoscope.cgi?m=c&q=";
 #     my $localparams = Storable::dclone( $config->{"params"} );
 #     my @deletions   = qw(t tt w ht h i);
-#     push( @deletions, "p" ) if ( $config->{"params"}->{"rt"} eq "chunk" );
+#     push( @deletions, "p" ) if ( $config->{"params"}->{"return_type"} eq "chunk" );
 #     foreach my $param (@deletions) {
 #         foreach my $i ( 1 .. 9 ) {
 #             undef( $localparams->{$param}->{$i} );
 #         }
 #     }
-#     if ( $config->{"params"}->{"rt"} eq "pos" ) {
+#     if ( $config->{"params"}->{"return_type"} eq "pos" ) {
 #         $localparams->{"t"}->{ $position + 1 }  = $head;
 #         $localparams->{"tt"}->{ $position + 1 } = "wf";
 #     }
-#     elsif ( $config->{"params"}->{"rt"} eq "chunk" ) {
+#     elsif ( $config->{"params"}->{"return_type"} eq "chunk" ) {
 #         $localparams->{"h"}->{ $position + 1 }  = $head;
 #         $localparams->{"ht"}->{ $position + 1 } = "wf";
 #     }
@@ -857,32 +840,32 @@ sub create_freq_link_struc {
     my ( $data, $freq, $position, @ngram ) = @_;
     my %argument;
     $argument{"corpus"} = param("corpus");
-    my $localparams = Storable::dclone( params );
+    my $localparams = Storable::dclone(params);
     my @deletions   = qw(ct t tt w ht h p);
     foreach my $param (@deletions) {
         foreach my $i ( 1 .. 9 ) {
-            undef( $localparams->{$param . $i} );
+            undef( $localparams->{ $param . $i } );
         }
     }
     for ( my $i = 0; $i <= $#ngram; $i++ ) {
         my $j = $i + 1 - $position;
         if ( $j > 0 ) {
             foreach my $param qw(t tt h ht) {
-                $localparams->{$param . ($i + 1) } = param($param . $j);
+                $localparams->{ $param . ( $i + 1 ) } = param( $param . $j );
             }
         }
-        if ( param("rt") eq "pos" ) {
-            $localparams->{"p" . ($i + 1) } = $ngram[$i];
+        if ( param("return_type") eq "pos" ) {
+            $localparams->{ "p" . ( $i + 1 ) } = $ngram[$i];
         }
-        elsif ( param("rt") eq "chunk" ) {
-            $localparams->{"ct" . ($i + 1) } = $ngram[$i];
-            $localparams->{"p" . ($i + 1) }  = param("p" . $j);
-            $localparams->{"w" . ($i + 1) }  = param("w" . $j);
+        elsif ( param("return_type") eq "chunk" ) {
+            $localparams->{ "ct" . ( $i + 1 ) } = $ngram[$i];
+            $localparams->{ "p" .  ( $i + 1 ) } = param( "p" . $j );
+            $localparams->{ "w" .  ( $i + 1 ) } = param( "w" . $j );
         }
     }
     my ($query) = &build_query( $data, $localparams );
     $argument{"query"} = URI::Escape::uri_escape($query);
-    $argument{"s"} = "Link";
+    $argument{"s"}     = "Link";
     return \%argument;
 }
 
@@ -893,24 +876,24 @@ sub create_ngfreq_link_struc {
     my ( $data, $ngfreq, @ngram ) = @_;
     my %argument;
     $argument{"corpus"} = param("corpus");
-    my $localparams = Storable::dclone( params );
+    my $localparams = Storable::dclone(params);
     my @deletions   = qw(ct t tt w ht h p);
     foreach my $param (@deletions) {
         foreach my $i ( 1 .. 9 ) {
-            undef( $localparams->{$param . $i} );
+            undef( $localparams->{ $param . $i } );
         }
     }
     for ( my $i = 0; $i <= $#ngram; $i++ ) {
-        if ( param("rt") eq "pos" ) {
-            $localparams->{"p" . ($i + 1) } = $ngram[$i];
+        if ( param("return_type") eq "pos" ) {
+            $localparams->{ "p" . ( $i + 1 ) } = $ngram[$i];
         }
-        elsif ( param("rt") eq "chunk" ) {
-            $localparams->{"ct" . ($i + 1) } = $ngram[$i];
+        elsif ( param("return_type") eq "chunk" ) {
+            $localparams->{ "ct" . ( $i + 1 ) } = $ngram[$i];
         }
     }
     my ($query) = &build_query( $data, $localparams );
     $argument{"query"} = URI::Escape::uri_escape($query);
-    $argument{"s"} = "Link";
+    $argument{"s"}     = "Link";
     return \%argument;
 }
 
@@ -924,13 +907,13 @@ sub new_print_table {
     my $vars;
     my %filter_relations = ( 1 => ">=", 2 => "<=", 3 => "=" );
     my %specifics;
-    if ( param("rt") eq "pos" ) {
+    if ( param("return_type") eq "pos" ) {
         %specifics = (
             "map"   => "number_to_tag",
             "class" => "strucp"
         );
     }
-    elsif ( param("rt") eq "chunk" ) {
+    elsif ( param("return_type") eq "chunk" ) {
         %specifics = (
             "map"   => "number_to_chunk",
             "class" => "strucc"
@@ -1013,8 +996,8 @@ sub new_print_table {
         $row->{"display_ngram"} = $display_ngram;
 
         # CREATE LEX AND STRUC LINKS
-        ###$row->{"struc_href"} = &create_n_link_struc( $cgi, $config, "sn", \@ngram, $position );
-        ###$row->{"lex_href"}   = &create_n_link_struc( $cgi, $config, "ln", \@ngram, $position );
+        $row->{"struc_href"} = &create_n_link_struc( \@ngram, $position );
+        $row->{"lex_href"}   = &create_n_link_struc( \@ngram, $position );
         $row->{"cofreq_href"} = &create_freq_link_struc( $data, $o11, $position, @ngram );
         $row->{"ngfreq_href"} = &create_ngfreq_link_struc( $data, $c1, @ngram );
         $counter++;
@@ -1028,6 +1011,7 @@ sub new_print_table {
 # RETRIEVE N-GRAMS
 #------------------
 sub retrieve_ngrams {
+
     #my ( $tagsref, $nghashref, $maxlength, $match_length, $position ) = @_;
     my ( $tagsref, $nghashref, $maxlength, $match_length, $position, $absolute_pos ) = @_;
     my $localr1     = 0;
@@ -1042,6 +1026,7 @@ sub retrieve_ngrams {
             my ( @ngram, $ngram );
             @ngram = @$tagsref[ $start .. $start + $length - 1 ];
             $ngram = pack( "C*", @ngram );
+
             #$nghashref->{$ngram}->{$localposition}->{$match_length}++;
             $nghashref->{$ngram}->{$localposition}->{$match_length}->{$absolute_pos}++;
             $localr1++;
@@ -1136,6 +1121,5 @@ sub retrieve_ngrams {
 # #---------------
 # # OLD FUNCTIONS
 # #---------------
-
 
 1;
