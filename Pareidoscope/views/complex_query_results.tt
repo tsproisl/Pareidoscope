@@ -15,7 +15,7 @@
 </p>
 [% ELSE %]
 [% INCLUDE results_table.tt
-    vars = vars
+    variables = variables
 %]
 [% END %]
 [% END %]

@@ -124,9 +124,6 @@ any [ 'get', 'post' ] => '/results/word_form_query' => sub {
     my %vars;
     $vars{"query_type"} = "Word form query";
     %vars = ( %vars, %{ &executequeries::single_item_query($data) } );
-    $vars{"current"} = uri_for("/results/word_form_query");
-
-    #debug( Dumper( \%vars ) );
     template( 'single_item_query_results', \%vars );
 };
 
@@ -134,12 +131,14 @@ any [ 'get', 'post' ] => '/results/lemma_query' => sub {
     my %vars;
     $vars{"query_type"} = "Lemma query";
     %vars = ( %vars, %{ &executequeries::single_item_query($data) } );
-    $vars{"current"} = uri_for("/results/lemma_query");
+    debug Dumper(\%vars);
     template( 'single_item_query_results', \%vars );
 };
 
 any [ 'get', 'post' ] => '/results/complex_query' => sub {
-    template( 'complex_query_results', { "current" => uri_for("/results/complex_query") } );
+    my %vars;
+    %vars = %{ &executequeries::ngram_query( $data ) };
+    template( 'complex_query_results', \%vars );
 };
 
 get '/results/concordance' => sub {
@@ -150,15 +149,16 @@ get '/results/concordance' => sub {
 
 get '/results/lexical_ngram_query' => sub {
     my %vars;
-    ###%vars = ( %vars, %{ &executequeries::ngram_query( $data ) } );
-    ###template( 'complex_query_results', \%vars );
+    ###%vars = ( %vars, %{ &executequeries::lexn_query( $data ) } );
+    ###template( 'lexical_query_results', \%vars );
 };
 
 get '/results/structural_ngram_query' => sub {
     my %vars;
-    ###%vars = ( %vars, %{ &executequeries::strucn_query( $data ) } );
-    ###template( 'complex_query_results', \%vars );
+    %vars = ( %vars, %{ &executequeries::strucn_query( $data ) } );
+    template( 'complex_query_results', \%vars );
 };
+
 
 # get '/' => sub {
 

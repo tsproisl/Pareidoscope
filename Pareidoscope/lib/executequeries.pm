@@ -109,30 +109,32 @@ sub single_item_query {
     return $return_vars;
 }
 
-# #--------------
-# # N-GRAM QUERY
-# #--------------
-# sub ngram_query {
-#     my ( $cgi, $config, $localdata ) = @_;
-#     my $vars;
-#     my %specifics;
-#     if ( $config->{"params"}->{"return_type"} eq "pos" ) {
-#         %specifics = ( "name" => "pos" );
-#     }
-#     elsif ( $config->{"params"}->{"return_type"} eq "chunk" ) {
-#         %specifics = ( "name" => "chunk" );
-#     }
-#     foreach my $nr ( 1 .. 9 ) {
-#         $config->{"params"}->{"i"}->{$nr} = $config->{"params"}->{"i"}->{1};
-#     }
-#     my ( $query, $pos_only_query, $title, $anchor, $query_length, $ngramref ) = &build_query($data);
-#     my $id = $config->{"cache"}->query( -corpus => $config->{"active"}->{"corpus"}, -query => $query );
-#     my ($size) = $config->{"cqp"}->exec("size $id");
-#     $vars->{"query_type"} = "Structural " . $specifics{"name"} . " n-gram query";
-#     $vars->{"query"}      = $cgi->escapeHTML($query);
-#     $vars->{"vars"}       = &_strucn( $cgi, $config, $localdata, $size );
-#     return $vars;
-# }
+#--------------
+# N-GRAM QUERY
+#--------------
+sub ngram_query {
+    my ( $data ) = @_;
+    my $vars;
+    my %specifics;
+    if ( param("return_type") eq "pos" ) {
+        %specifics = ( "name" => "pos" );
+    }
+    elsif ( param("return_type") eq "chunk" ) {
+        %specifics = ( "name" => "chunk" );
+    }
+    my ( $query, $pos_only_query, $title, $anchor, $query_length, $ngramref ) = &build_query($data);
+    my $id = $data->{"cache"}->query( -corpus => $data->{"active"}->{"corpus"}, -query => $query );
+    my ($size) = $data->{"cqp"}->exec("size $id");
+    $vars->{"query_type"} = "Structural " . $specifics{"name"} . " n-gram query";
+    $vars->{"query"} = $query;
+    $vars->{"query"} =~ s/&/&amp;/g;
+    $vars->{"query"} =~ s/</&lt;/g;
+    $vars->{"query"} =~ s/>/&gt;/g;
+    $vars->{"query"} =~ s/'/&apos;/g;
+    $vars->{"query"} =~ s/"/&quot;/g;
+    $vars->{"variables"}       = &_strucn( $data, $size );
+    return $vars;
+}
 
 #---------------
 # STRUCN QUERY
@@ -152,7 +154,7 @@ sub strucn_query {
     $return_vars->{"query"} =~ s/"/&quot;/g;
     $id = $data->{"cache"}->query( -corpus => $data->{"active"}->{"corpus"}, -query => $query );
     ($freq) = $data->{'cqp'}->exec("size $id");
-    $return_vars->{"vars"} = &_strucn( $data, $freq );
+    $return_vars->{"variables"} = &_strucn( $data, $freq );
     return $return_vars;
 }
 
@@ -404,7 +406,7 @@ sub build_query {
                 if ( $token =~ m/^\[(?:(?<tt>word|lemma)=(?<t>'\S+')(?<i> %c)?)?(?: & )?(?:(?<pwt>pos|wc)=(?<pw>'\S+'))?\]$/ ) {
                     $token{"tt"}  = $+{tt}  if ( defined( $+{tt} ) );
                     $token{"t"}   = $+{t}   if ( defined( $+{t} ) );
-                    $token{"i"}   = $+{i}   if ( defined( $+{i} ) );
+                    $token{"ignore_case"}   = $+{i}   if ( defined( $+{i} ) );
                     $token{"pwt"} = $+{pwt} if ( defined( $+{pwt} ) );
                     $token{"pw"}  = $+{pw}  if ( defined( $+{pw} ) );
                 }
@@ -414,7 +416,7 @@ sub build_query {
                 if ( $head =~ m/^\[(?:(?<tt>word|lemma)=(?<t>'\S+')(?<i> %c)?)?(?: & )?(?:(?<pwt>pos|wc)=(?<pw>'\S+'))?\]$/ ) {
                     $head{"tt"}  = $+{tt}  if ( defined( $+{tt} ) );
                     $head{"t"}   = $+{t}   if ( defined( $+{t} ) );
-                    $head{"i"}   = $+{i}   if ( defined( $+{i} ) );
+                    $head{"ignore_case"}   = $+{i}   if ( defined( $+{i} ) );
                     $head{"pwt"} = $+{pwt} if ( defined( $+{pwt} ) );
                     $head{"pw"}  = $+{pw}  if ( defined( $+{pw} ) );
                 }
@@ -432,7 +434,7 @@ sub build_query {
                     };
                     my ( $token_t, $head_t );
 
-                    if ( $token{"i"} ) {
+                    if ( $token{"ignore_case"} ) {
                         $token_t = lc( $token{"t"} ) if ( defined( $token{"t"} ) );
                         $head_t  = lc( $head{"t"} )  if ( defined( $head{"t"} ) );
                     }
@@ -452,7 +454,7 @@ sub build_query {
                         else {
                             foreach ( \%token, \%head ) {
                                 $combi = $_->{"tt"} . "=" . $_->{"t"};
-                                $combi .= " %c" if ( $_->{"i"} );
+                                $combi .= " %c" if ( $_->{"ignore_case"} );
                                 push( @combi, $combi );
                             }
                         }
@@ -460,7 +462,7 @@ sub build_query {
                     elsif ( defined( $token{"tt"} ) xor defined( $head{"tt"} ) ) {
                         my $def = $return_def->( \%token, \%head, "tt" );
                         my $combi = $def->{"tt"} . "=" . $def->{"t"};
-                        $combi .= " %c" if ( $def->{"i"} );
+                        $combi .= " %c" if ( $def->{"ignore_case"} );
                         push( @combi, $combi );
                     }
 
@@ -712,7 +714,7 @@ sub _strucn {
 #---------------
 sub create_new_db {
     my ($qid) = @_;
-    my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$qid" ) or die("Cannot connect: $DBI::errstr");
+    my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$qid" ) or die("Cannot connect to " . config->{"user_data"} . "/$qid: $DBI::errstr");
     $dbh->do("PRAGMA encoding = 'UTF-8'");
     $dbh->do("PRAGMA cache_size = 50000");
     $dbh->do(
@@ -738,6 +740,7 @@ sub create_n_link_struc {
     my ( $ngramref, $position ) = @_;
     my %argument;
     $argument{"corpus"} = param("corpus");
+    $argument{"threshold"} = param("threshold");
     $argument{"return_type"} = param("return_type");
     my @params   = qw(t tt);
     if ( param("return_type") eq "chunk" ) {
@@ -766,10 +769,10 @@ sub create_n_link_struc {
 #     my %mode2text = ( "ln" => "lex", "sn" => "struc" );
 #     my $state;
 #     if ( $config->{"params"}->{"return_type"} eq "pos" ) {
-#         $state = $config->keep_states_href( { "t" . ( $position + 1 ) => $head, "tt" . ( $position + 1 ) => "wf", "i" . ( $position + 1 ) => 0 }, qw(c rt p w i t tt) );
+#         $state = $config->keep_states_href( { "t" . ( $position + 1 ) => $head, "tt" . ( $position + 1 ) => "wf", "ignore_case" . ( $position + 1 ) => 0 }, qw(c rt p w i t tt) );
 #     }
 #     elsif ( $config->{"params"}->{"return_type"} eq "chunk" ) {
-#         $state = $config->keep_states_href( { "h" . ( $position + 1 ) => $head, "ht" . ( $position + 1 ) => "wf", "i" . ( $position + 1 ) => 0 }, qw(c rt t tt p w i ct h ht) );
+#         $state = $config->keep_states_href( { "h" . ( $position + 1 ) => $head, "ht" . ( $position + 1 ) => "wf", "ignore_case" . ( $position + 1 ) => 0 }, qw(c rt t tt p w i ct h ht) );
 #     }
 #     my $href = "pareidoscope.cgi?m=$mode&s=link&$state";
 
@@ -793,7 +796,7 @@ sub create_n_link_struc {
 #         $localparams->{"h"}->{ $position + 1 }  = $head;
 #         $localparams->{"ht"}->{ $position + 1 } = "wf";
 #     }
-#     $localparams->{"i"}->{ $position + 1 } = 0;
+#     $localparams->{"ignore_case"}->{ $position + 1 } = 0;
 #     my ($query) = &build_query( { "params" => $localparams } );
 #     $href .= URI::Escape::uri_escape($query) . "&s=Link";
 #     $href .= "&$state";
@@ -840,6 +843,7 @@ sub create_freq_link_struc {
     my ( $data, $freq, $position, @ngram ) = @_;
     my %argument;
     $argument{"corpus"} = param("corpus");
+    $argument{"threshold"} = param("threshold");
     my $localparams = Storable::dclone(params);
     my @deletions   = qw(ct t tt w ht h p);
     foreach my $param (@deletions) {
@@ -876,6 +880,7 @@ sub create_ngfreq_link_struc {
     my ( $data, $ngfreq, @ngram ) = @_;
     my %argument;
     $argument{"corpus"} = param("corpus");
+    $argument{"threshold"} = param("threshold");
     my $localparams = Storable::dclone(params);
     my @deletions   = qw(ct t tt w ht h p);
     foreach my $param (@deletions) {

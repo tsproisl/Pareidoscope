@@ -36,7 +36,7 @@
 </table>
 [% FOREACH word_form_line IN word_forms %]
 [% INCLUDE results_table.tt
-    vars = call_strucn(word_form_line)
+    variables = call_strucn(word_form_line)
 %]
 [% END %]
 [% END %]
