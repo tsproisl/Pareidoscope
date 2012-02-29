@@ -39,6 +39,7 @@ hook 'before_template' => sub {
     $tokens->{"concordance_url"} = uri_for("/results/concordance");
     $tokens->{lex_url} = uri_for("/results/lexical_ngram_query");
     $tokens->{struc_url} = uri_for("/results/structural_ngram_query");
+    $tokens->{"display_context_url"} = uri_for("results/display_context");
 
     # Corpus
     $tokens->{"url_args"}->{"corpus"} = param("corpus");
@@ -143,8 +144,15 @@ any [ 'get', 'post' ] => '/results/complex_query' => sub {
 
 get '/results/concordance' => sub {
     my %vars;
-    ###%vars = ( %vars, %{ &executequeries::cqp_query( $data ) } );
-    ###template( 'kwic', \%vars );
+    $vars{"current"} = uri_for("/results/concordance");
+    %vars = ( %vars, %{ &executequeries::cqp_query( $data ) } );
+    template( 'kwic', \%vars );
+};
+
+get '/results/display_context' => sub {
+    my %vars;
+    $vars{"ps"} = &kwic::display_context( $data );
+    template( 'context_display', \%vars );
 };
 
 get '/results/lexical_ngram_query' => sub {

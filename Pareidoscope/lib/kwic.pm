@@ -1,40 +1,47 @@
 package kwic;
+use Dancer ':syntax';
 
-use warnings;
-use strict;
-use CGI::Carp qw(fatalsToBrowser);
+use Carp;
+use List::Util qw(max);
 use URI::Escape;
 
 sub display{
-    my ($cgi, $config) = @_;
-    my $state = $config->keep_states_href({}, qw(c));
+    my ($data) = @_;
+    my %state;
+    $state{"corpus"} = param("corpus");
+    $state{"id"} = param("id");
+    $state{"s"} = "Link";
     my ($size, $end);
     my $vars;
-    my $sid = $config->get_attribute("s_id");
-    $config->{"cache"}->retrieve($config->{"params"}->{"id"});
-    ($size) = $config->{"cqp"}->exec("size " . $config->{"params"}->{"id"});
-    $end = $config->{"params"}->{"start"} + 39 > $size - 1 ? $size - 1 : $config->{"params"}->{"start"} + 39;
-    my @ranges = $config->{"cqp"}->dump($config->{"params"}->{"id"}, $config->{"params"}->{"start"}, $end);
-    $vars->{"start"} = $config->{"params"}->{"start"} + 1;
-    $vars->{"end"} = $end + 1;
+    my $sid = $data->get_attribute("s_id");
+    $data->{"cache"}->retrieve(param("id"));
+    ($size) = $data->{"cqp"}->exec("size " . param("id"));
+    $end = param("start") + 39 > $size - 1 ? $size - 1 : param("start") + 39;
+    my @ranges = $data->{"cqp"}->dump(param("id"), param("start"), $end);
+    $vars->{"match_start"} = param("start") + 1;
+    $vars->{"match_end"} = $end + 1;
     $vars->{"matches"} = $size;
-    foreach my $n ($config->{"params"}->{"start"} .. $end){
+    foreach my $n (param("start") .. $end){
 	my $row;
-	my $idx = $n - $config->{"params"}->{"start"};
+	my $idx = $n - param("start");
 	my ($s, $e, $t, $k) = @{$ranges[$idx]};
-	my ($cs, $ce, $ellip_start, $ellip_end) = &context($config, $s, $e, "1s");
+	my ($cs, $ce, $ellip_start, $ellip_end) = &context($data, $s, $e, "1s");
 	my $id = $sid->cpos2struc2str($s);
 	my $dispid = $id;
 	$dispid =~ s/-/&nbsp;/g;
 	$row->{"id"} = $dispid;
-	$row->{"id_href"} = "pareidoscope.cgi?m=dc&id=" . $config->{"params"}->{"id"} . "&q=$id&s=Link&$state";
-	$row->{"pre"} = &format($cgi, $config, $cs, $s - 1, $t, $k);
-	$row->{"kwic"} = &format($cgi, $config, $s, $e, $t, $k);
-	$row->{"post"} = &format($cgi, $config, $e + 1, $ce, $t, $k);
+	#$row->{"id_href"} = "pareidoscope.cgi?m=dc&id=" . param("id") . "&q=$id&s=Link&$state";
+	$row->{"id_href"} = \%state;
+	$row->{"id_href"}->{"sentence_id"} = $id;	
+	$row->{"pre"} = &format($data, $cs, $s - 1, $t, $k);
+	$row->{"kwic"} = &format($data, $s, $e, $t, $k);
+	$row->{"post"} = &format($data, $e + 1, $ce, $t, $k);
 	push(@{$vars->{"rows"}}, $row);
     }
-    $vars->{"previous_href"} = "pareidoscope.cgi?m=d&id=" . $config->{"params"}->{"id"} . "&start=" . &max($config->{"params"}->{"start"} - 40, 0) . "&s=Link&$state" if($config->{"params"}->{"start"} > 0);
-    $vars->{"next_href"} = "pareidoscope.cgi?m=d&id=" . $config->{"params"}->{"id"} . "&start=" . ($config->{"params"}->{"start"} + 40) . "&s=Link&$state" unless($end + 1 == $size);
+    $vars->{"previous_href"} = \%state;
+    $vars->{"previous_href"}->{"start"} = max(param("start") - 40, 0);
+    $vars->{"next_href"} = \%state;
+    $vars->{"next_href"}->{"start"} = param("start") + 40;
     return $vars;
 }
 
@@ -44,7 +51,7 @@ sub display{
 #   $ellip_start and $ellip_end indicate that it might be appropriate to put an ellipsis "..." before/after context
 sub context{
     croak 'Usage:  ($c_start, $c_end) = kwic::context($config, $start, $end [, $context]);' unless(@_ == 3 or @_ == 4);
-    my ($config, $s, $e, $context) = @_;
+    my ($data, $s, $e, $context) = @_;
     my $cs = $s - 5;    # default context: 5 words (if appropriate context cannot be determined)
     my $ce = $e + 5;
     my $ellip_start = 1;
@@ -59,7 +66,7 @@ sub context{
 	    $cs = $s - $num;
 	    $ce = $e + $num;
 	}else{
-	    my $att = $config->get_attribute($unit);    # hope it's a structural attribute, otherwise we'll just crash
+	    my $att = $data->get_attribute($unit);    # hope it's a structural attribute, otherwise we'll just crash
 	    croak "kwic::context: attribute does not exist in context specification '$context'." unless(defined($att));
 	    my $struc = $att->cpos2struc($s);
 	    if(defined $struc){
@@ -79,7 +86,7 @@ sub context{
 	}
     }
     # now make sure context doesn't extend beyond corpus limits
-    my $att = $config->get_attribute("word");
+    my $att = $data->get_attribute("word");
     my $max = $att->max_cpos;
     if($cs < 0){
 	$ellip_start = 0;
@@ -97,10 +104,10 @@ sub context{
 #   format corpus range $s .. $e as HTML string according to parameter settings
 sub format {
     croak 'Usage:  $html_string = kwic::format($cgi, $config, $start, $end [, $target, $keyword]);' unless @_ >= 4 and @_ <= 6;
-    my ($cgi, $config, $start, $end, $target, $keyword) = @_;
+    my ($data, $start, $end, $target, $keyword) = @_;
     # load relevant attributes (to avoid multiple lookups)
-    my $Word  = $config->get_attribute("word");
-    my $POS   = $config->get_attribute("pos");
+    my $Word  = $data->get_attribute("word");
+    my $POS   = $data->get_attribute("pos");
     
     # now go through range of cpos and format each token
     my @html = ();    # list of HTML-formatted tokens (and phrase boundaries)
@@ -108,12 +115,13 @@ sub format {
 	my $html  = "";                                                          # process token annotations
 	my $word  = $Word->cpos2str($cpos);
 	my $pos   = $POS->cpos2str($cpos);
-	$html = $cgi->span({'title'=>$cgi->escapeHTML("$word") . "/" . $cgi->escapeHTML("$pos")}, $cgi->escapeHTML("$word"));
+	#$html = "<span title='" . &escapeHTML($word) . "/" . &escapeHTML($pos) . "'>" . &escapeHTML($word) . "</span>";
+	$html = "<span title='" . $word . "/" . $pos . "'>" . $word . "</span>";
 	if ( $cpos == $keyword ) {
-	    $html = $cgi->span( { -class => 'keyword' }, $html );
+	    $html = "<span class='keyword'>$html</span>";
 	}
 	if ( $cpos == $target ) {
-	    $html = $cgi->span( { -class => 'target' }, $html );
+	    $html = "<span class='target'>$html</span>";
 	}
 	push @html, $html;
     }
@@ -122,34 +130,36 @@ sub format {
 
 
 sub display_context{
-    my ($cgi, $config) = @_;
-    my $sentid = $config->{"params"}->{"q"};
-    my $sid = $config->get_attribute("s_id");
+    my ($data) = @_;
+    my $sentid = param("sentence_id");
+    my $sid = $data->get_attribute("s_id");
     my $ps;
     $sentid =~ s/\s+/ /g;
-    $config->{"cache"}->retrieve($config->{"params"}->{"id"});
-    my @ranges = $config->{"cqp"}->dump($config->{"params"}->{"id"});
+    $data->{"cache"}->retrieve(param("id"));
+    my @ranges = $data->{"cqp"}->dump(param("id"));
     foreach my $range (@ranges){
 	my ($s, $e, $t, $k) = @$range;
 	my $p;
 	my $id = $sid->cpos2struc2str($s);
 	next unless($id eq $sentid);
-	my ($cs, $ce, $ellip_start, $ellip_end) = &context($config, $s, $e, "5s");
+	my ($cs, $ce, $ellip_start, $ellip_end) = &context($data, $s, $e, "5s");
 	$id =~ s/-/&nbsp;/g;
-	$p->{"pre"} = &format($cgi, $config, $cs, $s - 1, $t, $k);
-	$p->{"kwic"} = &format($cgi, $config, $s, $e, $t, $k);
-	$p->{"post"} = &format($cgi, $config, $e + 1, $ce, $t, $k);
+	$p->{"pre"} = &format($data, $cs, $s - 1, $t, $k);
+	$p->{"kwic"} = &format($data, $s, $e, $t, $k);
+	$p->{"post"} = &format($data, $e + 1, $ce, $t, $k);
 	push(@$ps, $p);
     }
     return $ps;
 }
 
 
-sub max{
-    my ($arg1, $arg2) = @_;
-    return $arg1 if($arg1 >= $arg2);
-    return $arg2;
+sub escapeHTML {
+    $_[0] =~ s/&/&amp;/g;
+    $_[0] =~ s/</&lt;/g;
+    $_[0] =~ s/>/&gt;/g;
+    $_[0] =~ s/'/&apos;/g;
+    $_[0] =~ s/"/&quot;/g;
+    return $_[0];
 }
-
 
 1;

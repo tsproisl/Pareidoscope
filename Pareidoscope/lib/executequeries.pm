@@ -306,27 +306,27 @@ sub strucn_query {
 #     return $vars;
 # }
 
-# #-----------
-# # CQP QUERY
-# #-----------
-# sub cqp_query {
-#     my ( $cgi, $config ) = @_;
-#     my $vars = {};
-#     my ( $query, $id );
-#     if ( defined( $config->{"params"}->{"q"} ) and not $config->{"params"}->{"q"} =~ m/^\s*$/ ) {
-#         $query = $config->{"params"}->{"q"};
-#     }
-#     else {
-#         $vars->{"error"} = "Oh, you seem to have forgotten the query!";
-#         return $vars;
-#     }
-#     $query =~ s/\s+/ /g;
-#     $id = $config->{"cache"}->query( -corpus => $config->{"active"}->{"corpus"}, -query => $query );
-#     $config->{"params"}->{"id"}    = $id;
-#     $config->{"params"}->{"start"} = 0;
-#     %$vars = (%$vars, %{&kwic::display( $cgi, $config )});
-#     return $vars;
-# }
+#-----------
+# CQP QUERY
+#-----------
+sub cqp_query {
+    my ( $data ) = @_;
+    my $vars = {};
+    my ( $query, $id );
+    if ( defined( param("query") ) and not param("query") =~ m/^\s*$/ ) {
+        $query = param("query");
+    }
+    else {
+        $vars->{"error"} = "Oh, you seem to have forgotten the query!";
+        return $vars;
+    }
+    $query =~ s/\s+/ /g;
+    $id = $data->{"cache"}->query( -corpus => $data->{"active"}->{"corpus"}, -query => $query );
+    params->{"id"}    = $id;
+    params->{"start"} = 0;
+    %$vars = (%$vars, %{&kwic::display( $data )});
+    return $vars;
+}
 
 #-------------
 # BUILD QUERY
