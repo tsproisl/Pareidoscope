@@ -37,7 +37,7 @@
   [% END %]
 </table>
 <p style="margin-top: -10px;text-align: center;">
-  [% IF previous_href.start >= 0 %]
+  [% IF previous_href.start > 1 %]
   <a href="[% current %][% FOREACH arg IN previous_href %][% IF loop.first %]?[% ELSE %]&[% END %][% arg.key %]=[% arg.value %][% END %]">previous</a>
   [% ELSE %]
   previous

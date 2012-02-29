@@ -31,16 +31,17 @@ sub display{
 	$dispid =~ s/-/&nbsp;/g;
 	$row->{"id"} = $dispid;
 	#$row->{"id_href"} = "pareidoscope.cgi?m=dc&id=" . param("id") . "&q=$id&s=Link&$state";
-	$row->{"id_href"} = \%state;
+	$row->{"id_href"} = {%state};
 	$row->{"id_href"}->{"sentence_id"} = $id;	
 	$row->{"pre"} = &format($data, $cs, $s - 1, $t, $k);
 	$row->{"kwic"} = &format($data, $s, $e, $t, $k);
 	$row->{"post"} = &format($data, $e + 1, $ce, $t, $k);
 	push(@{$vars->{"rows"}}, $row);
     }
-    $vars->{"previous_href"} = \%state;
+    $state{"query"} = URI::Escape::uri_escape(param("query"));
+    $vars->{"previous_href"} = {%state};
     $vars->{"previous_href"}->{"start"} = max(param("start") - 40, 0);
-    $vars->{"next_href"} = \%state;
+    $vars->{"next_href"} = {%state};
     $vars->{"next_href"}->{"start"} = param("start") + 40;
     return $vars;
 }

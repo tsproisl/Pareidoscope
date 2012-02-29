@@ -123,6 +123,7 @@ sub ngram_query {
         %specifics = ( "name" => "chunk" );
     }
     my ( $query, $pos_only_query, $title, $anchor, $query_length, $ngramref ) = &build_query($data);
+    debug $query;
     my $id = $data->{"cache"}->query( -corpus => $data->{"active"}->{"corpus"}, -query => $query );
     my ($size) = $data->{"cqp"}->exec("size $id");
     $vars->{"query_type"} = "Structural " . $specifics{"name"} . " n-gram query";
@@ -321,9 +322,10 @@ sub cqp_query {
         return $vars;
     }
     $query =~ s/\s+/ /g;
+    debug "query: $query";
     $id = $data->{"cache"}->query( -corpus => $data->{"active"}->{"corpus"}, -query => $query );
     params->{"id"}    = $id;
-    params->{"start"} = 0;
+    params->{"start"} = 0 unless(param("start"));
     %$vars = (%$vars, %{&kwic::display( $data )});
     return $vars;
 }
