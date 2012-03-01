@@ -47,6 +47,12 @@ With the Pareidoscope you can find out</p>
   Changelog
 </h3>
 <h4 style="padding:10px 15px 0px 15px;">
+  2012/03/01
+</h4>
+<p>
+  Version 0.9: Now using the <a href="http://perldancer.org/">Perl Dancer</a> framework; improvements to the code base
+</p>
+<h4 style="padding:10px 15px 0px 15px;">
   2011/11/29
 </h4>
 <p>

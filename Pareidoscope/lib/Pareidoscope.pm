@@ -8,7 +8,7 @@ use Data::Dumper;
 use data;
 use executequeries;
 
-use version; our $VERSION = qv('0.8.1');
+use version; our $VERSION = qv('0.9');
 my $data;
 
 hook 'before' => sub {
