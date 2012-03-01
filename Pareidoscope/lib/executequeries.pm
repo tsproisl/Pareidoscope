@@ -113,7 +113,7 @@ sub single_item_query {
 # N-GRAM QUERY
 #--------------
 sub ngram_query {
-    my ( $data ) = @_;
+    my ($data) = @_;
     my $vars;
     my %specifics;
     if ( param("return_type") eq "pos" ) {
@@ -123,17 +123,17 @@ sub ngram_query {
         %specifics = ( "name" => "chunk" );
     }
     my ( $query, $pos_only_query, $title, $anchor, $query_length, $ngramref ) = &build_query($data);
-    debug $query;
+    debug "query: $query";
     my $id = $data->{"cache"}->query( -corpus => $data->{"active"}->{"corpus"}, -query => $query );
     my ($size) = $data->{"cqp"}->exec("size $id");
     $vars->{"query_type"} = "Structural " . $specifics{"name"} . " n-gram query";
-    $vars->{"query"} = $query;
+    $vars->{"query"}      = $query;
     $vars->{"query"} =~ s/&/&amp;/g;
     $vars->{"query"} =~ s/</&lt;/g;
     $vars->{"query"} =~ s/>/&gt;/g;
     $vars->{"query"} =~ s/'/&apos;/g;
     $vars->{"query"} =~ s/"/&quot;/g;
-    $vars->{"variables"}       = &_strucn( $data, $size );
+    $vars->{"variables"} = &_strucn( $data, $size );
     return $vars;
 }
 
@@ -159,159 +159,164 @@ sub strucn_query {
     return $return_vars;
 }
 
-# #--------------
-# # LEXN QUERY
-# #--------------
-# #
-# # rotate contingency table so that the invariable frequency of the n-gram can be stored as R1 in the database
-# #
-# #         | word | !word |
-# # --------+------+-------+----
-# #  n-gram | O11  | O12   | R1
-# # --------+------+-------+----
-# # !n-gram | O21  | O22   | R2
-# # --------+------+-------+----
-# #         |  C1  |  C2   | N
-# #
-# sub lexn_query {
-#     my ( $cgi, $config, $localdata ) = @_;
-#     my ( $query, $smallquery, $title, $anchor, $query_length, $id, $localn, $r1, @ranges, @frequencies, @cofreq, $cofreq, $ngramref );
-#     my ( $t0, $t1, $t2, $t01diff, $t12diff );
-#     my ( $qids, $qid );
-#     my $vars;
-#     my $check_cache      = $config->{"cache_dbh"}->prepare(qq{SELECT qid, r1, n FROM queries WHERE corpus=? AND class=? AND query=?});
-#     my $insert_query     = $config->{"cache_dbh"}->prepare(qq{INSERT INTO queries (corpus, class, query, qlen, time, r1, n) VALUES (?, ?, ?, ?, strftime('%s','now'), ?, ?)});
-#     my $update_timestamp = $config->{"cache_dbh"}->prepare(qq{UPDATE queries SET time=strftime('%s','now') WHERE qid=?});
-#     my %specifics;
+#--------------
+# LEXN QUERY
+#--------------
+#
+# rotate contingency table so that the invariable frequency of the n-gram can be stored as R1 in the database
+#
+#         | word | !word |
+# --------+------+-------+----
+#  n-gram | O11  | O12   | R1
+# --------+------+-------+----
+# !n-gram | O21  | O22   | R2
+# --------+------+-------+----
+#         |  C1  |  C2   | N
+#
+sub lexn_query {
+    my ($data) = @_;
+    my ( $query, $smallquery, $title, $anchor, $query_length, $id, $localn, $r1, @ranges, @frequencies, @cofreq, $cofreq, $ngramref );
+    my ( $t0, $t1, $t2, $t01diff, $t12diff );
+    my ( $qids, $qid );
+    my $vars;
+    my $check_cache      = database->prepare(qq{SELECT qid, r1, n FROM queries WHERE corpus=? AND class=? AND query=?});
+    my $insert_query     = database->prepare(qq{INSERT INTO queries (corpus, class, query, qlen, time, r1, n) VALUES (?, ?, ?, ?, strftime('%s','now'), ?, ?)});
+    my $update_timestamp = database->prepare(qq{UPDATE queries SET time=strftime('%s','now') WHERE qid=?});
+    my %specifics;
 
-#     if ( $config->{"params"}->{"return_type"} eq "pos" ) {
-#         %specifics = (
-#             "name"  => "pos",
-#             "class" => "lexp"
-#         );
-#     }
-#     elsif ( $config->{"params"}->{"return_type"} eq "chunk" ) {
-#         %specifics = (
-#             "name"  => "chunk",
-#             "class" => "lexc"
-#         );
-#     }
-#     $vars->{"query_type"} = "Lexical " . $specifics{"name"} . " n-gram query";
-#     ( $smallquery, $query, $title, $anchor, $query_length, $ngramref ) = &build_query($data);
-#     $vars->{"query"} = $cgi->escapeHTML($smallquery);
+    if ( param("return_type") eq "pos" ) {
+        %specifics = (
+            "name"  => "pos",
+            "class" => "lexp"
+        );
+    }
+    elsif ( param("return_type") eq "chunk" ) {
+        %specifics = (
+            "name"  => "chunk",
+            "class" => "lexc"
+        );
+    }
+    $vars->{"query_type"} = "Lexical " . $specifics{"name"} . " n-gram query";
+    ( $smallquery, $query, $title, $anchor, $query_length, $ngramref ) = &build_query($data);
+    $vars->{"query"} = $smallquery;
+    $vars->{"query"} =~ s/&/&amp;/g;
+    $vars->{"query"} =~ s/</&lt;/g;
+    $vars->{"query"} =~ s/>/&gt;/g;
+    $vars->{"query"} =~ s/'/&apos;/g;
+    $vars->{"query"} =~ s/"/&quot;/g;
 
-#     # check cache database
-#     $check_cache->execute( $config->{"active"}->{"corpus"}, $specifics{"class"}, $smallquery );
-#     $qids = $check_cache->fetchall_arrayref;
-#     if ( scalar(@$qids) == 1 ) {
-#         $qid                       = $qids->[0]->[0];
-#         $vars->{"matches"}         = $qids->[0]->[1];
-#         $vars->{"analyze_matches"} = $qids->[0]->[2];
-#         $update_timestamp->execute($qid);
-#     }
-#     elsif ( scalar(@$qids) == 0 ) {
-#         my ( @cooccurrencematches, @matches );
+    # check cache database
+    $check_cache->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $smallquery );
+    $qids = $check_cache->fetchall_arrayref;
+    if ( scalar(@$qids) == 1 ) {
+        $qid                       = $qids->[0]->[0];
+        $vars->{"matches"}         = $qids->[0]->[1];
+        $vars->{"analyze_matches"} = $qids->[0]->[2];
+        $update_timestamp->execute($qid);
+    }
+    elsif ( scalar(@$qids) == 0 ) {
+        my ( @cooccurrencematches, @matches );
 
-#         # execute 'large' query, expand to s, execute 'small' query
-#         $t0 = [ &Time::HiRes::gettimeofday() ];
-#         $id = $config->{"cache"}->query( -corpus => $config->{"active"}->{"corpus"}, -query => $query );
-#         ($localn) = $config->{"cqp"}->exec("size $id");
-#         $config->{"cqp"}->exec("$id expand to s; A = $smallquery");
-#         ($r1) = $config->{"cqp"}->exec("size A");
-#         $vars->{"matches"}         = $r1;
-#         $vars->{"analyze_matches"} = $localn;
-#         return $vars if ( $localn == 0 or $r1 == 0 );
+        # execute 'large' query, expand to s, execute 'small' query
+        $t0 = [ &Time::HiRes::gettimeofday() ];
+        $id = $data->{"cache"}->query( -corpus => $data->{"active"}->{"corpus"}, -query => $query );
+        ($localn) = $data->{"cqp"}->exec("size $id");
+        $data->{"cqp"}->exec("$id expand to s; A = $smallquery");
+        ($r1) = $data->{"cqp"}->exec("size A");
+        $vars->{"matches"}         = $r1;
+        $vars->{"analyze_matches"} = $localn;
+        return $vars if ( $localn == 0 or $r1 == 0 );
 
-#         # insert into cache.db
-#         if ( $query eq $smallquery ) {
-#             $insert_query->execute( $config->{"active"}->{"corpus"}, $specifics{"class"}, $smallquery, $query_length, $r1, $config->{"active"}->{ $specifics{"name"} . "_ngrams" } );
-#         }
-#         else {
-#             $insert_query->execute( $config->{"active"}->{"corpus"}, $specifics{"class"}, $smallquery, $query_length, $r1, $localn );
-#         }
-#         $check_cache->execute( $config->{"active"}->{"corpus"}, $specifics{"class"}, $smallquery );
-#         $qid = ( $check_cache->fetchrow_array )[0];
-#         $t1  = [ &Time::HiRes::gettimeofday() ];
+        # insert into cache.db
+        if ( $query eq $smallquery ) {
+            $insert_query->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $smallquery, $query_length, $r1, $data->{"active"}->{ $specifics{"name"} . "_ngrams" } );
+        }
+        else {
+            $insert_query->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $smallquery, $query_length, $r1, $localn );
+        }
+        $check_cache->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $smallquery );
+        $qid = ( $check_cache->fetchrow_array )[0];
+        $t1  = [ &Time::HiRes::gettimeofday() ];
 
-#         # get cooccurrence frequencies
-#         @cooccurrencematches = $config->{"cqp"}->exec("tabulate A match, matchend");
+        # get cooccurrence frequencies
+        @cooccurrencematches = $data->{"cqp"}->exec("tabulate A match, matchend");
 
-#         # get overall frequencies in n-gram
-#         @matches = $config->{"cqp"}->exec("tabulate $id match, matchend") unless ( $query eq $smallquery );
-#         my $word = $config->get_attribute("word");
-#         my $head = $config->get_attribute("h") if ( $config->{"params"}->{"return_type"} eq "chunk" );
-#         foreach my $ms ( [ \@cooccurrencematches, \@cofreq ], [ \@matches, \@frequencies ] ) {
-#             foreach my $m ( @{ $ms->[0] } ) {
-#                 my ( $match, $matchend ) = split( /\t/, $m );
+        # get overall frequencies in n-gram
+        @matches = $data->{"cqp"}->exec("tabulate $id match, matchend") unless ( $query eq $smallquery );
+        my $word = $data->get_attribute("word");
+        my $head = $data->get_attribute("h") if ( param("return_type") eq "chunk" );
+        foreach my $ms ( [ \@cooccurrencematches, \@cofreq ], [ \@matches, \@frequencies ] ) {
+            foreach my $m ( @{ $ms->[0] } ) {
+                my ( $match, $matchend ) = split( /\t/, $m );
 
-#                 # get cpos of sentence start and end
-#                 my @words;
-#                 my $core_query;
-#                 if ( $config->{"params"}->{"return_type"} eq "pos" ) {
+                # get cpos of sentence start and end
+                my @words;
+                my $core_query;
+                if ( param("return_type") eq "pos" ) {
 
-#                     # fetch word forms info via CWB::CL
-#                     @words = $word->cpos2str( $match .. $matchend );
-#                 }
-#                 elsif ( $config->{"params"}->{"return_type"} eq "chunk" ) {
+                    # fetch word forms info via CWB::CL
+                    @words = $word->cpos2str( $match .. $matchend );
+                }
+                elsif ( param("return_type") eq "chunk" ) {
 
-#                     # fetch heads info via CWB::CL
-#                     @words = $word->cpos2str( grep( defined( $head->cpos2struc($_) ), ( $match .. $matchend ) ) );
-#                 }
-#                 croak( scalar(@words) . " != $query_length\n" ) unless ( @words == $query_length );
-#                 for ( my $i = 0; $i <= $#words; $i++ ) {
-#                     $ms->[1]->[$i]->{ $words[$i] }++;
-#                 }
-#             }
-#         }
-#         $t2 = [ &Time::HiRes::gettimeofday() ];
-#         $vars->{"execution_times"} = [ map( sprintf( "%.2f", $_ ), ( &Time::HiRes::tv_interval( $t0, $t1 ), &Time::HiRes::tv_interval( $t1, $t2 ) ) ) ];
+                    # fetch heads info via CWB::CL
+                    @words = $word->cpos2str( grep( defined( $head->cpos2struc($_) ), ( $match .. $matchend ) ) );
+                }
+                croak( scalar(@words) . " != $query_length\n" ) unless ( @words == $query_length );
+                for ( my $i = 0; $i <= $#words; $i++ ) {
+                    $ms->[1]->[$i]->{ $words[$i] }++;
+                }
+            }
+        }
+        $t2 = [ &Time::HiRes::gettimeofday() ];
+        $vars->{"execution_times"} = [ map( sprintf( "%.2f", $_ ), ( &Time::HiRes::tv_interval( $t0, $t1 ), &Time::HiRes::tv_interval( $t1, $t2 ) ) ) ];
 
-#         # for all co-occurring word forms, calculate am and store in database
-#         my $dbh           = &create_new_db($qid);
-#         my $insert_result = $dbh->prepare(qq{INSERT INTO results (qid, result, position, mlen, o11, c1, am) VALUES (?, ?, ?, ?, ?, ?, ?)});
-#         $dbh->do(qq{BEGIN TRANSACTION});
-#         if ( $query eq $smallquery ) {
-#             my %wordfreqs;
-#             my $getc1 = $config->{"dbh"}->prepare( "SELECT sum(" . $specifics{"name"} . "seq) FROM types WHERE type=?" );
-#             for ( my $i = 0; $i <= $#cofreq; $i++ ) {
-#                 foreach my $type ( keys %{ $cofreq[$i] } ) {
-#                     $wordfreqs{$type} = 0;
-#                 }
-#             }
-#             foreach my $type ( keys %wordfreqs ) {
-#                 $getc1->execute($type);
-#                 $wordfreqs{$type} = ( $getc1->fetchrow_array )[0];
-#             }
-#             for ( my $i = 0; $i <= $#cofreq; $i++ ) {
-#                 foreach my $type ( keys %{ $cofreq[$i] } ) {
-#                     my $g = &statistics::g( $cofreq[$i]->{$type}, $r1, $wordfreqs{$type}, $config->{"active"}->{ $specifics{"name"} . "_ngrams" } );
-#                     $insert_result->execute( $qid, $type, $i, $query_length, $cofreq[$i]->{$type}, $wordfreqs{$type}, $g );
-#                 }
-#             }
-#         }
-#         else {
-#             for ( my $i = 0; $i <= $#cofreq; $i++ ) {
-#                 foreach my $type ( keys %{ $cofreq[$i] } ) {
-#                     my $g = &statistics::g( $cofreq[$i]->{$type}, $r1, $frequencies[$i]->{$type}, $localn );
-#                     $insert_result->execute( $qid, $type, $i, $query_length, $cofreq[$i]->{$type}, $frequencies[$i]->{$type}, $g );
-#                 }
-#             }
-#         }
-#         $dbh->do(qq{COMMIT});
-#     }
-#     else {
-#         croak("Feel proud: you witness an extremely unlikely behaviour of this website.");
-#     }
-#     %$vars = ( %$vars, %{ &print_ngram_overview_table( $cgi, $config, $qid, $ngramref ) } );
-#     $vars->{"slots"} = &print_ngram_query_tables( $cgi, $config, $qid, $ngramref, ( $query eq $smallquery ) );
-#     return $vars;
-# }
+        # for all co-occurring word forms, calculate am and store in database
+        my $dbh           = &create_new_db($qid);
+        my $insert_result = $dbh->prepare(qq{INSERT INTO results (qid, result, position, mlen, o11, c1, am) VALUES (?, ?, ?, ?, ?, ?, ?)});
+        $dbh->do(qq{BEGIN TRANSACTION});
+        if ( $query eq $smallquery ) {
+            my %wordfreqs;
+            my $getc1 = $data->{"dbh"}->prepare( "SELECT sum(" . $specifics{"name"} . "seq) FROM types WHERE type=?" );
+            for ( my $i = 0; $i <= $#cofreq; $i++ ) {
+                foreach my $type ( keys %{ $cofreq[$i] } ) {
+                    $wordfreqs{$type} = 0;
+                }
+            }
+            foreach my $type ( keys %wordfreqs ) {
+                $getc1->execute($type);
+                $wordfreqs{$type} = ( $getc1->fetchrow_array )[0];
+            }
+            for ( my $i = 0; $i <= $#cofreq; $i++ ) {
+                foreach my $type ( keys %{ $cofreq[$i] } ) {
+                    my $g = &statistics::g( $cofreq[$i]->{$type}, $r1, $wordfreqs{$type}, $data->{"active"}->{ $specifics{"name"} . "_ngrams" } );
+                    $insert_result->execute( $qid, $type, $i, $query_length, $cofreq[$i]->{$type}, $wordfreqs{$type}, $g );
+                }
+            }
+        }
+        else {
+            for ( my $i = 0; $i <= $#cofreq; $i++ ) {
+                foreach my $type ( keys %{ $cofreq[$i] } ) {
+                    my $g = &statistics::g( $cofreq[$i]->{$type}, $r1, $frequencies[$i]->{$type}, $localn );
+                    $insert_result->execute( $qid, $type, $i, $query_length, $cofreq[$i]->{$type}, $frequencies[$i]->{$type}, $g );
+                }
+            }
+        }
+        $dbh->do(qq{COMMIT});
+    }
+    else {
+        croak("Feel proud: you witness an extremely unlikely behaviour of this website.");
+    }
+    %$vars = ( %$vars, %{ &print_ngram_overview_table( $data, $qid, $ngramref ) } );
+    $vars->{"slots"} = &print_ngram_query_tables( $data, $qid, $ngramref, ( $query eq $smallquery ) );
+    return $vars;
+}
 
 #-----------
 # CQP QUERY
 #-----------
 sub cqp_query {
-    my ( $data ) = @_;
+    my ($data) = @_;
     my $vars = {};
     my ( $query, $id );
     if ( defined( param("query") ) and not param("query") =~ m/^\s*$/ ) {
@@ -324,9 +329,9 @@ sub cqp_query {
     $query =~ s/\s+/ /g;
     debug "query: $query";
     $id = $data->{"cache"}->query( -corpus => $data->{"active"}->{"corpus"}, -query => $query );
-    params->{"id"}    = $id;
-    params->{"start"} = 0 unless(param("start"));
-    %$vars = (%$vars, %{&kwic::display( $data )});
+    params->{"id"} = $id;
+    params->{"start"} = 0 unless ( param("start") );
+    %$vars = ( %$vars, %{ &kwic::display($data) } );
     return $vars;
 }
 
@@ -406,21 +411,21 @@ sub build_query {
             if ( defined($head) and defined($token) ) {
                 my ( %token, %head );
                 if ( $token =~ m/^\[(?:(?<tt>word|lemma)=(?<t>'\S+')(?<i> %c)?)?(?: & )?(?:(?<pwt>pos|wc)=(?<pw>'\S+'))?\]$/ ) {
-                    $token{"tt"}  = $+{tt}  if ( defined( $+{tt} ) );
-                    $token{"t"}   = $+{t}   if ( defined( $+{t} ) );
-                    $token{"ignore_case"}   = $+{i}   if ( defined( $+{i} ) );
-                    $token{"pwt"} = $+{pwt} if ( defined( $+{pwt} ) );
-                    $token{"pw"}  = $+{pw}  if ( defined( $+{pw} ) );
+                    $token{"tt"}          = $+{tt}  if ( defined( $+{tt} ) );
+                    $token{"t"}           = $+{t}   if ( defined( $+{t} ) );
+                    $token{"ignore_case"} = $+{i}   if ( defined( $+{i} ) );
+                    $token{"pwt"}         = $+{pwt} if ( defined( $+{pwt} ) );
+                    $token{"pw"}          = $+{pw}  if ( defined( $+{pw} ) );
                 }
                 else {
                     croak("Unable to parse token: '$token'\n");
                 }
                 if ( $head =~ m/^\[(?:(?<tt>word|lemma)=(?<t>'\S+')(?<i> %c)?)?(?: & )?(?:(?<pwt>pos|wc)=(?<pw>'\S+'))?\]$/ ) {
-                    $head{"tt"}  = $+{tt}  if ( defined( $+{tt} ) );
-                    $head{"t"}   = $+{t}   if ( defined( $+{t} ) );
-                    $head{"ignore_case"}   = $+{i}   if ( defined( $+{i} ) );
-                    $head{"pwt"} = $+{pwt} if ( defined( $+{pwt} ) );
-                    $head{"pw"}  = $+{pw}  if ( defined( $+{pw} ) );
+                    $head{"tt"}          = $+{tt}  if ( defined( $+{tt} ) );
+                    $head{"t"}           = $+{t}   if ( defined( $+{t} ) );
+                    $head{"ignore_case"} = $+{i}   if ( defined( $+{i} ) );
+                    $head{"pwt"}         = $+{pwt} if ( defined( $+{pwt} ) );
+                    $head{"pw"}          = $+{pw}  if ( defined( $+{pw} ) );
                 }
                 else {
                     croak("Unable to parse head: '$head'\n");
@@ -669,8 +674,6 @@ sub _strucn {
             my $max_end   = min( $cstart + ( $data->{"active"}->{"ngram_length"} - 1 ), $#cseq );
             my $position  = $cstart - $max_start;
             my @max_ngram = @cseq[ $max_start .. $max_end ];
-
-            #$r1 += &retrieve_ngrams( \@max_ngram, \%ngrams, $data->{"active"}->{"ngram_length"}, $match_length, $position );
             $r1 += &retrieve_ngrams( \@max_ngram, \%ngrams, $data->{"active"}->{"ngram_length"}, $match_length, $position, $pseq[$max_start] + $start );
         }
         ## handle skipped matches
@@ -716,7 +719,7 @@ sub _strucn {
 #---------------
 sub create_new_db {
     my ($qid) = @_;
-    my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$qid" ) or die("Cannot connect to " . config->{"user_data"} . "/$qid: $DBI::errstr");
+    my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$qid" ) or die( "Cannot connect to " . config->{"user_data"} . "/$qid: $DBI::errstr" );
     $dbh->do("PRAGMA encoding = 'UTF-8'");
     $dbh->do("PRAGMA cache_size = 50000");
     $dbh->do(
@@ -741,10 +744,10 @@ sub create_new_db {
 sub create_n_link_struc {
     my ( $ngramref, $position ) = @_;
     my %argument;
-    $argument{"corpus"} = param("corpus");
-    $argument{"threshold"} = param("threshold");
+    $argument{"corpus"}      = param("corpus");
+    $argument{"threshold"}   = param("threshold");
     $argument{"return_type"} = param("return_type");
-    my @params   = qw(t tt);
+    my @params = qw(t tt);
     if ( param("return_type") eq "chunk" ) {
         push @params, qw(p w h ht);
     }
@@ -763,24 +766,39 @@ sub create_n_link_struc {
     return \%argument;
 }
 
-# #-------------------
-# # CREATE N LINK LEX
-# #-------------------
-# sub create_n_link_lex {
-#     my ( $cgi, $config, $mode, $ngramref, $position, $head ) = @_;
-#     my %mode2text = ( "ln" => "lex", "sn" => "struc" );
-#     my $state;
-#     if ( $config->{"params"}->{"return_type"} eq "pos" ) {
-#         $state = $config->keep_states_href( { "t" . ( $position + 1 ) => $head, "tt" . ( $position + 1 ) => "wf", "ignore_case" . ( $position + 1 ) => 0 }, qw(c rt p w i t tt) );
-#     }
-#     elsif ( $config->{"params"}->{"return_type"} eq "chunk" ) {
-#         $state = $config->keep_states_href( { "h" . ( $position + 1 ) => $head, "ht" . ( $position + 1 ) => "wf", "ignore_case" . ( $position + 1 ) => 0 }, qw(c rt t tt p w i ct h ht) );
-#     }
-#     my $href = "pareidoscope.cgi?m=$mode&s=link&$state";
+#-------------------
+# CREATE N LINK LEX
+#-------------------
+sub create_n_link_lex {
+    my ( $data, $ngramref, $position, $head ) = @_;
+    my %argument;
+    $argument{"corpus"}      = param("corpus");
+    $argument{"return_type"} = param("return_type");
+    $argument{"s"}           = "Link";
+    $argument{"ignore_case"} = 0;
+    my @params = qw(p w t tt);
+    for ( my $i = 0; $i <= $data->{"active"}->{"ngram_length"}; $i++ ) {
 
-#     #return $cgi->a( { "href" => $href }, $mode2text{$mode} );
-#     return $cgi->escapeHTML($href);
-# }
+        foreach my $param (@params) {
+            $argument{ $param . $i } = param( $param . $i ) if ( defined( param( $param . $i ) ) and param( $param . $i ) ne "" );
+        }
+    }
+    if ( param("return_type") eq "pos" ) {
+        $argument{ "t" .  ( $position + 1 ) } = $head;
+        $argument{ "tt" . ( $position + 1 ) } = "wordform";
+    }
+    elsif ( param("return_type") eq "chunk" ) {
+        my @params = qw(ct h ht);
+        for ( my $i = 0; $i <= $data->{"active"}->{"ngram_length"}; $i++ ) {
+            foreach my $param (@params) {
+                $argument{ $param . $i } = param( $param . $i ) if ( defined( param( $param . $i ) ) and param( $param . $i ) ne "" );
+            }
+        }
+        $argument{ "h" .  ( $position + 1 ) } = $head;
+        $argument{ "ht" . ( $position + 1 ) } = "wordform";
+    }
+    return \%argument;
+}
 
 # #----------------------
 # # CREATE FREQ LINK LEX
@@ -844,7 +862,7 @@ sub create_n_link_struc {
 sub create_freq_link_struc {
     my ( $data, $freq, $position, @ngram ) = @_;
     my %argument;
-    $argument{"corpus"} = param("corpus");
+    $argument{"corpus"}    = param("corpus");
     $argument{"threshold"} = param("threshold");
     my $localparams = Storable::dclone(params);
     my @deletions   = qw(ct t tt w ht h p);
@@ -881,7 +899,7 @@ sub create_freq_link_struc {
 sub create_ngfreq_link_struc {
     my ( $data, $ngfreq, @ngram ) = @_;
     my %argument;
-    $argument{"corpus"} = param("corpus");
+    $argument{"corpus"}    = param("corpus");
     $argument{"threshold"} = param("threshold");
     my $localparams = Storable::dclone(params);
     my @deletions   = qw(ct t tt w ht h p);
@@ -1035,95 +1053,91 @@ sub retrieve_ngrams {
             $ngram = pack( "C*", @ngram );
 
             #$nghashref->{$ngram}->{$localposition}->{$match_length}++;
-            $nghashref->{$ngram}->{$localposition}->{$match_length}->{$absolute_pos}++;
+            $nghashref->{$ngram}->{$localposition}->{$match_length}->{ $absolute_pos + $position }++;
             $localr1++;
         }
     }
     return $localr1;
 }
 
-# #--------------------------
-# # PRINT NGRAM QUERY TABLES
-# #--------------------------
-# sub print_ngram_query_tables {
-#     my ( $cgi, $config, $qid, $ngramref, $general ) = @_;
-#     my $dbh = DBI->connect("dbi:SQLite:" . config->{"user_data"} . "/$qid") or die("Cannot connect: $DBI::errstr");
-#     print $cgi->end_table, $cgi->end_p;
-#     $dbh->do("SELECT icu_load_collation('en_GB', 'BE')");
-#     my $get_top_50    = $dbh->prepare(qq{SELECT result, position, o11, c1, am FROM results WHERE position=? ORDER BY am DESC, o11 DESC LIMIT 0, 40});
-#     my $get_positions = $dbh->prepare(qq{SELECT DISTINCT position FROM results ORDER BY position ASC});
-#     $get_positions->execute();
-#     my $positionsref = $get_positions->fetchall_arrayref;
-#     my $slots;
-#     foreach my $position (@$positionsref) {
-#         my $slot;
-#         $position = $position->[0];
-#         $get_top_50->execute($position);
-#         my $rows = $get_top_50->fetchall_arrayref;
-#         $slot->{"name"} = $ngramref->[$position];
-#         my $counter = 0;
-#         foreach my $row (@$rows) {
-#             my $slotrow;
-#             my ( $result, $posit, $o11, $c1, $g2 ) = @$row;
-#             $g2 = sprintf( "%.5f", $g2 );
-#             my ( $freqlink, $ngfreqlink, $lexnlink, $strucnlink );
-#             my %words;
-#             foreach my $nr ( keys %{ $config->{'params'}->{'q'} } ) {
-#                 $words{$nr} = $config->{'params'}->{'q'}->{$nr} if ( defined( $config->{'params'}->{'q'}->{$nr} ) and $config->{'params'}->{'q'}->{$nr} ne "" );
-#             }
-#             $words{ $position + 1 } = $result;
-#             $slotrow->{"word"} = $result;
-#             $slotrow->{"cofreq_href"} = &create_freq_link_lex( $cgi, $config, $o11, $ngramref, $position, $result );
-#             $slotrow->{"ngfreq_href"} = &create_ngfreq_link_lex( $cgi, $config, $c1, $ngramref, $position, $result ) unless ($general);
-#             $slotrow->{"lex_href"}   = &create_n_link_lex( $cgi, $config, "ln", $ngramref, $position, $result );
-#             $slotrow->{"struc_href"} = &create_n_link_lex( $cgi, $config, "sn", $ngramref, $position, $result );
-#             $counter++;
-#             $slotrow->{"number"} = $counter;
-#             $slotrow->{"cofreq"} = $o11;
-#             $slotrow->{"ngfreq"} = $c1;
-#             $slotrow->{"g"}      = $g2;
-# 	    push( @{ $slot->{"rows"} }, $slotrow );
-#         }
-# 	push(@$slots, $slot);
-#     }
-#     return $slots;
-# }
+#--------------------------
+# PRINT NGRAM QUERY TABLES
+#--------------------------
+sub print_ngram_query_tables {
+    my ( $data, $qid, $ngramref, $general ) = @_;
+    my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$qid" ) or die("Cannot connect: $DBI::errstr");
+    $dbh->do("PRAGMA encoding = 'UTF-8'");
+    $dbh->do("SELECT icu_load_collation('en_GB', 'BE')");
+    my $get_top_50    = $dbh->prepare(qq{SELECT result, position, o11, c1, am FROM results WHERE position=? ORDER BY am DESC, o11 DESC LIMIT 0, 40});
+    my $get_positions = $dbh->prepare(qq{SELECT DISTINCT position FROM results ORDER BY position ASC});
+    $get_positions->execute();
+    my $positionsref = $get_positions->fetchall_arrayref;
+    my $slots;
 
-# #----------------------------
-# # PRINT NGRAM OVERVIEW TABLE
-# #----------------------------
-# sub print_ngram_overview_table {
-#     my ( $cgi, $config, $qid, $ngramref ) = @_;
-#     my $vars;
-#     my $dbh = DBI->connect("dbi:SQLite:" . config->{"user_data"} . "/$qid") or die("Cannot connect: $DBI::errstr");
-#     $dbh->do("SELECT icu_load_collation('en_GB', 'BE')");
-#     my $get_top_10    = $dbh->prepare(qq{SELECT result, position, o11, c1, am FROM results WHERE position=? ORDER BY am DESC, o11 DESC LIMIT 0, 10});
-#     my $get_positions = $dbh->prepare(qq{SELECT DISTINCT position FROM results ORDER BY position ASC});
-#     $get_positions->execute();
-#     my $positionsref = $get_positions->fetchall_arrayref;
-#     my @columns;
+    foreach my $position (@$positionsref) {
+        my $slot;
+        $position = $position->[0];
+        $get_top_50->execute($position);
+        my $rows = $get_top_50->fetchall_arrayref;
+        $slot->{"name"} = $ngramref->[$position];
+        my $counter = 0;
+        foreach my $row (@$rows) {
+            my $slotrow;
+            my ( $result, $posit, $o11, $c1, $g2 ) = @$row;
+            $g2 = sprintf( "%.5f", $g2 );
+            my ( $freqlink, $ngfreqlink, $lexnlink, $strucnlink );
+            $slotrow->{"word"}        = $result;
+            $slotrow->{"cofreq_href"} = &create_freq_link_lex( $data, $o11, $ngramref, $position, $result );
+            $slotrow->{"ngfreq_href"} = &create_ngfreq_link_lex( $data, $c1, $ngramref, $position, $result ) unless ($general);
+            $slotrow->{"lex_href"}    = &create_n_link_lex( $data, "ln", $ngramref, $position, $result );
+            $slotrow->{"struc_href"}  = &create_n_link_lex( $data, "sn", $ngramref, $position, $result );
+            $counter++;
+            $slotrow->{"number"} = $counter;
+            $slotrow->{"cofreq"} = $o11;
+            $slotrow->{"ngfreq"} = $c1;
+            $slotrow->{"g"}      = $g2;
+            push( @{ $slot->{"rows"} }, $slotrow );
+        }
+        push( @$slots, $slot );
+    }
+    return $slots;
+}
 
-#     foreach my $position (@$positionsref) {
-#         $position = $position->[0];
-#         $get_top_10->execute($position);
-#         my $rows = $get_top_10->fetchall_arrayref;
-#         push( @{ $columns[$position] }, $ngramref->[$position] );
-#         my $counter = 0;
-#         foreach my $row (@$rows) {
-#             my ( $result, $posit, $o11, $c1, $g2 ) = @$row;
-#             push( @{ $columns[$position] }, $result );
-#         }
-#         push( @{ $columns[$position] }, ( "", "", "", "", "", "", "", "", "", "" ) );
-#     }
-#         $vars->{"row_numbers"}    = [ 0 ];
-#     foreach my $i (1 .. 10) {
-# 	last if ( join( "", map( $_->[$i], @columns ) ) eq "" );
-# 	push(@{$vars->{"row_numbers"}}, $i);
-#     }
-#     $vars->{"column_numbers"} = [ 0 .. $#columns ];
-#     $vars->{"overview_table"} = \@columns;
-#     return $vars;
-# }
+#----------------------------
+# PRINT NGRAM OVERVIEW TABLE
+#----------------------------
+sub print_ngram_overview_table {
+    my ( $data, $qid, $ngramref ) = @_;
+    my $vars;
+    my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$qid" ) or die("Cannot connect: $DBI::errstr");
+    $dbh->do("PRAGMA encoding = 'UTF-8'");
+    my $get_top_10    = $dbh->prepare(qq{SELECT result, position, o11, c1, am FROM results WHERE position=? ORDER BY am DESC, o11 DESC LIMIT 0, 10});
+    my $get_positions = $dbh->prepare(qq{SELECT DISTINCT position FROM results ORDER BY position ASC});
+    $get_positions->execute();
+    my $positionsref = $get_positions->fetchall_arrayref;
+    my @columns;
+
+    foreach my $position (@$positionsref) {
+        $position = $position->[0];
+        $get_top_10->execute($position);
+        my $rows = $get_top_10->fetchall_arrayref;
+        push( @{ $columns[$position] }, $ngramref->[$position] );
+        my $counter = 0;
+        foreach my $row (@$rows) {
+            my ( $result, $posit, $o11, $c1, $g2 ) = @$row;
+            push( @{ $columns[$position] }, $result );
+        }
+        push( @{ $columns[$position] }, ( "", "", "", "", "", "", "", "", "", "" ) );
+    }
+    $vars->{"row_numbers"} = [0];
+    foreach my $i ( 1 .. 10 ) {
+        last if ( join( "", map( $_->[$i], @columns ) ) eq "" );
+        push( @{ $vars->{"row_numbers"} }, $i );
+    }
+    $vars->{"column_numbers"} = [ 0 .. $#columns ];
+    $vars->{"overview_table"} = \@columns;
+    return $vars;
+}
 
 # #---------------
 # # OLD FUNCTIONS

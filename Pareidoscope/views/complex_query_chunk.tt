@@ -21,8 +21,8 @@
       <td style="border: 0px;">constraints on head:</td>
       <td style="border: 0px;">
 	<select name="ht[% i %]" >
-	  <option value="l">lemma</option>
-	  <option selected="selected" value="wf">word form</option>
+	  <option value="lemma">lemma</option>
+	  <option selected="selected" value="wordform">word form</option>
 	</select>
       </td>
       <td style="border: 0px;">

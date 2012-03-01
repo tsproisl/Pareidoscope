@@ -157,8 +157,8 @@ get '/results/display_context' => sub {
 
 get '/results/lexical_ngram_query' => sub {
     my %vars;
-    ###%vars = ( %vars, %{ &executequeries::lexn_query( $data ) } );
-    ###template( 'lexical_query_results', \%vars );
+    %vars = ( %vars, %{ &executequeries::lexn_query( $data ) } );
+    template( 'lexical_query_results', \%vars );
 };
 
 get '/results/structural_ngram_query' => sub {

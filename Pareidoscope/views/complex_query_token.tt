@@ -10,8 +10,8 @@
     <tr style="vertical-align:bottom;">
       <td style="border: 0px;">
 	<select name="tt[% i %]" >
-	  <option value="l">lemma [% i %]</option>
-	  <option selected="selected" value="wf">word form [% i %]</option>
+	  <option value="lemma">lemma [% i %]</option>
+	  <option selected="selected" value="wordform">word form [% i %]</option>
 	</select>
       </td>
       <td style="border: 0px;">
