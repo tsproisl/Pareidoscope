@@ -179,8 +179,8 @@ sub lexn_query {
     my ( $t0, $t1, $t2, $t01diff, $t12diff );
     my ( $qids, $qid );
     my $vars;
-    my $check_cache      = database->prepare(qq{SELECT qid, r1, n FROM queries WHERE corpus=? AND class=? AND query=?});
-    my $insert_query     = database->prepare(qq{INSERT INTO queries (corpus, class, query, qlen, time, r1, n) VALUES (?, ?, ?, ?, strftime('%s','now'), ?, ?)});
+    my $check_cache      = database->prepare(qq{SELECT qid, r1, n FROM queries WHERE corpus=? AND class=? AND query=? AND threshold=?});
+    my $insert_query     = database->prepare(qq{INSERT INTO queries (corpus, class, query, threshold, qlen, time, r1, n) VALUES (?, ?, ?, ?, ?, strftime('%s','now'), ?, ?)});
     my $update_timestamp = database->prepare(qq{UPDATE queries SET time=strftime('%s','now') WHERE qid=?});
     my %specifics;
 
@@ -206,7 +206,7 @@ sub lexn_query {
     $vars->{"query"} =~ s/"/&quot;/g;
 
     # check cache database
-    $check_cache->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $smallquery );
+    $check_cache->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $smallquery, param("threshold") );
     $qids = $check_cache->fetchall_arrayref;
     if ( scalar(@$qids) == 1 ) {
         $qid                       = $qids->[0]->[0];
@@ -229,12 +229,12 @@ sub lexn_query {
 
         # insert into cache.db
         if ( $query eq $smallquery ) {
-            $insert_query->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $smallquery, $query_length, $r1, $data->{"active"}->{ $specifics{"name"} . "_ngrams" } );
+            $insert_query->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $smallquery, param("threshold"), $query_length, $r1, $data->{"active"}->{ $specifics{"name"} . "_ngrams" } );
         }
         else {
-            $insert_query->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $smallquery, $query_length, $r1, $localn );
+            $insert_query->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $smallquery, param("threshold"), $query_length, $r1, $localn );
         }
-        $check_cache->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $smallquery );
+        $check_cache->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $smallquery, param("threshold") );
         $qid = ( $check_cache->fetchrow_array )[0];
         $t1  = [ &Time::HiRes::gettimeofday() ];
 
@@ -604,6 +604,7 @@ sub _strucn {
             "class" => "strucc"
         );
     }
+    $return_vars->{"threshold"}          = param("threshold");
     $return_vars->{"return_type"}        = $specifics{"name"};
     $return_vars->{"frequency"}          = $freq;
     $return_vars->{"frequency_too_high"} = $freq >= $frequency_threshold;
@@ -776,7 +777,9 @@ sub create_n_link_lex {
     $argument{"return_type"} = param("return_type");
     $argument{"s"}           = "Link";
     $argument{"ignore_case"} = 0;
+    $argument{"threshold"}   = param("threshold");
     my @params = qw(p w t tt);
+
     for ( my $i = 0; $i <= $data->{"active"}->{"ngram_length"}; $i++ ) {
 
         foreach my $param (@params) {
@@ -800,61 +803,58 @@ sub create_n_link_lex {
     return \%argument;
 }
 
-# #----------------------
-# # CREATE FREQ LINK LEX
-# #----------------------
-# sub create_freq_link_lex {
-#     my ( $cgi, $config, $freq, $ngramref, $position, $head ) = @_;
-#     my $state       = $config->keep_states_href( {}, qw(c) );
-#     my $href        = "pareidoscope.cgi?m=c&q=";
-#     my $localparams = Storable::dclone( $config->{"params"} );
-#     if ( $config->{"params"}->{"return_type"} eq "pos" ) {
-#         $localparams->{"t"}->{ $position + 1 }  = $head;
-#         $localparams->{"tt"}->{ $position + 1 } = "wf";
-#     }
-#     elsif ( $config->{"params"}->{"return_type"} eq "chunk" ) {
-#         $localparams->{"h"}->{ $position + 1 }  = $head;
-#         $localparams->{"ht"}->{ $position + 1 } = "wf";
-#     }
-#     $localparams->{"ignore_case"}->{ $position + 1 } = 0;
-#     my ($query) = &build_query( { "params" => $localparams } );
-#     $href .= URI::Escape::uri_escape($query) . "&s=Link";
-#     $href .= "&$state";
+#----------------------
+# CREATE FREQ LINK LEX
+#----------------------
+sub create_freq_link_lex {
+    my ( $data, $freq, $ngramref, $position, $head ) = @_;
+    my %argument;
+    $argument{"corpus"} = param("corpus");
+    $argument{"s"}      = "Link";
+    my $localparams = Storable::dclone(params);
+    if ( param("return_type") eq "pos" ) {
+        $localparams->{ "t" .  ( $position + 1 ) } = $head;
+        $localparams->{ "tt" . ( $position + 1 ) } = "wordform";
+    }
+    elsif ( param("return_type") eq "chunk" ) {
+        $localparams->{ "h" .  ( $position + 1 ) } = $head;
+        $localparams->{ "ht" . ( $position + 1 ) } = "wordform";
+    }
+    $localparams->{"ignore_case"} = 0;
+    my ($query) = &build_query( $data, $localparams );
+    $argument{"query"} = URI::Escape::uri_escape($query);
+    return \%argument;
+}
 
-#     #return $cgi->a( { 'href' => $href }, $freq );
-#     return $cgi->escapeHTML($href);
-# }
+#------------------------
+# CREATE NGFREQ LINK LEX
+#------------------------
+sub create_ngfreq_link_lex {
+    my ( $data, $freq, $ngramref, $position, $head ) = @_;
+    my %argument;
+    $argument{"corpus"} = param("corpus");
+    $argument{"s"}      = "Link";
+    my $localparams = Storable::dclone(params);
+    my @deletions   = qw(t tt w ht h);
+    push( @deletions, "p" ) if ( param("return_type") eq "chunk" );
+    foreach my $param (@deletions) {
 
-# #------------------------
-# # CREATE NGFREQ LINK LEX
-# #------------------------
-# sub create_ngfreq_link_lex {
-#     my ( $cgi, $config, $freq, $ngramref, $position, $head ) = @_;
-#     my $state       = $config->keep_states_href( {}, qw(c) );
-#     my $href        = "pareidoscope.cgi?m=c&q=";
-#     my $localparams = Storable::dclone( $config->{"params"} );
-#     my @deletions   = qw(t tt w ht h i);
-#     push( @deletions, "p" ) if ( $config->{"params"}->{"return_type"} eq "chunk" );
-#     foreach my $param (@deletions) {
-#         foreach my $i ( 1 .. 9 ) {
-#             undef( $localparams->{$param}->{$i} );
-#         }
-#     }
-#     if ( $config->{"params"}->{"return_type"} eq "pos" ) {
-#         $localparams->{"t"}->{ $position + 1 }  = $head;
-#         $localparams->{"tt"}->{ $position + 1 } = "wf";
-#     }
-#     elsif ( $config->{"params"}->{"return_type"} eq "chunk" ) {
-#         $localparams->{"h"}->{ $position + 1 }  = $head;
-#         $localparams->{"ht"}->{ $position + 1 } = "wf";
-#     }
-#     my ($query) = &build_query( { "params" => $localparams } );
-#     $href .= URI::Escape::uri_escape($query) . "&s=Link";
-#     $href .= "&$state";
-
-#     #return $cgi->a( { 'href' => $href }, $freq );
-#     return $cgi->escapeHTML($href);
-# }
+        foreach my $i ( 1 .. 9 ) {
+            undef $localparams->{ $param . $i };
+        }
+    }
+    if ( param("return_type") eq "pos" ) {
+        $localparams->{ "t" .  ( $position + 1 ) } = $head;
+        $localparams->{ "tt" . ( $position + 1 ) } = "wordform";
+    }
+    elsif ( param("return_type") eq "chunk" ) {
+        $localparams->{ "h" .  ( $position + 1 ) } = $head;
+        $localparams->{ "ht" . ( $position + 1 ) } = "wordform";
+    }
+    my ($query) = &build_query( $data, $localparams );
+    $argument{"query"} = URI::Escape::uri_escape($query);
+    return \%argument;
+}
 
 #------------------------
 # CREATE FREQ LINK STRUC
@@ -995,9 +995,14 @@ sub new_print_table {
     # id fch flen frel ftag fwc fpos q rt
     foreach my $param ( keys %{ params() } ) {
         next if ( param($param) eq q{} );
-        next if List::MoreUtils::any { $_ eq $param } qw(fch flen frel ftag fwc fpos);
-        $vars->{"hidden_states"}->{$param} = param($param);
+        if ( List::MoreUtils::any { $_ eq $param } qw(fch flen frel ftag fwc fpos) ) {
+	    $vars->{$param} = param($param);
+        }
+        else {
+            $vars->{"hidden_states"}->{$param} = param($param);
+        }
     }
+    $vars->{"hidden_states"}->{"start"} = 0;
 
     $vars->{"pos_tags"} = $data->{"number_to_tag"};
     $vars->{"word_classes"} = [ "", sort keys %{ config->{"tagsets"}->{ $data->{"active"}->{"tagset"} } } ];
@@ -1067,7 +1072,6 @@ sub print_ngram_query_tables {
     my ( $data, $qid, $ngramref, $general ) = @_;
     my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$qid" ) or die("Cannot connect: $DBI::errstr");
     $dbh->do("PRAGMA encoding = 'UTF-8'");
-    $dbh->do("SELECT icu_load_collation('en_GB', 'BE')");
     my $get_top_50    = $dbh->prepare(qq{SELECT result, position, o11, c1, am FROM results WHERE position=? ORDER BY am DESC, o11 DESC LIMIT 0, 40});
     my $get_positions = $dbh->prepare(qq{SELECT DISTINCT position FROM results ORDER BY position ASC});
     $get_positions->execute();
@@ -1089,8 +1093,8 @@ sub print_ngram_query_tables {
             $slotrow->{"word"}        = $result;
             $slotrow->{"cofreq_href"} = &create_freq_link_lex( $data, $o11, $ngramref, $position, $result );
             $slotrow->{"ngfreq_href"} = &create_ngfreq_link_lex( $data, $c1, $ngramref, $position, $result ) unless ($general);
-            $slotrow->{"lex_href"}    = &create_n_link_lex( $data, "ln", $ngramref, $position, $result );
-            $slotrow->{"struc_href"}  = &create_n_link_lex( $data, "sn", $ngramref, $position, $result );
+            $slotrow->{"lex_href"}    = &create_n_link_lex( $data, $ngramref, $position, $result );
+            $slotrow->{"struc_href"}  = &create_n_link_lex( $data, $ngramref, $position, $result );
             $counter++;
             $slotrow->{"number"} = $counter;
             $slotrow->{"cofreq"} = $o11;

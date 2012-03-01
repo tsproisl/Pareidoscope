@@ -14,6 +14,13 @@
     rows = variables.rows
     previous_href = variables.previous_href
     next_href = variables.next_href
+    threshold = variables.threshold
+    fch = variables.fch
+    flen = variables.flen
+    frel = variables.frel
+    ftag = variables.ftag
+    fwc = variables.fwc
+    fpos = variables.fpos
 %]
 
 <a name="[% query_anchor %]"></a>
@@ -27,7 +34,7 @@
   occurs in [% ngram_tokens %] [% return_type %] n-gram tokens
   [% IF ngram_tokens > 0 %]
   <br />
-  occurs in [% ngram_types %] [% return_type %] n-gram types
+  occurs in [% ngram_types %] [% return_type %] n-gram types with a frequency of at least [% threshold %]
   [% END %]
   [% END %]
   [% IF frequency_too_high or too_many_ngram_types %]
@@ -57,31 +64,31 @@
     [% END %]
     n-gram with n
     <select name="frel" >
-      <option selected="selected" value="1">≥</option>
-      <option value="2">≤</option>
-      <option value="3">=</option>
+      <option [% IF (! frel.defined) or frel == 1 %]selected="selected"[% END %] value="1">≥</option>
+      <option [% IF frel == 2 %]selected="selected"[% END %] value="2">≤</option>
+      <option [% IF frel == 3 %]selected="selected"[% END %] value="3">=</option>
     </select>
     <select name="flen" >
-      <option selected="selected" value="1">1</option>
-      <option value="2">2</option>
-      <option value="3">3</option>
-      <option value="4">4</option>
-      <option value="5">5</option>
-      <option value="6">6</option>
-      <option value="7">7</option>
-      <option value="8">8</option>
-      <option value="9">9</option>
+      <option [% IF (! flen.defined) or flen == 1 %]selected="selected"[% END %] value="1">1</option>
+      <option [% IF flen == 2 %]selected="selected"[% END %] value="2">2</option>
+      <option [% IF flen == 3 %]selected="selected"[% END %] value="3">3</option>
+      <option [% IF flen == 4 %]selected="selected"[% END %] value="4">4</option>
+      <option [% IF flen == 5 %]selected="selected"[% END %] value="5">5</option>
+      <option [% IF flen == 6 %]selected="selected"[% END %] value="6">6</option>
+      <option [% IF flen == 7 %]selected="selected"[% END %] value="7">7</option>
+      <option [% IF flen == 8 %]selected="selected"[% END %] value="8">8</option>
+      <option [% IF flen == 9 %]selected="selected"[% END %] value="9">9</option>
     </select>
     and a
     <select name="ftag" >
       [% FOREACH pos_tag IN pos_tags %]
-      <option value="[% pos_tag %]">[% pos_tag %]</option>
+      <option [% IF ftag == pos_tag %]selected="selected"[% END %] value="[% pos_tag %]">[% pos_tag %]</option>
       [% END %]
     </select>
     or
     <select name="fwc" >
       [% FOREACH word_class IN word_classes %]
-      <option value="[% word_class %]">[% word_class %]</option>
+      <option [% IF fwc == word_class %]selected="selected"[% END %] value="[% word_class %]">[% word_class %]</option>
       [% END %]
     </select>
     to the
@@ -153,7 +160,7 @@
   previous
   [% END %]
   &nbsp;&nbsp;
-  [% IF next_href.start <= ngram_types %]
+  [% IF next_href.start < ngram_types %]
   <a href="[% current %][% FOREACH arg IN next_href %][% IF loop.first %]?[% ELSE %]&[% END %][% arg.key %]=[% arg.value %][% END %]">next</a>
   [% ELSE %]
   next

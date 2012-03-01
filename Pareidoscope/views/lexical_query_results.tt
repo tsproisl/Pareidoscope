@@ -72,10 +72,10 @@
     <td style="text-align:right;" class="first">[% row.number %]</td>
     <td>[% row.word %]</td>
     <td style="text-align:right;">
-      <a href="[% row.cofreq_href %]">[% row.cofreq %]</a>
+      <a href="[% concordance_url %][% FOREACH arg IN row.cofreq_href %][% IF loop.first %]?[% ELSE %]&[% END %][% arg.key %]=[% arg.value %][% END %]">[% row.cofreq %]</a>
     </td>
     <td style="text-align:right;">
-      [% IF row.ngfreq_href %]<a href="[% row.ngfreq_href %]">[% row.ngfreq %]</a>[% ELSE %][% row.ngfreq %][% END %]
+      [% IF row.ngfreq_href %]<a href="[% concordance_url %][% FOREACH arg IN row.ngfreq_href %][% IF loop.first %]?[% ELSE %]&[% END %][% arg.key %]=[% arg.value %][% END %]">[% row.ngfreq %]</a>[% ELSE %][% row.ngfreq %][% END %]
     </td>
     <td style="text-align:right;">
       <span
@@ -93,9 +93,9 @@
       </span>
     </td>
     <td style="text-align:center">
-      <a href="[% row.lex_href %]">lex</a>
+      <a href="[% lex_url %][% FOREACH arg IN row.lex_href %][% IF loop.first %]?[% ELSE %]&[% END %][% arg.key %]=[% arg.value %][% END %]">lex</a>
       &nbsp;&nbsp;
-      <a href="[% row.struc_href %]">struc</a>
+      <a href="[% struc_url %][% FOREACH arg IN row.struc_href %][% IF loop.first %]?[% ELSE %]&[% END %][% arg.key %]=[% arg.value %][% END %]">struc</a>
     </td>
   </tr>
   [% END %]
