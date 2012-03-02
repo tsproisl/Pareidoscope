@@ -45,6 +45,7 @@ hook 'before_template' => sub {
     $tokens->{"url_args"}->{"corpus"} = param("corpus");
     $tokens->{"corpus_name"} = $data->{"active"}->{"display_name"};
     $tokens->{"chunks"} = $data->{"active"}->{"chunk_ngrams"};
+    $tokens->{"dependencies"} = $data->{"active"}->{"subgraphs"};
 };
 
 get '/' => sub {

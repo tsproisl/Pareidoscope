@@ -89,7 +89,7 @@ sub single_item_query {
         my ($wfline) = @_;
         my $old_tt1 = param("tt1");
         foreach my $p qw(t tt p w) {
-            foreach my $nr ( 1 .. 9 ) {
+            foreach my $nr ( 1 .. $data->{"active"}->{"ngram_length"} ) {
                 params->{ $p . $nr } = "";
             }
         }
@@ -343,7 +343,7 @@ sub build_query {
     $parameter = defined $parameter ? $parameter : params;
     my ( @query, @unlex_query, $query, $unlex_query );
     my ( $anchor, @title, $title, $length, @ngram, $ngram );
-    foreach my $nr ( 1 .. 9 ) {
+    foreach my $nr ( 1 .. $data->{"active"}->{"ngram_length"} ) {
         my ( $token, $head, $poswc, $query_elem, $unlex_elem, $title_elem, $token_title, $head_title, $ng_elem );
         my ( $ct, $h, $ht, $p, $t, $tt, $w, $unlex );
         foreach my $pair ( [ \$t, "t" ], [ \$tt, "tt" ], [ \$p, "p" ], [ \$w, "w" ], [ \$ct, "ct" ], [ \$h, "h" ], [ \$ht, "ht" ] ) {
@@ -839,7 +839,7 @@ sub create_ngfreq_link_lex {
     push( @deletions, "p" ) if ( param("return_type") eq "chunk" );
     foreach my $param (@deletions) {
 
-        foreach my $i ( 1 .. 9 ) {
+        foreach my $i ( 1 .. $data->{"active"}->{"ngram_length"} ) {
             undef $localparams->{ $param . $i };
         }
     }
@@ -867,7 +867,7 @@ sub create_freq_link_struc {
     my $localparams = Storable::dclone(params);
     my @deletions   = qw(ct t tt w ht h p);
     foreach my $param (@deletions) {
-        foreach my $i ( 1 .. 9 ) {
+        foreach my $i ( 1 .. $data->{"active"}->{"ngram_length"} ) {
             undef( $localparams->{ $param . $i } );
         }
     }
@@ -904,7 +904,7 @@ sub create_ngfreq_link_struc {
     my $localparams = Storable::dclone(params);
     my @deletions   = qw(ct t tt w ht h p);
     foreach my $param (@deletions) {
-        foreach my $i ( 1 .. 9 ) {
+        foreach my $i ( 1 .. $data->{"active"}->{"ngram_length"} ) {
             undef( $localparams->{ $param . $i } );
         }
     }

@@ -58,6 +58,11 @@
   sequences of syntactic chunks
   <br />
   [% END %]
+  [% IF dependencies %]
+  <input value="dep" name="return_type" style="margin-left: 11px;" type="radio" />
+  dependency stemmata
+  <br />
+  [% END %]
   <input value="split" name="display_type" style="margin-left: 11px; margin-top: 10px;" type="radio" />
   split results (separate tables for different word form-pos tag pairs)
   <br />
