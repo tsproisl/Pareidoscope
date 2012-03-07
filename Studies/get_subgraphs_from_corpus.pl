@@ -26,7 +26,7 @@ Readonly my $UNLIMITED_NUMBER_OF_FIELDS  => -1;
 Readonly my $GET_ATTRIBUTE_USAGE         => 'Usage: $att_handle = $self->_get_attribute($name);';
 Readonly my $RELATION_IDS                => Storable::retrieve('dependency_relations.dump');
 
-# use Data::Dumper;            # Dumper
+use Data::Dumper;            # Dumper
 # use List::Util;              # first max maxstr min minstr reduce shuffle sum
 # use List::MoreUtils;         # "the stuff missing in List::Util"
 use Log::Log4perl qw(:easy); # TRACE DEBUG INFO WARN ERROR FATAL ALWAYS
@@ -50,6 +50,7 @@ sub connect_to_corpus {
 sub get_subgraphs {
     my ( $self, $word ) = @_;
     my $s_handle      = $self->_get_attribute("s");
+    my $s_id_handle      = $self->_get_attribute("s_id");
     my $indep_handle  = $self->_get_attribute("indep");
     my $outdep_handle = $self->_get_attribute("outdep");
     $self->{"cqp"}->exec( sprintf "A = [word = \"%s\" %%c]", $word );
@@ -57,13 +58,16 @@ sub get_subgraphs {
     my $loop_counter = 0;
 SENTENCE:
     foreach my $match (@matches) {
-	DEBUG(sprintf "%d/%d", $loop_counter, scalar @matches);
 	$loop_counter++;
-	last SENTENCE if($loop_counter > 100);
+	last SENTENCE if($loop_counter > 200);
+	DEBUG(sprintf "%d/%d", $loop_counter, scalar @matches);
+	#my $s_id = $s_id_handle->cpos2str($match);
+	#DEBUG( "$s_id\n");
         my ( $start, $end ) = $s_handle->cpos2struc2cpos($match);
         my @indeps  = $indep_handle->cpos2str( $start .. $end );
         my @outdeps = $outdep_handle->cpos2str( $start .. $end );
         my %relation;
+	my %reverse_relation;
         my $graph = Graph::Directed->new();
         foreach my $i ( 0 .. $#outdeps ) {
             $indeps[$i]  =~ s/^[|]//xms;
@@ -77,39 +81,39 @@ SENTENCE:
                 $dep =~ m/^ (?<relation>[^(]+)[(]0(?:&apos;)*,(?<offset>-?\d+)(?:&apos;)*/xms;
                 my $target = $cpos + $LAST_PAREN_MATCH{"offset"};
                 $relation{$cpos}->{$target} = $LAST_PAREN_MATCH{"relation"};
+                $reverse_relation{$target}->{$cpos} = $LAST_PAREN_MATCH{"relation"};
                 $graph->add_edge( $cpos, $target );
             }
         }
         my $subgraph = Graph::Directed->new();
         $subgraph->add_vertex($match);
         _emit( $subgraph, \%relation );
-        my $prohibited_nodes = Set::Object->new();
-        _enumerate_connected_subgraphs_recursive( $graph, $subgraph, $prohibited_nodes, \%relation );
+        my $prohibited_nodes = Set::Object->new($match);
+        _enumerate_connected_subgraphs_recursive( $graph, $subgraph, $prohibited_nodes, \%relation, \%reverse_relation );
     }
     return;
 }
 
 sub _enumerate_connected_subgraphs_recursive {
-    my ( $graph, $subgraph, $prohibited_nodes, $relation_ref ) = @_;
+    my ( $graph, $subgraph, $prohibited_nodes, $relation_ref, $reverse_relation_ref ) = @_;
 
     # determine all edges to neighbouring nodes that are not
     # prohibited
-    my $edges      = Set::Object->new();
     my $out_edges  = Set::Object->new();
     my $in_edges   = Set::Object->new();
     my $neighbours = Set::Object->new();
     foreach my $node ( $subgraph->vertices ) {
-        foreach my $edge ( $graph->edges_from($node) ) {
-            next if ( $prohibited_nodes->contains( $edge->[1] ) );
-            $edges->insert($edge);
-            $out_edges->insert($edge);
-            $neighbours->insert( $edge->[1] );
+        #foreach my $edge ( $graph->edges_from($node) ) {
+        foreach my $target ( keys %{$relation_ref->{$node}} ) {
+            next if ( $prohibited_nodes->contains( $target ) );
+            $out_edges->insert([$node, $target]);
+            $neighbours->insert( $target );
         }
-        foreach my $edge ( $graph->edges_to($node) ) {
-            next if ( $prohibited_nodes->contains( $edge->[0] ) );
-            $edges->insert($edge);
-            $in_edges->insert($edge);
-            $neighbours->insert( $edge->[0] );
+        #foreach my $edge ( $graph->edges_to($node) ) {
+        foreach my $origin ( keys %{$reverse_relation_ref->{$node}} ) {
+            next if ( $prohibited_nodes->contains( $origin ) );
+            $in_edges->insert([$origin, $node]);
+            $neighbours->insert( $origin );
         }
     }
 
@@ -172,29 +176,47 @@ OUTER: for ( my $i = 0; $i < 2**$number_of_elements; $i++ ) {
 sub _emit {
     my ( $subgraph, $relation_ref ) = @_;
     my %edges;
+    my %incoming_edge;
     my @list_representation;
     my %nodes;
     my @sorted_nodes;
     my @emit_structure;
     foreach my $edge ( $subgraph->edges() ) {
-        $edges{ $edge->[0] }->{ $edge->[1] } = $relation_ref->{ $edge->[0] }->{ $edge->[1] };
-        push( @list_representation, sprintf( "%s(%d, %d)", $edges{ $edge->[0] }->{ $edge->[1] }, $edge->[0], $edge->[1] ) );
+	my ($start, $end) = @$edge;
+	my $relation = $relation_ref->{ $start }->{ $end };
+        $edges{ $start }->{ $end } = $relation;
+        $incoming_edge{ $end }->{ $start } = $relation;
+        push( @list_representation, sprintf( "%s(%d, %d)", $relation, $start, $end ) );
     }
     foreach my $vertex ( $subgraph->vertices() ) {
         my ( @incoming, @outgoing );
-        foreach my $edge ( $subgraph->edges_to($vertex) ) {
-            my $ins  = join( ",", sort map( $edges{ $_->[0] }->{ $_->[1] }, $subgraph->edges_to( $edge->[0] ) ) );
-            my $outs = join( ",", sort map( $edges{ $_->[0] }->{ $_->[1] }, $subgraph->edges_from( $edge->[0] ) ) );
+        # foreach my $edge ( $subgraph->edges_to($vertex) ) {
+        #     my $ins  = join( ",", sort map( $edges{ $_->[0] }->{ $_->[1] }, $subgraph->edges_to( $edge->[0] ) ) );
+        #     my $outs = join( ",", sort map( $edges{ $_->[0] }->{ $_->[1] }, $subgraph->edges_from( $edge->[0] ) ) );
+        #     $ins  = $ins  ne "" ? "<($ins)"  : "";
+        #     $outs = $outs ne "" ? ">($outs)" : "";
+        #     push( @incoming, sprintf( "%s(%s%s)", $edges{ $edge->[0] }->{ $edge->[1] }, $ins, $outs ) );
+        # }
+	foreach my $local_vertex ( keys %{$incoming_edge{$vertex}} ) {
+            my $ins  = join( ",", sort map( $edges{ $_ }->{ $local_vertex }, keys %{$incoming_edge{$local_vertex}} ) );
+            my $outs = join( ",", sort map( $edges{ $local_vertex }->{ $_ }, keys %{$edges{$local_vertex}} ) );
             $ins  = $ins  ne "" ? "<($ins)"  : "";
             $outs = $outs ne "" ? ">($outs)" : "";
-            push( @incoming, sprintf( "%s(%s%s)", $edges{ $edge->[0] }->{ $edge->[1] }, $ins, $outs ) );
+            push( @incoming, sprintf( "%s(%s%s)", $edges{ $local_vertex }->{ $vertex }, $ins, $outs ) );
         }
-        foreach my $edge ( $subgraph->edges_from($vertex) ) {
-            my $ins  = join( ",", sort map( $edges{ $_->[0] }->{ $_->[1] }, $subgraph->edges_to( $edge->[1] ) ) );
-            my $outs = join( ",", sort map( $edges{ $_->[0] }->{ $_->[1] }, $subgraph->edges_from( $edge->[1] ) ) );
+        # foreach my $edge ( $subgraph->edges_from($vertex) ) {
+        #     my $ins  = join( ",", sort map( $edges{ $_->[0] }->{ $_->[1] }, $subgraph->edges_to( $edge->[1] ) ) );
+        #     my $outs = join( ",", sort map( $edges{ $_->[0] }->{ $_->[1] }, $subgraph->edges_from( $edge->[1] ) ) );
+        #     $ins  = $ins  ne "" ? "<($ins)"  : "";
+        #     $outs = $outs ne "" ? ">($outs)" : "";
+        #     push( @outgoing, sprintf( "%s(%s%s)", $edges{ $edge->[0] }->{ $edge->[1] }, $ins, $outs ) );
+        # }
+	foreach my $local_vertex ( keys %{$edges{$vertex}} ) {
+            my $ins  = join( ",", sort map( $edges{ $_ }->{ $local_vertex }, keys %{$incoming_edge{$local_vertex}} ) );
+            my $outs = join( ",", sort map( $edges{ $local_vertex }->{ $_ }, keys %{$edges{$local_vertex}} ) );
             $ins  = $ins  ne "" ? "<($ins)"  : "";
             $outs = $outs ne "" ? ">($outs)" : "";
-            push( @outgoing, sprintf( "%s(%s%s)", $edges{ $edge->[0] }->{ $edge->[1] }, $ins, $outs ) );
+            push( @outgoing, sprintf( "%s(%s%s)", $edges{ $vertex }->{ $local_vertex }, $ins, $outs ) );
         }
         my $incoming = join( ",", @incoming );
         my $outgoing = join( ",", @outgoing );
