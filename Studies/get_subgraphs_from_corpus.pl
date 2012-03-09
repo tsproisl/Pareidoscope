@@ -51,6 +51,7 @@ sub connect_to_corpus {
 
 sub get_subgraphs {
     my ( $self, $word ) = @_;
+    my $result_ref    = [];
     my $s_handle      = $self->_get_attribute("s");
     my $s_id_handle   = $self->_get_attribute("s_id");
     my $indep_handle  = $self->_get_attribute("indep");
@@ -83,7 +84,7 @@ SENTENCE:
             next SENTENCE if ( scalar( () = split /[|]/xms, $indeps[$i], $UNLIMITED_NUMBER_OF_FIELDS ) + scalar @out > $MAXIMUM_NUMBER_OF_RELATIONS );
             my $cpos = $start + $i;
             foreach my $dep (@out) {
-                $dep =~ m/^ (?<relation>[^(]+)[(]0(?:&apos;)*,(?<offset>-?\d+)(?:&apos;)*/xms;
+                $dep =~ m/^(?<relation>[^(]+)[(]0(?:&apos;)*,(?<offset>-?\d+)(?:&apos;)*/xms;
                 my $target = $cpos + $LAST_PAREN_MATCH{"offset"};
                 $relation{$cpos}->{$target}         = $LAST_PAREN_MATCH{"relation"};
                 $reverse_relation{$target}->{$cpos} = $LAST_PAREN_MATCH{"relation"};
@@ -92,15 +93,16 @@ SENTENCE:
         }
         my $subgraph = Graph::Directed->new();
         $subgraph->add_vertex($match);
-        _emit( $subgraph, \%relation );
+        _emit( $match, $subgraph, \%relation, $result_ref );
         my $prohibited_nodes = Set::Object->new($match);
-        _enumerate_connected_subgraphs_recursive( $graph, $subgraph, $prohibited_nodes, \%relation, \%reverse_relation, 1 );
+        _enumerate_connected_subgraphs_recursive( $match, $graph, $subgraph, $prohibited_nodes, \%relation, \%reverse_relation, 1, $result_ref );
     }
+    print Dumper($result_ref);
     return;
 }
 
 sub _enumerate_connected_subgraphs_recursive {
-    my ( $graph, $subgraph, $prohibited_nodes, $relation_ref, $reverse_relation_ref, $depth ) = @_;
+    my ( $match, $graph, $subgraph, $prohibited_nodes, $relation_ref, $reverse_relation_ref, $depth, $result_ref ) = @_;
 
     # determine all edges to neighbouring nodes that are not
     # prohibited
@@ -139,10 +141,11 @@ sub _enumerate_connected_subgraphs_recursive {
         foreach my $new_set ( $second_powerset->elements ) {
             my $local_subgraph = $subgraph->copy_graph;
             $local_subgraph->add_edges( $set->elements, $new_set->elements );
-            _emit( $local_subgraph, $relation_ref );
+            _emit( $match, $local_subgraph, $relation_ref, $result_ref );
+
             #if ( $local_subgraph->vertices < $MAXIMUM_SUBGRAPH_SIZE ) {
-	    if ( $local_subgraph->vertices < $MAXIMUM_SUBGRAPH_SIZE && $depth < $MAXIMUM_DEPTH ) {
-                _enumerate_connected_subgraphs_recursive( $graph, $local_subgraph, Set::Object::union( $prohibited_nodes, $neighbours ), $relation_ref, $reverse_relation_ref, $depth + 1 );
+            if ( $local_subgraph->vertices < $MAXIMUM_SUBGRAPH_SIZE && $depth < $MAXIMUM_DEPTH ) {
+                _enumerate_connected_subgraphs_recursive( $match, $graph, $local_subgraph, Set::Object::union( $prohibited_nodes, $neighbours ), $relation_ref, $reverse_relation_ref, $depth + 1, $result_ref );
             }
         }
     }
@@ -182,7 +185,7 @@ OUTER: for ( my $i = 0; $i < 2**$number_of_elements; $i++ ) {
 }
 
 sub _emit {
-    my ( $subgraph, $relation_ref ) = @_;
+    my ( $match, $subgraph, $relation_ref, $result_ref ) = @_;
     my %edges;
     my %incoming_edge;
     my @list_representation;
@@ -199,13 +202,7 @@ sub _emit {
     foreach my $vertex ( $subgraph->vertices() ) {
         my ( @incoming, @outgoing );
 
-        # foreach my $edge ( $subgraph->edges_to($vertex) ) {
-        #     my $ins  = join( ",", sort map( $edges{ $_->[0] }->{ $_->[1] }, $subgraph->edges_to( $edge->[0] ) ) );
-        #     my $outs = join( ",", sort map( $edges{ $_->[0] }->{ $_->[1] }, $subgraph->edges_from( $edge->[0] ) ) );
-        #     $ins  = $ins  ne "" ? "<($ins)"  : "";
-        #     $outs = $outs ne "" ? ">($outs)" : "";
-        #     push( @incoming, sprintf( "%s(%s%s)", $edges{ $edge->[0] }->{ $edge->[1] }, $ins, $outs ) );
-        # }
+        # incoming edges
         foreach my $local_vertex ( keys %{ $incoming_edge{$vertex} } ) {
             my $ins  = join( ",", sort map( $edges{$_}->{$local_vertex}, keys %{ $incoming_edge{$local_vertex} } ) );
             my $outs = join( ",", sort map( $edges{$local_vertex}->{$_}, keys %{ $edges{$local_vertex} } ) );
@@ -214,13 +211,7 @@ sub _emit {
             push( @incoming, sprintf( "%s(%s%s)", $edges{$local_vertex}->{$vertex}, $ins, $outs ) );
         }
 
-        # foreach my $edge ( $subgraph->edges_from($vertex) ) {
-        #     my $ins  = join( ",", sort map( $edges{ $_->[0] }->{ $_->[1] }, $subgraph->edges_to( $edge->[1] ) ) );
-        #     my $outs = join( ",", sort map( $edges{ $_->[0] }->{ $_->[1] }, $subgraph->edges_from( $edge->[1] ) ) );
-        #     $ins  = $ins  ne "" ? "<($ins)"  : "";
-        #     $outs = $outs ne "" ? ">($outs)" : "";
-        #     push( @outgoing, sprintf( "%s(%s%s)", $edges{ $edge->[0] }->{ $edge->[1] }, $ins, $outs ) );
-        # }
+        # outgoing edges
         foreach my $local_vertex ( keys %{ $edges{$vertex} } ) {
             my $ins  = join( ",", sort map( $edges{$_}->{$local_vertex}, keys %{ $incoming_edge{$local_vertex} } ) );
             my $outs = join( ",", sort map( $edges{$local_vertex}->{$_}, keys %{ $edges{$local_vertex} } ) );
@@ -235,8 +226,12 @@ sub _emit {
         $nodes{$vertex} = $incoming . $outgoing;
     }
     @sorted_nodes = sort { $nodes{$a} cmp $nodes{$b} } keys %nodes;
+    my $node_index;
     for ( my $i = 0; $i <= $#sorted_nodes; $i++ ) {
         my $node_1 = $sorted_nodes[$i];
+	if ($node_1 == $match) {
+	    $node_index = $i;
+	}
         for ( my $j = 0; $j <= $#sorted_nodes; $j++ ) {
             my $node_2 = $sorted_nodes[$j];
             if ( $edges{$node_1}->{$node_2} ) {
@@ -251,6 +246,7 @@ sub _emit {
 
     #printf OUT ( "%s\t%d\n", join( " ", map( join( " ", @$_ ), @emit_structure ) ), scalar(@emit_structure) );
     #printf ( "%s\t%d\n", join( " ", map( join( " ", @$_ ), @emit_structure ) ), scalar(@emit_structure) );
+    $result_ref->[ scalar @emit_structure ]->{ join " ", map { join " ", @$_ } @emit_structure }->{$node_index}++;
 }
 
 sub _get_attribute {
@@ -287,7 +283,7 @@ __PACKAGE__->run(@ARGV) unless caller;
 sub run {
     my ( $class, @args ) = @_;
     my $get_subgraphs = connect_to_corpus($class);
-    $get_subgraphs->get_subgraphs("test");
+    $get_subgraphs->get_subgraphs("give");
     return;
 }
 
