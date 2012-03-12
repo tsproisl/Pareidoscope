@@ -27,7 +27,7 @@ Readonly my $UNLIMITED_NUMBER_OF_FIELDS  => -1;
 Readonly my $GET_ATTRIBUTE_USAGE         => 'Usage: $att_handle = $self->_get_attribute($name);';
 Readonly my $RELATION_IDS                => Storable::retrieve('dependency_relations.dump');
 
-use Data::Dumper;    # Dumper
+# use Data::Dumper;    # Dumper
 
 # use List::Util;              # first max maxstr min minstr reduce shuffle sum
 # use List::MoreUtils;         # "the stuff missing in List::Util"
@@ -97,8 +97,19 @@ SENTENCE:
         my $prohibited_nodes = Set::Object->new($match);
         _enumerate_connected_subgraphs_recursive( $match, $graph, $subgraph, $prohibited_nodes, \%relation, \%reverse_relation, 1, $result_ref );
     }
-    print Dumper($result_ref);
+
+    # print Dumper($result_ref);
+    Storable::nstore $result_ref, 'subgraphs.ref';
     return;
+}
+
+sub _get_frequencies {
+    my ($result_ref) = @_;
+    foreach my $size ( 1 .. $MAXIMUM_SUBGRAPH_SIZE ) {
+        foreach my $subgraph (sort keys %{$result_ref->[$size]}) {
+	    #
+	}
+    }
 }
 
 sub _enumerate_connected_subgraphs_recursive {
@@ -229,9 +240,9 @@ sub _emit {
     my $node_index;
     for ( my $i = 0; $i <= $#sorted_nodes; $i++ ) {
         my $node_1 = $sorted_nodes[$i];
-	if ($node_1 == $match) {
-	    $node_index = $i;
-	}
+        if ( $node_1 == $match ) {
+            $node_index = $i;
+        }
         for ( my $j = 0; $j <= $#sorted_nodes; $j++ ) {
             my $node_2 = $sorted_nodes[$j];
             if ( $edges{$node_1}->{$node_2} ) {
@@ -246,7 +257,8 @@ sub _emit {
 
     #printf OUT ( "%s\t%d\n", join( " ", map( join( " ", @$_ ), @emit_structure ) ), scalar(@emit_structure) );
     #printf ( "%s\t%d\n", join( " ", map( join( " ", @$_ ), @emit_structure ) ), scalar(@emit_structure) );
-    $result_ref->[ scalar @emit_structure ]->{ join " ", map { join " ", @$_ } @emit_structure }->{$node_index}++;
+    #$result_ref->[ scalar @emit_structure ]->{ join " ", map { join " ", @$_ } @emit_structure }->{$node_index}++;
+    $result_ref->[ scalar @emit_structure ]->{ pack "S*", map {@$_} @emit_structure }->{$node_index}++;
 }
 
 sub _get_attribute {
