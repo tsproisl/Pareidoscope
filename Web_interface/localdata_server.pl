@@ -19,7 +19,7 @@ sub init {
     my $class = ref($invocant) || $invocant;
     my @ngds;
     my @ngramidxs;
-    my @indices = $file eq "subgraph" ? ( 1 .. 5 ) : ( 1 .. 9 );
+    my @indices = $file eq "subgraphs" ? ( 1 .. 5 ) : ( 1 .. 9 );
 
     # Subgraphs: $ngds[($i ** 2) * 2]
     for my $i (@indices) {

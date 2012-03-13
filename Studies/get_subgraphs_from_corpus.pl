@@ -26,6 +26,9 @@ Readonly my $MAXIMUM_DEPTH               => 2;
 Readonly my $UNLIMITED_NUMBER_OF_FIELDS  => -1;
 Readonly my $GET_ATTRIBUTE_USAGE         => 'Usage: $att_handle = $self->_get_attribute($name);';
 Readonly my $RELATION_IDS                => Storable::retrieve('dependency_relations.dump');
+Readonly my $FREQUENCY_THRESHOLD         => 2;
+
+use localdata_client;
 
 # use Data::Dumper;    # Dumper
 
@@ -45,6 +48,7 @@ sub connect_to_corpus {
     $CWB::CL::Registry = '../Pareidoscope/corpora/registry';
     $self->{"corpus_handle"} = CWB::CL::Corpus->new("OANC");
     croak "Error: can't open corpus OANC, aborted." unless ( defined $self->{"corpus_handle"} );
+    $self->{"localdata"} = localdata_client->init('oanc', ['127.0.0.1', 4878, 8487]);
     bless $self, $class;
     return $self;
 }
@@ -98,18 +102,42 @@ SENTENCE:
         _enumerate_connected_subgraphs_recursive( $match, $graph, $subgraph, $prohibited_nodes, \%relation, \%reverse_relation, 1, $result_ref );
     }
 
-    # print Dumper($result_ref);
     Storable::nstore $result_ref, 'subgraphs.ref';
-    return;
+    return $result_ref;
 }
 
 sub _get_frequencies {
-    my ($result_ref) = @_;
+    my ($self, $result_ref, $word) = @_;
+    my @queue;
+    my $r1 = 0;
+    my $n = 28746592400;
     foreach my $size ( 1 .. $MAXIMUM_SUBGRAPH_SIZE ) {
         foreach my $subgraph (sort keys %{$result_ref->[$size]}) {
-	    #
+	    foreach my $position (sort {$a <=> $b} keys %{$result_ref->[$size]->{$subgraph}}) {
+		my $frequency = $result_ref->[$size]->{$subgraph}->{$position};
+		$r1 += $frequency;
+		push(@queue, [$subgraph, $position, 1, $frequency]) if ($frequency >= $FREQUENCY_THRESHOLD);
+	    }
 	}
     }
+    my $dbh = DBI->connect( "dbi:SQLite:${word}_subgraphs.sqlite" ) or die( "Cannot connect to ${word}_subgraphs.sqlite: $DBI::errstr" );
+    $dbh->do("PRAGMA encoding = 'UTF-8'");
+    $dbh->do("PRAGMA cache_size = 50000");
+    $dbh->do(
+        qq{CREATE TABLE results (
+			 rid INTEGER PRIMARY KEY,
+			 qid INTEGER NOT NULL,
+			 result TEXT NOT NULL,
+			 position INTEGER NOT NULL,
+                         mlen INTEGER NOT NULL,
+			 o11 INTEGER NOT NULL,
+			 c1 INTEGER NOT NULL,
+			 am REAL,
+			 UNIQUE (qid, result, position)
+		     )}
+    );
+    $dbh->disconnect();
+    $self->{"localdata"}->add_freq_and_am(\@queue, $r1, $n, "${word}_subgraphs.sqlite");
 }
 
 sub _enumerate_connected_subgraphs_recursive {
@@ -295,7 +323,8 @@ __PACKAGE__->run(@ARGV) unless caller;
 sub run {
     my ( $class, @args ) = @_;
     my $get_subgraphs = connect_to_corpus($class);
-    $get_subgraphs->get_subgraphs("give");
+    my $subgraphs = $get_subgraphs->get_subgraphs("give");
+    $get_subgraphs->_get_frequencies($subgraphs, "give");
     return;
 }
 

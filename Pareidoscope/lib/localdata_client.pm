@@ -4,7 +4,7 @@ use Dancer ':syntax';
 #use threads;
 #use threads::shared;
 
-use CGI::Carp qw(fatalsToBrowser);
+use Carp;
 use IO::Socket;
 use Data::Dumper;
 use POSIX qw();
@@ -55,15 +55,6 @@ sub DESTROY {
 	#close($con);
     #}
     undef($self);
-}
-
-
-sub get_ngram_freq {
-    my ($self, $ngram, $o11, $r1, $n) = @_;
-    print {$self->{"socket"}} ("gngf:$ngram,$o11,$r1,$n\n");
-    my $socket = $$self{"socket"};
-    chomp(my $line = <$socket>);
-    return split(",", $line);
 }
 
 
