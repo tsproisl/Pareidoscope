@@ -111,7 +111,7 @@ sub _get_frequencies {
     my @queue;
     my $r1 = 0;
     my $n = 28746592400;
-    foreach my $size ( 1 .. $MAXIMUM_SUBGRAPH_SIZE ) {
+    foreach my $size ( 2 .. $MAXIMUM_SUBGRAPH_SIZE ) {
         foreach my $subgraph (sort keys %{$result_ref->[$size]}) {
 	    foreach my $position (sort {$a <=> $b} keys %{$result_ref->[$size]->{$subgraph}}) {
 		my $frequency = $result_ref->[$size]->{$subgraph}->{$position};
@@ -323,7 +323,8 @@ __PACKAGE__->run(@ARGV) unless caller;
 sub run {
     my ( $class, @args ) = @_;
     my $get_subgraphs = connect_to_corpus($class);
-    my $subgraphs = $get_subgraphs->get_subgraphs("give");
+    #my $subgraphs = $get_subgraphs->get_subgraphs("give");
+    my $subgraphs = Storable::retrieve('subgraphs.ref');
     $get_subgraphs->_get_frequencies($subgraphs, "give");
     return;
 }
