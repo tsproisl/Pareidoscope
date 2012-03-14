@@ -67,8 +67,7 @@ OUTER: while ( my $match = <TAB> ) {
                 m/^([^(]+)\(0(?:&apos;)*,(-?\d+)(?:&apos;)*/;
                 #my $offset = $+{"offset"};
 		my $offset = $2;
-                $offset = "+" . $offset unless ( substr( $offset, 0, 1 ) eq "-" );
-                my $target = eval "$cpos$offset";
+                my $target = $cpos + $offset;
                 #$relations{$cpos}->{$target} = $+{"relation"};
                 $relations{$cpos}->{$target} = $1;
                 $raw_graph->add_edge( $cpos, $target );
@@ -177,7 +176,7 @@ sub enumerate_connected_subgraphs_recursive {
         # all combinations of edges between the newly added nodes
         my $edges = Set::Object->new();
         foreach my $new_node ($new_nodes) {
-            $edges->insert( grep( $new_nodes->contains( $_->[1] ), $subgraph->edges_from($new_node) ) );
+            $edges->insert( grep( $new_nodes->contains( $_->[1] ), $graph->edges_from($new_node) ) );
         }
 
         #my $second_powerset = &powerset_old( $edges, [], $max_n );

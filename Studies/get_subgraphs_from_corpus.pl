@@ -111,9 +111,9 @@ sub _get_frequencies {
     my @queue;
     my $r1 = 0;
     my $n = 28746592400;
-    foreach my $size ( 2 .. $MAXIMUM_SUBGRAPH_SIZE ) {
+    foreach my $size ( 1 .. $MAXIMUM_SUBGRAPH_SIZE ) {
         foreach my $subgraph (sort keys %{$result_ref->[$size]}) {
-	    foreach my $position (sort {$a <=> $b} keys %{$result_ref->[$size]->{$subgraph}}) {
+	    foreach my $position (sort keys %{$result_ref->[$size]->{$subgraph}}) {
 		my $frequency = $result_ref->[$size]->{$subgraph}->{$position};
 		$r1 += $frequency;
 		push(@queue, [$subgraph, $position, 1, $frequency]) if ($frequency >= $FREQUENCY_THRESHOLD);
@@ -174,7 +174,7 @@ sub _enumerate_connected_subgraphs_recursive {
         # all combinations of edges between the newly added nodes
         my $edges = Set::Object->new();
         foreach my $new_node ($new_nodes) {
-            $edges->insert( grep( $new_nodes->contains( $_->[1] ), $subgraph->edges_from($new_node) ) );
+            $edges->insert( grep( $new_nodes->contains( $_->[1] ), $graph->edges_from($new_node) ) );
         }
         my $second_powerset = _powerset( $edges, 0, $edges->size );
         foreach my $new_set ( $second_powerset->elements ) {
@@ -286,7 +286,10 @@ sub _emit {
     #printf OUT ( "%s\t%d\n", join( " ", map( join( " ", @$_ ), @emit_structure ) ), scalar(@emit_structure) );
     #printf ( "%s\t%d\n", join( " ", map( join( " ", @$_ ), @emit_structure ) ), scalar(@emit_structure) );
     #$result_ref->[ scalar @emit_structure ]->{ join " ", map { join " ", @$_ } @emit_structure }->{$node_index}++;
-    $result_ref->[ scalar @emit_structure ]->{ pack "S*", map {@$_} @emit_structure }->{$node_index}++;
+    #my @bins = pack "(S*)>", map {@$_} @emit_structure;
+    #my @strings = join " ", map { join " ", @$_ } @emit_structure;
+    #DEBUG join( " ", map { join " ", @$_ } @emit_structure) . ": " . pack( "(S*)>", map {@$_} @emit_structure) . "\n";
+    $result_ref->[ scalar @emit_structure ]->{ unpack("H*", pack("(S*)>", map {@$_} @emit_structure)) }->{$node_index}++;
 }
 
 sub _get_attribute {

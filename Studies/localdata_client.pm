@@ -116,8 +116,8 @@ sub add_freq_and_am {
 	    my @localresults;
 	    my $size = @$queueref > $per_message ? $per_message : @$queueref;
 	    my @localqueue = splice(@$queueref, 0, $size);
-	    #my $workingqueue = "gngf:$r1:$n:," . join(",", map(MIME::Base64::encode(pack("H*", $_->[0]), "") . ":" . $_->[3], @localqueue));
-	    my $workingqueue = "gngf:$r1:$n:," . join(",", map(MIME::Base64::encode($_->[0], "") . ":" . $_->[3], @localqueue));
+	    my $workingqueue = "gngf:$r1:$n:," . join(",", map(MIME::Base64::encode(pack("H*", $_->[0]), "") . ":" . $_->[3], @localqueue));
+	    #my $workingqueue = "gngf:$r1:$n:," . join(",", map(MIME::Base64::encode($_->[0], "") . ":" . $_->[3], @localqueue));
 	    print $socket $workingqueue . "\n";
 	    foreach my $record (@localqueue){
 		my $marked_ngram = $record->[0];

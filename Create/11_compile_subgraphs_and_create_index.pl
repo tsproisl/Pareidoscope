@@ -33,7 +33,7 @@ for my $i ( 1 .. $max_n ) {
         my @fields = split( /\t/,  $line );
         my @matrix = split( /\s+/, $fields[0] );
         die("There should be no tags with code > 65535: $line\n") if ( grep( $_ > 65535, @matrix ) );
-        my $matrix = pack( "S*", @matrix );
+        my $matrix = pack( "(S*)>", @matrix );
         my $freq   = pack( "L",  $fields[2] );
         if ( $counter % 512 == 0 ) {
             $position = tell(OUT);
