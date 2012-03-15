@@ -63,11 +63,14 @@ OUTER: while ( my $match = <TAB> ) {
                 next OUTER;
             }
             foreach ( split( /\|/, $outdep ) ) {
+
                 #m/^(?<relation>[^(]+)\(0(?:&apos;)*,(?<offset>-?\d+)(?:&apos;)*/;
                 m/^([^(]+)\(0(?:&apos;)*,(-?\d+)(?:&apos;)*/;
+
                 #my $offset = $+{"offset"};
-		my $offset = $2;
+                my $offset = $2;
                 my $target = $cpos + $offset;
+
                 #$relations{$cpos}->{$target} = $+{"relation"};
                 $relations{$cpos}->{$target} = $1;
                 $raw_graph->add_edge( $cpos, $target );
@@ -169,13 +172,13 @@ sub enumerate_connected_subgraphs_recursive {
     my $first_powerset = &cross_set( &powerset( $out_edges, 0, $max_n - $subgraph->vertices ), &powerset( $in_edges, 0, $max_n - $subgraph->vertices ), $max_n - $subgraph->vertices );
 
     #my $first_powerset = &powerset_of_sets_of_sets( $edges, 0, $max_n - $subgraph->vertices);
-    foreach my $set ( $first_powerset->elements ) {
+    foreach my $set ( $first_powerset->elements() ) {
         next if ( $set->size == 0 );
         my $new_nodes = Set::Object::intersection( $neighbours, Set::Object->new( map( @$_, $set->elements ) ) );
 
         # all combinations of edges between the newly added nodes
         my $edges = Set::Object->new();
-        foreach my $new_node ($new_nodes) {
+        foreach my $new_node ( $new_nodes->elements() ) {
             $edges->insert( grep( $new_nodes->contains( $_->[1] ), $graph->edges_from($new_node) ) );
         }
 
