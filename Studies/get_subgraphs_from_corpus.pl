@@ -150,14 +150,14 @@ sub _enumerate_connected_subgraphs_recursive {
     my $neighbours = Set::Object->new();
     foreach my $node ( $subgraph->vertices ) {
 
-        #foreach my $edge ( $graph->edges_from($node) ) {
+        # outgoing edges
         foreach my $target ( keys %{ $relation_ref->{$node} } ) {
             next if ( $prohibited_nodes->contains($target) );
             $out_edges->insert( [ $node, $target ] );
             $neighbours->insert($target);
         }
 
-        #foreach my $edge ( $graph->edges_to($node) ) {
+        # incoming edges
         foreach my $origin ( keys %{ $reverse_relation_ref->{$node} } ) {
             next if ( $prohibited_nodes->contains($origin) );
             $in_edges->insert( [ $origin, $node ] );
@@ -173,7 +173,7 @@ sub _enumerate_connected_subgraphs_recursive {
 
         # all combinations of edges between the newly added nodes
         my $edges = Set::Object->new();
-        foreach my $new_node ($new_nodes) {
+        foreach my $new_node ( $new_nodes->elements() ) {
             $edges->insert( grep( $new_nodes->contains( $_->[1] ), $graph->edges_from($new_node) ) );
         }
         my $second_powerset = _powerset( $edges, 0, $edges->size );
