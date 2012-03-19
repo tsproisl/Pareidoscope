@@ -98,8 +98,10 @@ SENTENCE:
         my $subgraph = Graph::Directed->new();
         $subgraph->add_vertex($match);
         _emit( $match, $subgraph, \%relation, $result_ref );
-        my $prohibited_nodes = Set::Object->new($match);
-        _enumerate_connected_subgraphs_recursive( $match, $graph, $subgraph, $prohibited_nodes, \%relation, \%reverse_relation, 1, $result_ref );
+        #my $prohibited_nodes = Set::Object->new($match);
+        #_enumerate_connected_subgraphs_recursive( $match, $graph, $subgraph, $prohibited_nodes, \%relation, \%reverse_relation, 1, $result_ref );
+	my $prohibited_edges = Set::Object->new();
+        _enumerate_connected_subgraphs_recursive( $match, $graph, $subgraph, $prohibited_edges, \%relation, \%reverse_relation, 1, $result_ref );
     }
 
     Storable::nstore $result_ref, 'subgraphs.ref';
@@ -141,27 +143,33 @@ sub _get_frequencies {
 }
 
 sub _enumerate_connected_subgraphs_recursive {
-    my ( $match, $graph, $subgraph, $prohibited_nodes, $relation_ref, $reverse_relation_ref, $depth, $result_ref ) = @_;
+    #my ( $match, $graph, $subgraph, $prohibited_nodes, $relation_ref, $reverse_relation_ref, $depth, $result_ref ) = @_;
+    my ( $match, $graph, $subgraph, $prohibited_edges, $relation_ref, $reverse_relation_ref, $depth, $result_ref ) = @_;
 
     # determine all edges to neighbouring nodes that are not
     # prohibited
     my $out_edges  = Set::Object->new();
     my $in_edges   = Set::Object->new();
     my $neighbours = Set::Object->new();
+    my $neighbouring_edges = Set::Object->new();
     foreach my $node ( $subgraph->vertices ) {
 
         # outgoing edges
         foreach my $target ( keys %{ $relation_ref->{$node} } ) {
-            next if ( $prohibited_nodes->contains($target) );
+            #next if ( $prohibited_nodes->contains($target) );
+	    next if ( $prohibited_edges->contains( "$node-$target" ) );
             $out_edges->insert( [ $node, $target ] );
             $neighbours->insert($target);
+	    $neighbouring_edges->insert( "$node-$target" );
         }
 
         # incoming edges
         foreach my $origin ( keys %{ $reverse_relation_ref->{$node} } ) {
-            next if ( $prohibited_nodes->contains($origin) );
+            #next if ( $prohibited_nodes->contains($origin) );
+	    next if ( $prohibited_edges->contains( "$origin-$node" ) );
             $in_edges->insert( [ $origin, $node ] );
             $neighbours->insert($origin);
+	    $neighbouring_edges->insert( "$origin-$node" );
         }
     }
 
@@ -184,7 +192,8 @@ sub _enumerate_connected_subgraphs_recursive {
 
             #if ( $local_subgraph->vertices < $MAXIMUM_SUBGRAPH_SIZE ) {
             if ( $local_subgraph->vertices < $MAXIMUM_SUBGRAPH_SIZE && $depth < $MAXIMUM_DEPTH ) {
-                _enumerate_connected_subgraphs_recursive( $match, $graph, $local_subgraph, Set::Object::union( $prohibited_nodes, $neighbours ), $relation_ref, $reverse_relation_ref, $depth + 1, $result_ref );
+                #_enumerate_connected_subgraphs_recursive( $match, $graph, $local_subgraph, Set::Object::union( $prohibited_nodes, $neighbours ), $relation_ref, $reverse_relation_ref, $depth + 1, $result_ref );
+                _enumerate_connected_subgraphs_recursive( $match, $graph, $local_subgraph, Set::Object::union( $prohibited_edges, $neighbouring_edges ), $relation_ref, $reverse_relation_ref, $depth + 1, $result_ref );
             }
         }
     }
