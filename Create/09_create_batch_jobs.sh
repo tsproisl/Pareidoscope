@@ -17,8 +17,8 @@ relations_basename=$(basename $relations)
 mkdir -p $outdir/batch
 cp $relations $outdir/batch/$relations_basename
 
-# split dependencies.out into smaller files of 25,000 lines
-split -a 3 -d -l 25000 $dependencies $outdir/batch/dependencies
+# split dependencies.out into smaller files of 10,000 lines
+split -a 3 -d -l 10000 $dependencies $outdir/batch/dependencies
 
 i=0
 infiles=""
@@ -44,7 +44,7 @@ do
 #
 # allocate 1 node (4 CPUs) for 4 hours
 # sufficient for 100,000 sentences
-#PBS -l nodes=1:ppn=4,walltime=18:00:00
+#PBS -l nodes=1:ppn=4,walltime=10:00:00
 #
 # job name 
 #PBS -N subgraphjob_$jobnr

@@ -90,6 +90,7 @@ SENTENCE:
             foreach my $dep (@out) {
                 $dep =~ m/^(?<relation>[^(]+)[(]0(?:&apos;)*,(?<offset>-?\d+)(?:&apos;)*/xms;
                 my $target = $cpos + $LAST_PAREN_MATCH{"offset"};
+		next if ($cpos == $target);
                 $relation{$cpos}->{$target}         = $LAST_PAREN_MATCH{"relation"};
                 $reverse_relation{$target}->{$cpos} = $LAST_PAREN_MATCH{"relation"};
                 $graph->add_edge( $cpos, $target );
@@ -335,9 +336,9 @@ __PACKAGE__->run(@ARGV) unless caller;
 sub run {
     my ( $class, @args ) = @_;
     my $get_subgraphs = connect_to_corpus($class);
-    #my $subgraphs = $get_subgraphs->get_subgraphs("give");
-    my $subgraphs = Storable::retrieve('subgraphs.ref');
-    $get_subgraphs->_get_frequencies($subgraphs, "give");
+    my $subgraphs = $get_subgraphs->get_subgraphs("give");
+    #my $subgraphs = Storable::retrieve('subgraphs.ref');
+    #$get_subgraphs->_get_frequencies($subgraphs, "give");
     return;
 }
 
