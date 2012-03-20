@@ -16,7 +16,7 @@ packages=$(grep "^physical id" /proc/cpuinfo | sort | uniq | wc -l)
 cores_per_cpu=$(grep -m1 "cpu cores" /proc/cpuinfo | cut -d' ' -f3)
 cores=$(( $packages * $cores_per_cpu ))
 
-cd $outdir/subgraphs
+cd $outdir
 
 for (( n=1 ; n<=$max_n ; n++))
 do
