@@ -7,6 +7,7 @@ use Data::Dumper;
 
 use data;
 use executequeries;
+use visualizegraph;
 
 use version; our $VERSION = qv('0.9');
 my $data;
@@ -174,6 +175,10 @@ any [ 'get', 'post' ] => '/results/structural_ngram_query' => sub {
     template( 'complex_query_results', \%vars );
 };
 
+get '/visualization/graph' => sub {
+    visualizegraph::visualize_graph($data);
+};
+
 
 # get '/' => sub {
 
@@ -187,4 +192,4 @@ any [ 'get', 'post' ] => '/results/structural_ngram_query' => sub {
 
 # };
 
-true;
+1;

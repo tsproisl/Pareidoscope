@@ -88,6 +88,17 @@ sub init_corpus {
         $fetch_chunk->finish();
     }
 
+    # dependency relations -> numbers
+    if ( $self->{"active"}->{"subgraphs"} ) {
+        my $fetch_relations = $self->{"dbh"}->prepare(qq{SELECT depid, relation FROM dependencies});
+        $fetch_relations->execute();
+        while ( my ( $depid, $relation ) = $fetch_relations->fetchrow_array() ) {
+            $self->{"number_to_relation"}->[$depid] = $relation;
+            $self->{"relation_to_number"}->{$relation} = $depid;
+        }
+        $fetch_relations->finish();
+    }
+
     # corpus handle
     $self->{"corpus_handle"} = new CWB::CL::Corpus $self->{"active"}->{"corpus"};
     croak( "Error: can't open corpus " . $self->{"active"}->{"corpus"} . ", aborted." ) unless ( defined( $self->{"corpus_handle"} ) );
