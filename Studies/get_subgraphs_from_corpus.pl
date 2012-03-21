@@ -194,7 +194,7 @@ sub _enumerate_connected_subgraphs_recursive {
             #if ( $local_subgraph->vertices < $MAXIMUM_SUBGRAPH_SIZE ) {
             if ( $local_subgraph->vertices < $MAXIMUM_SUBGRAPH_SIZE && $depth < $MAXIMUM_DEPTH ) {
                 #_enumerate_connected_subgraphs_recursive( $match, $graph, $local_subgraph, Set::Object::union( $prohibited_nodes, $neighbours ), $relation_ref, $reverse_relation_ref, $depth + 1, $result_ref );
-                _enumerate_connected_subgraphs_recursive( $match, $graph, $local_subgraph, Set::Object::union( $prohibited_edges, $neighbouring_edges ), $relation_ref, $reverse_relation_ref, $depth + 1, $result_ref );
+                _enumerate_connected_subgraphs_recursive( $match, $graph, $local_subgraph, Set::Object::union( $prohibited_edges, $neighbouring_edges, $edges ), $relation_ref, $reverse_relation_ref, $depth + 1, $result_ref );
             }
         }
     }

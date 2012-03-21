@@ -191,7 +191,7 @@ sub enumerate_connected_subgraphs_recursive {
             &emit( $local_subgraph, $relations );
             if ( $local_subgraph->vertices < $max_n ) {
                 #&enumerate_connected_subgraphs_recursive( $graph, $local_subgraph, Set::Object::union( $prohibited_nodes, $neighbours ), $max_n, $relations, $reverse_relations );
-		&enumerate_connected_subgraphs_recursive( $graph, $local_subgraph, Set::Object::union( $prohibited_edges, $neighbouring_edges ), $max_n, $relations, $reverse_relations );
+		&enumerate_connected_subgraphs_recursive( $graph, $local_subgraph, Set::Object::union( $prohibited_edges, $neighbouring_edges, $edges ), $max_n, $relations, $reverse_relations );
             }
         }
     }
