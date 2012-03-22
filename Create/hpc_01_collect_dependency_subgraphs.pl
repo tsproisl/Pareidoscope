@@ -180,9 +180,11 @@ sub enumerate_connected_subgraphs_recursive {
 
         # all combinations of edges between the newly added nodes
         my $edges = Set::Object->new();
+	my $string_edges = Set::Object->new();
         foreach my $new_node ( $new_nodes->elements() ) {
             $edges->insert( grep( $new_nodes->contains( $_->[1] ), $graph->edges_from($new_node) ) );
         }
+	$string_edges->insert( map { $_->[0] . '-' . $_->[1] } $edges->elements() );
 
         my $second_powerset = &powerset( $edges, 0, $edges->size );
         foreach my $new_set ( $second_powerset->elements ) {
@@ -191,7 +193,7 @@ sub enumerate_connected_subgraphs_recursive {
             &emit( $local_subgraph, $relations );
             if ( $local_subgraph->vertices < $max_n ) {
                 #&enumerate_connected_subgraphs_recursive( $graph, $local_subgraph, Set::Object::union( $prohibited_nodes, $neighbours ), $max_n, $relations, $reverse_relations );
-		&enumerate_connected_subgraphs_recursive( $graph, $local_subgraph, Set::Object::union( $prohibited_edges, $neighbouring_edges, $edges ), $max_n, $relations, $reverse_relations );
+		&enumerate_connected_subgraphs_recursive( $graph, $local_subgraph, Set::Object::union( $prohibited_edges, $neighbouring_edges, $string_edges ), $max_n, $relations, $reverse_relations );
             }
         }
     }
