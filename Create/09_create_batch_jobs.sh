@@ -42,9 +42,9 @@ do
 	cat > subgraphjob_$jobnr.sh <<EOF
 #!/bin/bash -l
 #
-# allocate 1 node (4 CPUs) for 4 hours
+# allocate 1 node (4 CPUs) for 10 hours
 # sufficient for 100,000 sentences
-#PBS -l nodes=1:ppn=4,walltime=15:00:00
+#PBS -l nodes=1:ppn=4,walltime=10:00:00
 #
 # job name 
 #PBS -N subgraphjob_$jobnr
