@@ -182,9 +182,12 @@ sub _enumerate_connected_subgraphs_recursive {
 
         # all combinations of edges between the newly added nodes
         my $edges = Set::Object->new();
+	my $string_edges = Set::Object->new();
         foreach my $new_node ( $new_nodes->elements() ) {
             $edges->insert( grep( $new_nodes->contains( $_->[1] ), $graph->edges_from($new_node) ) );
         }
+	$string_edges->insert( map { $_->[0] . '-' . $_->[1] } $edges->elements() );
+
         my $second_powerset = _powerset( $edges, 0, $edges->size );
         foreach my $new_set ( $second_powerset->elements ) {
             my $local_subgraph = $subgraph->copy_graph;
@@ -336,9 +339,9 @@ __PACKAGE__->run(@ARGV) unless caller;
 sub run {
     my ( $class, @args ) = @_;
     my $get_subgraphs = connect_to_corpus($class);
-    #my $subgraphs = $get_subgraphs->get_subgraphs("give");
-    my $subgraphs = Storable::retrieve('subgraphs.ref');
-    $get_subgraphs->_get_frequencies($subgraphs, "give");
+    my $subgraphs = $get_subgraphs->get_subgraphs("give");
+    #my $subgraphs = Storable::retrieve('subgraphs.ref');
+    #$get_subgraphs->_get_frequencies($subgraphs, "give");
     return;
 }
 
