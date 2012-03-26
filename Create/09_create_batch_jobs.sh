@@ -1,4 +1,5 @@
 #!/bin/bash
+shopt -s nullglob dotglob
 
 if [ $# -ne 2 ]
 then
@@ -21,21 +22,23 @@ cp $relations $outdir/batch/$relations_basename
 split -a 3 -d -l 10000 $dependencies $outdir/batch/dependencies
 
 i=0
+j=0
 infiles=""
 nr=0
 cd $outdir/batch
-for infile in dependencies*
+depfiles=(dependencies*)
+for infile in ${depfiles[@]}
 do
     i=$((i+1))
+    j=$((j+1))
     if [ $i -eq 1 ]
     then
 	infiles=$infile
-    elif [ $i -gt 1 -a $i -lt 4 ]
-    then
+    else
 	infiles="$infiles $infile"
-    elif [ $i -eq 4 ]
+    fi
+    if [ $i -eq 4 -o $j -eq ${#depfiles[@]} ]
     then
-	infiles="$infiles $infile"
 	i=0
 	nr=$((nr+1))
 	jobnr=$(printf "%03d" $nr)
