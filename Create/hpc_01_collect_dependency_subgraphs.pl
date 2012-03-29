@@ -83,11 +83,10 @@ OUTER: while ( my $match = <TAB> ) {
         }
 
         # Skip unconnected graphs (necessary because of a bug in the current version of the Stanford Dependencies converter)
-	if ( ! $raw_graph->is_weakly_connected() ) {
+        if ( ( $raw_graph->vertices() > 1 ) && ( !$raw_graph->is_weakly_connected() ) ) {
             print STDERR sprintf( "Skipped %s (not connected)\n", $s_id );
             next OUTER;
-	}
-
+        }
 
         # BFS
         $raw_to_graph{$root} = 0;

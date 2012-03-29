@@ -27,6 +27,7 @@ Readonly my $UNLIMITED_NUMBER_OF_FIELDS  => -1;
 Readonly my $GET_ATTRIBUTE_USAGE         => 'Usage: $att_handle = $self->_get_attribute($name);';
 Readonly my $RELATION_IDS                => Storable::retrieve('dependency_relations.dump');
 Readonly my $FREQUENCY_THRESHOLD         => 2;
+Readonly my $N => 60793955079;
 
 use localdata_client;
 
@@ -96,9 +97,9 @@ SENTENCE:
                 $graph->add_edge( $cpos, $target );
             }
         }
-	
+
         # Skip unconnected graphs (necessary because of a bug in the current version of the Stanford Dependencies converter)
-	next SENTENCE if ( ! $graph->is_weakly_connected() );
+        next SENTENCE if ( ( $graph->vertices() > 1 ) && ( !$graph->is_weakly_connected() ) );
 
         my $subgraph = Graph::Directed->new();
         $subgraph->add_vertex($match);
@@ -118,17 +119,16 @@ sub _get_frequencies {
     my ( $self, $result_ref, $word ) = @_;
     my @queue;
     my $r1 = 0;
-    my $n  = 28746592400;
     foreach my $size ( 1 .. $MAXIMUM_SUBGRAPH_SIZE ) {
         foreach my $subgraph ( sort keys %{ $result_ref->[$size] } ) {
             foreach my $position ( sort keys %{ $result_ref->[$size]->{$subgraph} } ) {
                 my $frequency = $result_ref->[$size]->{$subgraph}->{$position};
                 $r1 += $frequency;
-                push( @queue, [ $subgraph, $position, 1, $frequency ] ) if ( $frequency >= $FREQUENCY_THRESHOLD );
+                push @queue, [ $subgraph, $position, 1, $frequency ] if ( $frequency >= $FREQUENCY_THRESHOLD );
             }
         }
     }
-    my $dbh = DBI->connect("dbi:SQLite:${word}_subgraphs.sqlite") or die("Cannot connect to ${word}_subgraphs.sqlite: $DBI::errstr");
+    my $dbh = DBI->connect("dbi:SQLite:${word}_subgraphs.sqlite") or croak "Cannot connect to ${word}_subgraphs.sqlite: $DBI::errstr";
     $dbh->do("PRAGMA encoding = 'UTF-8'");
     $dbh->do("PRAGMA cache_size = 50000");
     $dbh->do(
@@ -145,7 +145,8 @@ sub _get_frequencies {
 		     )}
     );
     $dbh->disconnect();
-    $self->{"localdata"}->add_freq_and_am( \@queue, $r1, $n, "${word}_subgraphs.sqlite" );
+    $self->{"localdata"}->add_freq_and_am( \@queue, $r1, $N, "${word}_subgraphs.sqlite" );
+    return;
 }
 
 sub _enumerate_connected_subgraphs_recursive {
@@ -186,15 +187,15 @@ sub _enumerate_connected_subgraphs_recursive {
 
     foreach my $set ( $first_powerset->elements ) {
         next if ( $set->size == 0 );
-        my $new_nodes = Set::Object::intersection( $neighbours, Set::Object->new( map( @$_, $set->elements ) ) );
+        my $new_nodes = Set::Object::intersection( $neighbours, Set::Object->new( map {@{$_}} $set->elements ) );
 
         # all combinations of edges between the newly added nodes
         my $edges        = Set::Object->new();
         my $string_edges = Set::Object->new();
         foreach my $new_node ( $new_nodes->elements() ) {
-            $edges->insert( grep( $new_nodes->contains( $_->[1] ), $graph->edges_from($new_node) ) );
+            $edges->insert( grep {$new_nodes->contains( $_->[1] )} $graph->edges_from($new_node) );
         }
-        $string_edges->insert( map { $_->[0] . '-' . $_->[1] } $edges->elements() );
+        $string_edges->insert( map { $_->[0] . q{-} . $_->[1] } $edges->elements() );
 
         my $second_powerset = _powerset( $edges, 0, $edges->size );
         foreach my $new_set ( $second_powerset->elements ) {
@@ -210,6 +211,7 @@ sub _enumerate_connected_subgraphs_recursive {
             }
         }
     }
+    return;
 }
 
 sub _cross_set {
