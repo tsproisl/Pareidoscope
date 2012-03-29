@@ -339,8 +339,8 @@ __PACKAGE__->run(@ARGV) unless caller;
 sub run {
     my ( $class, @args ) = @_;
     my $get_subgraphs = connect_to_corpus($class);
-    #my $subgraphs = $get_subgraphs->get_subgraphs("give");
-    my $subgraphs = Storable::retrieve('subgraphs.ref');
+    my $subgraphs = $get_subgraphs->get_subgraphs("give");
+    #my $subgraphs = Storable::retrieve('subgraphs.ref');
     $get_subgraphs->_get_frequencies($subgraphs, "give");
     return;
 }
