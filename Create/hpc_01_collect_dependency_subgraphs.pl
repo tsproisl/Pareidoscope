@@ -46,6 +46,7 @@ OUTER: while ( my $match = <TAB> ) {
         my $graph     = Graph::Directed->new;
         my ( %raw_relations, %relations, %reverse_relations );
         my ( %raw_to_graph, %graph_to_raw );
+        my $number_of_nodes_with_relations;
 
         for ( my $i = 0; $i <= $#cposs; $i++ ) {
             $root = $cposs[$i] if ( $roots[$i] eq "root" );
@@ -56,25 +57,37 @@ OUTER: while ( my $match = <TAB> ) {
             $outdep =~ s/^\|//;
             $indep  =~ s/\|$//;
             $outdep =~ s/\|$//;
+            if ( !( $indep eq q{} && $outdep eq q{} ) ) {
+                $number_of_nodes_with_relations++;
+            }
 
             # Skip sentences with nodes that have more than ten edges
             if ( scalar( () = split( /\|/, $indep, -1 ) ) + scalar( () = split( /\|/, $outdep, -1 ) ) > 10 ) {
-                print STDERR sprintf( "Skipped %s (%d edges)\n", $s_id, scalar( () = split( /\|/, $indep, -1 ) ) + scalar( () = split( /\|/, $outdep, -1 ) ) );
+                print STDERR sprintf( "Skipped %s (node with %d edges)\n", $s_id, scalar( () = split( /\|/, $indep, -1 ) ) + scalar( () = split( /\|/, $outdep, -1 ) ) );
                 next OUTER;
             }
             foreach ( split( /\|/, $outdep ) ) {
 
                 #m/^(?<relation>[^(]+)\(0(?:&apos;)*,(?<offset>-?\d+)(?:&apos;)*/;
-		m/^([^(]+)\(0(?:&apos;)*,(-?\d+)(?:&apos;)*/;
-		#my $offset = $+{"offset"};
-		my $offset = $2;
+                m/^([^(]+)\(0(?:&apos;)*,(-?\d+)(?:&apos;)*/;
+
+                #my $offset = $+{"offset"};
+                my $offset = $2;
                 my $target = $cpos + $offset;
-		next if ($cpos == $target);
-		#$raw_relations{$cpos}->{$target} = $+{"relation"};
-		$raw_relations{$cpos}->{$target} = $1;
+                next if ( $cpos == $target );
+
+                #$raw_relations{$cpos}->{$target} = $+{"relation"};
+                $raw_relations{$cpos}->{$target} = $1;
                 $raw_graph->add_edge( $cpos, $target );
             }
         }
+
+        # Skip unconnected graphs (necessary because of a bug in the current version of the Stanford Dependencies converter)
+	if ( ! $raw_graph->is_weakly_connected() ) {
+            print STDERR sprintf( "Skipped %s (not connected)\n", $s_id );
+            next OUTER;
+	}
+
 
         # BFS
         $raw_to_graph{$root} = 0;
@@ -94,14 +107,14 @@ OUTER: while ( my $match = <TAB> ) {
                     push( @agenda, $target );
                     $node_counter++;
                 }
-                $relations{$raw_to_graph{$node}}->{$raw_to_graph{$target}} = $raw_relations{$node}->{$target};
-		$reverse_relations{$raw_to_graph{$target}}->{$raw_to_graph{$node}} = $raw_relations{$node}->{$target};
+                $relations{ $raw_to_graph{$node} }->{ $raw_to_graph{$target} }         = $raw_relations{$node}->{$target};
+                $reverse_relations{ $raw_to_graph{$target} }->{ $raw_to_graph{$node} } = $raw_relations{$node}->{$target};
                 $graph->add_edge( $raw_to_graph{$node}, $raw_to_graph{$target} );
             }
         }
 
         # get all connected subgraphs
-        &enumerate_connected_subgraphs( $graph, $max_n, \%relations, \%reverse_relations );
+        enumerate_connected_subgraphs( $graph, $max_n, \%relations, \%reverse_relations );
     }
     close(TAB) or die("Cannot close $dependencies: $!");
 }
@@ -131,44 +144,48 @@ sub enumerate_connected_subgraphs {
         my $subgraph = Graph::Directed->new;
         $subgraph->add_vertex($node);
         &emit( $subgraph, $relations );
+
         #my $prohibited_nodes = Set::Object->new();
         #$prohibited_nodes->insert( 0 .. $node );
         #&enumerate_connected_subgraphs_recursive( $graph, $subgraph, $prohibited_nodes, $max_n, $relations, $reverse_relations );
-	my $prohibited_edges = Set::Object->new();
-	$prohibited_edges->insert( map( $_->[0] . '-' . $_->[1], map {$graph->edges_at($_)} ( 0 .. $node - 1 )) );
+        my $prohibited_edges = Set::Object->new();
+        $prohibited_edges->insert( map( $_->[0] . '-' . $_->[1], map { $graph->edges_at($_) } ( 0 .. $node - 1 ) ) );
         &enumerate_connected_subgraphs_recursive( $graph, $subgraph, $prohibited_edges, $max_n, $relations, $reverse_relations );
     }
 }
 
 sub enumerate_connected_subgraphs_recursive {
+
     #my ( $graph, $subgraph, $prohibited_nodes, $max_n, $relations, $reverse_relations ) = @_;
     my ( $graph, $subgraph, $prohibited_edges, $max_n, $relations, $reverse_relations ) = @_;
 
     # determine all edges to neighbouring nodes that are not
     # prohibited
-    my $out_edges  = Set::Object->new();
-    my $in_edges   = Set::Object->new();
-    my $neighbours = Set::Object->new();
+    my $out_edges          = Set::Object->new();
+    my $in_edges           = Set::Object->new();
+    my $neighbours         = Set::Object->new();
     my $neighbouring_edges = Set::Object->new();
 
     foreach my $node ( $subgraph->vertices ) {
 
         # outgoing edges
         foreach my $target ( keys %{ $relations->{$node} } ) {
+
             #next if ( $prohibited_nodes->contains($target) );
-	    next if ( $prohibited_edges->contains( "$node-$target" ) );
+            next if ( $prohibited_edges->contains("$node-$target") );
             $out_edges->insert( [ $node, $target ] );
             $neighbours->insert($target);
-	    $neighbouring_edges->insert( "$node-$target" );
+            $neighbouring_edges->insert("$node-$target");
         }
 
         # incoming edges
         foreach my $origin ( keys %{ $reverse_relations->{$node} } ) {
+
             #next if ( $prohibited_nodes->contains($origin) );
-	    next if ( $prohibited_edges->contains( "$origin-$node" ) );
+            next if ( $prohibited_edges->contains("$origin-$node") );
             $in_edges->insert( [ $origin, $node ] );
             $neighbours->insert($origin);
-	    $neighbouring_edges->insert( "$origin-$node" );
+            $neighbouring_edges->insert("$origin-$node");
         }
     }
 
@@ -179,12 +196,12 @@ sub enumerate_connected_subgraphs_recursive {
         my $new_nodes = Set::Object::intersection( $neighbours, Set::Object->new( map( @$_, $set->elements ) ) );
 
         # all combinations of edges between the newly added nodes
-        my $edges = Set::Object->new();
-	my $string_edges = Set::Object->new();
+        my $edges        = Set::Object->new();
+        my $string_edges = Set::Object->new();
         foreach my $new_node ( $new_nodes->elements() ) {
             $edges->insert( grep( $new_nodes->contains( $_->[1] ), $graph->edges_from($new_node) ) );
         }
-	$string_edges->insert( map { $_->[0] . '-' . $_->[1] } $edges->elements() );
+        $string_edges->insert( map { $_->[0] . '-' . $_->[1] } $edges->elements() );
 
         my $second_powerset = &powerset( $edges, 0, $edges->size );
         foreach my $new_set ( $second_powerset->elements ) {
@@ -192,8 +209,9 @@ sub enumerate_connected_subgraphs_recursive {
             $local_subgraph->add_edges( $set->elements, $new_set->elements );
             &emit( $local_subgraph, $relations );
             if ( $local_subgraph->vertices < $max_n ) {
+
                 #&enumerate_connected_subgraphs_recursive( $graph, $local_subgraph, Set::Object::union( $prohibited_nodes, $neighbours ), $max_n, $relations, $reverse_relations );
-		&enumerate_connected_subgraphs_recursive( $graph, $local_subgraph, Set::Object::union( $prohibited_edges, $neighbouring_edges, $string_edges ), $max_n, $relations, $reverse_relations );
+                &enumerate_connected_subgraphs_recursive( $graph, $local_subgraph, Set::Object::union( $prohibited_edges, $neighbouring_edges, $string_edges ), $max_n, $relations, $reverse_relations );
             }
         }
     }

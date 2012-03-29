@@ -48,7 +48,7 @@ sub connect_to_corpus {
     $CWB::CL::Registry = '../Pareidoscope/corpora/registry';
     $self->{"corpus_handle"} = CWB::CL::Corpus->new("OANC");
     croak "Error: can't open corpus OANC, aborted." unless ( defined $self->{"corpus_handle"} );
-    $self->{"localdata"} = localdata_client->init('oanc', ['127.0.0.1', 4878, 8487]);
+    $self->{"localdata"} = localdata_client->init( 'oanc', [ '127.0.0.1', 4878, 8487 ] );
     bless $self, $class;
     return $self;
 }
@@ -63,8 +63,8 @@ sub get_subgraphs {
     $self->{"cqp"}->exec( sprintf "A = [word = \"%s\" %%c]", $word );
     my @matches      = $self->{"cqp"}->exec("tabulate A match");
     my $loop_counter = 0;
-SENTENCE:
 
+SENTENCE:
     foreach my $match (@matches) {
         $loop_counter++;
 
@@ -90,18 +90,23 @@ SENTENCE:
             foreach my $dep (@out) {
                 $dep =~ m/^(?<relation>[^(]+)[(]0(?:&apos;)*,(?<offset>-?\d+)(?:&apos;)*/xms;
                 my $target = $cpos + $LAST_PAREN_MATCH{"offset"};
-		next if ($cpos == $target);
+                next if ( $cpos == $target );
                 $relation{$cpos}->{$target}         = $LAST_PAREN_MATCH{"relation"};
                 $reverse_relation{$target}->{$cpos} = $LAST_PAREN_MATCH{"relation"};
                 $graph->add_edge( $cpos, $target );
             }
         }
+	
+        # Skip unconnected graphs (necessary because of a bug in the current version of the Stanford Dependencies converter)
+	next SENTENCE if ( ! $graph->is_weakly_connected() );
+
         my $subgraph = Graph::Directed->new();
         $subgraph->add_vertex($match);
         _emit( $match, $subgraph, \%relation, $result_ref );
+
         #my $prohibited_nodes = Set::Object->new($match);
         #_enumerate_connected_subgraphs_recursive( $match, $graph, $subgraph, $prohibited_nodes, \%relation, \%reverse_relation, 1, $result_ref );
-	my $prohibited_edges = Set::Object->new();
+        my $prohibited_edges = Set::Object->new();
         _enumerate_connected_subgraphs_recursive( $match, $graph, $subgraph, $prohibited_edges, \%relation, \%reverse_relation, 1, $result_ref );
     }
 
@@ -110,20 +115,20 @@ SENTENCE:
 }
 
 sub _get_frequencies {
-    my ($self, $result_ref, $word) = @_;
+    my ( $self, $result_ref, $word ) = @_;
     my @queue;
     my $r1 = 0;
-    my $n = 28746592400;
+    my $n  = 28746592400;
     foreach my $size ( 1 .. $MAXIMUM_SUBGRAPH_SIZE ) {
-        foreach my $subgraph (sort keys %{$result_ref->[$size]}) {
-	    foreach my $position (sort keys %{$result_ref->[$size]->{$subgraph}}) {
-		my $frequency = $result_ref->[$size]->{$subgraph}->{$position};
-		$r1 += $frequency;
-		push(@queue, [$subgraph, $position, 1, $frequency]) if ($frequency >= $FREQUENCY_THRESHOLD);
-	    }
-	}
+        foreach my $subgraph ( sort keys %{ $result_ref->[$size] } ) {
+            foreach my $position ( sort keys %{ $result_ref->[$size]->{$subgraph} } ) {
+                my $frequency = $result_ref->[$size]->{$subgraph}->{$position};
+                $r1 += $frequency;
+                push( @queue, [ $subgraph, $position, 1, $frequency ] ) if ( $frequency >= $FREQUENCY_THRESHOLD );
+            }
+        }
     }
-    my $dbh = DBI->connect( "dbi:SQLite:${word}_subgraphs.sqlite" ) or die( "Cannot connect to ${word}_subgraphs.sqlite: $DBI::errstr" );
+    my $dbh = DBI->connect("dbi:SQLite:${word}_subgraphs.sqlite") or die("Cannot connect to ${word}_subgraphs.sqlite: $DBI::errstr");
     $dbh->do("PRAGMA encoding = 'UTF-8'");
     $dbh->do("PRAGMA cache_size = 50000");
     $dbh->do(
@@ -140,37 +145,40 @@ sub _get_frequencies {
 		     )}
     );
     $dbh->disconnect();
-    $self->{"localdata"}->add_freq_and_am(\@queue, $r1, $n, "${word}_subgraphs.sqlite");
+    $self->{"localdata"}->add_freq_and_am( \@queue, $r1, $n, "${word}_subgraphs.sqlite" );
 }
 
 sub _enumerate_connected_subgraphs_recursive {
+
     #my ( $match, $graph, $subgraph, $prohibited_nodes, $relation_ref, $reverse_relation_ref, $depth, $result_ref ) = @_;
     my ( $match, $graph, $subgraph, $prohibited_edges, $relation_ref, $reverse_relation_ref, $depth, $result_ref ) = @_;
 
     # determine all edges to neighbouring nodes that are not
     # prohibited
-    my $out_edges  = Set::Object->new();
-    my $in_edges   = Set::Object->new();
-    my $neighbours = Set::Object->new();
+    my $out_edges          = Set::Object->new();
+    my $in_edges           = Set::Object->new();
+    my $neighbours         = Set::Object->new();
     my $neighbouring_edges = Set::Object->new();
     foreach my $node ( $subgraph->vertices ) {
 
         # outgoing edges
         foreach my $target ( keys %{ $relation_ref->{$node} } ) {
+
             #next if ( $prohibited_nodes->contains($target) );
-	    next if ( $prohibited_edges->contains( "$node-$target" ) );
+            next if ( $prohibited_edges->contains("$node-$target") );
             $out_edges->insert( [ $node, $target ] );
             $neighbours->insert($target);
-	    $neighbouring_edges->insert( "$node-$target" );
+            $neighbouring_edges->insert("$node-$target");
         }
 
         # incoming edges
         foreach my $origin ( keys %{ $reverse_relation_ref->{$node} } ) {
+
             #next if ( $prohibited_nodes->contains($origin) );
-	    next if ( $prohibited_edges->contains( "$origin-$node" ) );
+            next if ( $prohibited_edges->contains("$origin-$node") );
             $in_edges->insert( [ $origin, $node ] );
             $neighbours->insert($origin);
-	    $neighbouring_edges->insert( "$origin-$node" );
+            $neighbouring_edges->insert("$origin-$node");
         }
     }
 
@@ -181,12 +189,12 @@ sub _enumerate_connected_subgraphs_recursive {
         my $new_nodes = Set::Object::intersection( $neighbours, Set::Object->new( map( @$_, $set->elements ) ) );
 
         # all combinations of edges between the newly added nodes
-        my $edges = Set::Object->new();
-	my $string_edges = Set::Object->new();
+        my $edges        = Set::Object->new();
+        my $string_edges = Set::Object->new();
         foreach my $new_node ( $new_nodes->elements() ) {
             $edges->insert( grep( $new_nodes->contains( $_->[1] ), $graph->edges_from($new_node) ) );
         }
-	$string_edges->insert( map { $_->[0] . '-' . $_->[1] } $edges->elements() );
+        $string_edges->insert( map { $_->[0] . '-' . $_->[1] } $edges->elements() );
 
         my $second_powerset = _powerset( $edges, 0, $edges->size );
         foreach my $new_set ( $second_powerset->elements ) {
@@ -196,6 +204,7 @@ sub _enumerate_connected_subgraphs_recursive {
 
             #if ( $local_subgraph->vertices < $MAXIMUM_SUBGRAPH_SIZE ) {
             if ( $local_subgraph->vertices < $MAXIMUM_SUBGRAPH_SIZE && $depth < $MAXIMUM_DEPTH ) {
+
                 #_enumerate_connected_subgraphs_recursive( $match, $graph, $local_subgraph, Set::Object::union( $prohibited_nodes, $neighbours ), $relation_ref, $reverse_relation_ref, $depth + 1, $result_ref );
                 _enumerate_connected_subgraphs_recursive( $match, $graph, $local_subgraph, Set::Object::union( $prohibited_edges, $neighbouring_edges, $string_edges ), $relation_ref, $reverse_relation_ref, $depth + 1, $result_ref );
             }
@@ -302,7 +311,7 @@ sub _emit {
     #my @bins = pack "(S*)>", map {@$_} @emit_structure;
     #my @strings = join " ", map { join " ", @$_ } @emit_structure;
     #DEBUG join( " ", map { join " ", @$_ } @emit_structure) . ": " . pack( "(S*)>", map {@$_} @emit_structure) . "\n";
-    $result_ref->[ scalar @emit_structure ]->{ unpack("H*", pack("(S*)>", map {@$_} @emit_structure)) }->{$node_index}++;
+    $result_ref->[ scalar @emit_structure ]->{ unpack( "H*", pack( "(S*)>", map {@$_} @emit_structure ) ) }->{$node_index}++;
 }
 
 sub _get_attribute {
@@ -339,9 +348,10 @@ __PACKAGE__->run(@ARGV) unless caller;
 sub run {
     my ( $class, @args ) = @_;
     my $get_subgraphs = connect_to_corpus($class);
-    my $subgraphs = $get_subgraphs->get_subgraphs("give");
+    my $subgraphs     = $get_subgraphs->get_subgraphs("give");
+
     #my $subgraphs = Storable::retrieve('subgraphs.ref');
-    $get_subgraphs->_get_frequencies($subgraphs, "give");
+    $get_subgraphs->_get_frequencies( $subgraphs, "give" );
     return;
 }
 
