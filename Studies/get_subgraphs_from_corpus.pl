@@ -7,6 +7,7 @@ use warnings;
 use open qw(:utf8 :std);
 use utf8;
 use English qw( -no_match_vars );
+#use Data::Dumper;
 
 use CWB;
 use CWB::CL;
@@ -73,6 +74,7 @@ SENTENCE:
         DEBUG( sprintf "%d/%d", $loop_counter, scalar @matches );
 
         #my $s_id = $s_id_handle->cpos2str($match);
+	#next unless ($s_id eq '4eca80480572f4e02707f2e6');
         #DEBUG( "$s_id\n");
         my ( $start, $end ) = $s_handle->cpos2struc2cpos($match);
         my @indeps  = $indep_handle->cpos2str( $start .. $end );
@@ -266,7 +268,7 @@ sub _emit {
         my ( @incoming, @outgoing );
 
         # incoming edges
-        foreach my $local_vertex ( keys %{ $incoming_edge{$vertex} } ) {
+        foreach my $local_vertex ( sort keys %{ $incoming_edge{$vertex} } ) {
             my $ins  = join( ",", sort map( $edges{$_}->{$local_vertex}, keys %{ $incoming_edge{$local_vertex} } ) );
             my $outs = join( ",", sort map( $edges{$local_vertex}->{$_}, keys %{ $edges{$local_vertex} } ) );
             $ins  = $ins  ne "" ? "<($ins)"  : "";
@@ -275,7 +277,7 @@ sub _emit {
         }
 
         # outgoing edges
-        foreach my $local_vertex ( keys %{ $edges{$vertex} } ) {
+        foreach my $local_vertex ( sort keys %{ $edges{$vertex} } ) {
             my $ins  = join( ",", sort map( $edges{$_}->{$local_vertex}, keys %{ $incoming_edge{$local_vertex} } ) );
             my $outs = join( ",", sort map( $edges{$local_vertex}->{$_}, keys %{ $edges{$local_vertex} } ) );
             $ins  = $ins  ne "" ? "<($ins)"  : "";
@@ -313,6 +315,7 @@ sub _emit {
     #my @bins = pack "(S*)>", map {@$_} @emit_structure;
     #my @strings = join " ", map { join " ", @$_ } @emit_structure;
     #DEBUG join( " ", map { join " ", @$_ } @emit_structure) . ": " . pack( "(S*)>", map {@$_} @emit_structure) . "\n";
+    #DEBUG Dumper(\%nodes) if (join( " ", map {@$_} @emit_structure ) eq '0 0 0 0 0 0 0 0 24 144 0 0 143 0 0 0');
     $result_ref->[ scalar @emit_structure ]->{ unpack( "H*", pack( "(S*)>", map {@$_} @emit_structure ) ) }->{$node_index}++;
 }
 
@@ -351,9 +354,8 @@ sub run {
     my ( $class, @args ) = @_;
     my $get_subgraphs = connect_to_corpus($class);
     my $subgraphs     = $get_subgraphs->get_subgraphs("give");
-
     #my $subgraphs = Storable::retrieve('subgraphs.ref');
-    $get_subgraphs->_get_frequencies( $subgraphs, "give" );
+    #$get_subgraphs->_get_frequencies( $subgraphs, "give" );
     return;
 }
 

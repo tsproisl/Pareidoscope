@@ -276,7 +276,7 @@ sub emit {
         my ( @incoming, @outgoing );
 
         # incoming edges
-        foreach my $local_vertex ( keys %{ $incoming_edge{$vertex} } ) {
+        foreach my $local_vertex ( sort keys %{ $incoming_edge{$vertex} } ) {
             my $ins  = join( ",", sort map( $edges{$_}->{$local_vertex}, keys %{ $incoming_edge{$local_vertex} } ) );
             my $outs = join( ",", sort map( $edges{$local_vertex}->{$_}, keys %{ $edges{$local_vertex} } ) );
             $ins  = $ins  ne "" ? "<($ins)"  : "";
@@ -285,7 +285,7 @@ sub emit {
         }
 
         # outgoing edges
-        foreach my $local_vertex ( keys %{ $edges{$vertex} } ) {
+        foreach my $local_vertex ( sort keys %{ $edges{$vertex} } ) {
             my $ins  = join( ",", sort map( $edges{$_}->{$local_vertex}, keys %{ $incoming_edge{$local_vertex} } ) );
             my $outs = join( ",", sort map( $edges{$local_vertex}->{$_}, keys %{ $edges{$local_vertex} } ) );
             $ins  = $ins  ne "" ? "<($ins)"  : "";
@@ -312,5 +312,5 @@ sub emit {
             }
         }
     }
-    printf OUT ( "%s\t%d\n", join( " ", map( join( " ", @$_ ), @emit_structure ) ), scalar(@emit_structure) );
+    printf OUT ( "%s\t%d\n", join( " ", map {@$_} @emit_structure ), scalar(@emit_structure) );
 }
