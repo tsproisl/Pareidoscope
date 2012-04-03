@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+6~#!/usr/bin/perl
 
 # this is time-consuming! preferebly use hpc facilities
 # output: dependency subgraphs
@@ -276,7 +276,7 @@ sub emit {
         my ( @incoming, @outgoing );
 
         # incoming edges
-        foreach my $local_vertex ( sort keys %{ $incoming_edge{$vertex} } ) {
+        foreach my $local_vertex ( keys %{ $incoming_edge{$vertex} } ) {
             my $ins  = join( ",", sort map( $edges{$_}->{$local_vertex}, keys %{ $incoming_edge{$local_vertex} } ) );
             my $outs = join( ",", sort map( $edges{$local_vertex}->{$_}, keys %{ $edges{$local_vertex} } ) );
             $ins  = $ins  ne "" ? "<($ins)"  : "";
@@ -285,15 +285,15 @@ sub emit {
         }
 
         # outgoing edges
-        foreach my $local_vertex ( sort keys %{ $edges{$vertex} } ) {
+        foreach my $local_vertex ( keys %{ $edges{$vertex} } ) {
             my $ins  = join( ",", sort map( $edges{$_}->{$local_vertex}, keys %{ $incoming_edge{$local_vertex} } ) );
             my $outs = join( ",", sort map( $edges{$local_vertex}->{$_}, keys %{ $edges{$local_vertex} } ) );
             $ins  = $ins  ne "" ? "<($ins)"  : "";
             $outs = $outs ne "" ? ">($outs)" : "";
             push( @outgoing, sprintf( "%s(%s%s)", $edges{$vertex}->{$local_vertex}, $ins, $outs ) );
         }
-        my $incoming = join( ",", @incoming );
-        my $outgoing = join( ",", @outgoing );
+        my $incoming = join( ",", sort @incoming );
+        my $outgoing = join( ",", sort @outgoing );
         $incoming = $incoming ne "" ? "<($incoming)" : "";
         $outgoing = $outgoing ne "" ? ">($outgoing)" : "";
         $nodes{$vertex} = $incoming . $outgoing;
