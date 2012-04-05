@@ -1,4 +1,4 @@
-6~#!/usr/bin/perl
+#!/usr/bin/perl
 
 # this is time-consuming! preferebly use hpc facilities
 # output: dependency subgraphs
