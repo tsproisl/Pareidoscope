@@ -122,7 +122,7 @@ sub add_freq_and_am {
 	    foreach my $record (@localqueue){
 		my $marked_ngram = $record->[0];
 		my $position = $record->[1];
-		#my $match_length = $record->[2];
+		my $match_length = $record->[2];
 		#$marked_ngram =~ m/^((?:[0-9a-f]{2}){$position})((?:[0-9a-f]{2}){$match_length})((?:[0-9a-f]{2})*)$/;
 		#my ($pre, $match, $post) = ($1, $2, $3);
 		#$marked_ngram = $pre . "<" . $match . ">". $post;

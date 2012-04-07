@@ -28,7 +28,7 @@ Readonly my $UNLIMITED_NUMBER_OF_FIELDS  => -1;
 Readonly my $GET_ATTRIBUTE_USAGE         => 'Usage: $att_handle = $self->_get_attribute($name);';
 Readonly my $RELATION_IDS                => Storable::retrieve('dependency_relations.dump');
 Readonly my $FREQUENCY_THRESHOLD         => 2;
-Readonly my $N => 60793955079;
+Readonly my $N => 46014807335;
 
 use localdata_client;
 
@@ -353,8 +353,8 @@ __PACKAGE__->run(@ARGV) unless caller;
 sub run {
     my ( $class, @args ) = @_;
     my $get_subgraphs = connect_to_corpus($class);
-    my $subgraphs     = $get_subgraphs->get_subgraphs("give");
-    #my $subgraphs = Storable::retrieve('subgraphs.ref');
+    #my $subgraphs     = $get_subgraphs->get_subgraphs("give");
+    my $subgraphs = Storable::retrieve('subgraphs.ref');
     $get_subgraphs->_get_frequencies( $subgraphs, "give" );
     return;
 }
