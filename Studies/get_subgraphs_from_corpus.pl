@@ -17,6 +17,7 @@ use Graph::Directed;
 use Set::Object;
 use DBI;
 use Storable;
+use List::MoreUtils qw(first_index);
 
 use version; our $VERSION = qv('0.0.1');
 use Carp;    # carp croak
@@ -36,7 +37,6 @@ use localdata_client;
 # use Data::Dumper;    # Dumper
 
 # use List::Util;              # first max maxstr min minstr reduce shuffle sum
-# use List::MoreUtils;         # "the stuff missing in List::Util"
 use Log::Log4perl qw(:easy);    # TRACE DEBUG INFO WARN ERROR FATAL ALWAYS
 Log::Log4perl->easy_init($DEBUG);
 
@@ -63,6 +63,7 @@ sub get_subgraphs {
     my $s_id_handle   = $self->_get_attribute("s_id");
     my $indep_handle  = $self->_get_attribute("indep");
     my $outdep_handle = $self->_get_attribute("outdep");
+    my $root_handle = $self->_get_attribute("root");
     # $self->{"cqp"}->exec( sprintf "A = [word = \"%s\" %%c]", $word );
     $self->{"cqp"}->exec( sprintf "A = [lemma = \"%s\" %%c]", $word );
     my @matches      = $self->{"cqp"}->exec("tabulate A match");
@@ -75,12 +76,14 @@ SENTENCE:
         #last SENTENCE if($loop_counter > 200);
         DEBUG( sprintf "%d/%d", $loop_counter, scalar @matches );
 
-        #my $s_id = $s_id_handle->cpos2str($match);
+        my $s_id = $s_id_handle->cpos2str($match);
         #next unless ($s_id eq '4eca80480572f4e02707f2e6');
         #DEBUG( "$s_id\n");
         my ( $start, $end ) = $s_handle->cpos2struc2cpos($match);
         my @indeps  = $indep_handle->cpos2str( $start .. $end );
         my @outdeps = $outdep_handle->cpos2str( $start .. $end );
+        my $root = first_index { $_ eq 'root' } $root_handle->cpos2str( $start .. $end );
+	$root += $start;
         my %relation;
         my %reverse_relation;
         my $graph = Graph::Directed->new();
@@ -104,6 +107,11 @@ SENTENCE:
 
         # Skip unconnected graphs (necessary because of a bug in the current version of the Stanford Dependencies converter)
         next SENTENCE if ( ( $graph->vertices() > 1 ) && ( !$graph->is_weakly_connected() ) );
+
+        # check if all vertices are reachable from the root
+        my $graph_successors = Set::Object->new( $root, $graph->all_successors($root) );
+        my $graph_vertices   = Set::Object->new( $graph->vertices() );
+        next SENTENCE if ( $graph_successors->not_equal($graph_vertices) );
 
         my $subgraph = Graph::Directed->new();
         $subgraph->add_vertex($match);
@@ -150,6 +158,7 @@ sub _get_frequencies {
     );
     $dbh->disconnect();
     $self->{"localdata"}->add_freq_and_am( \@queue, $r1, $N, "${word}_subgraphs.sqlite" );
+    DEBUG "done";
     return;
 }
 
@@ -311,7 +320,7 @@ sub _emit {
         $outgoing = $outgoing ne q{} ? ">($outgoing)" : q{};
         $nodes{$vertex} = $incoming . $outgoing;
     }
-    @sorted_nodes = sort { $nodes{$a} cmp $nodes{$b} } keys %nodes;
+    @sorted_nodes = sort { $nodes{$a} cmp $nodes{$b} || $a <=> $b } keys %nodes;
     my $node_index;
     for ( my $i = 0; $i <= $#sorted_nodes; $i++ ) {
         my $node_1 = $sorted_nodes[$i];
@@ -367,9 +376,8 @@ __PACKAGE__->run(@ARGV) unless caller;
 sub run {
     my ( $class, @args ) = @_;
     my $get_subgraphs = connect_to_corpus($class);
-    my $subgraphs     = $get_subgraphs->get_subgraphs("give");
-
-    #my $subgraphs = Storable::retrieve('subgraphs.ref');
+    #my $subgraphs     = $get_subgraphs->get_subgraphs("give");
+    my $subgraphs = Storable::retrieve('subgraphs.ref');
     $get_subgraphs->_get_frequencies( $subgraphs, "give" );
     return;
 }

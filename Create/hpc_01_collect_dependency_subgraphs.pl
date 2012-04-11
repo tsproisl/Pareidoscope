@@ -88,6 +88,14 @@ OUTER: while ( my $match = <TAB> ) {
             next OUTER;
         }
 
+        # check if all vertices are reachable from the root
+        my $raw_graph_successors = Set::Object->new( $root, $raw_graph->all_successors($root) );
+        my $raw_graph_vertices   = Set::Object->new( $raw_graph->vertices() );
+        if ( $raw_graph_successors->not_equal($raw_graph_vertices) ) {
+            print STDERR sprintf( "Skipped %s (unreachable nodes)\n", $s_id );
+            next OUTER;
+        }
+
         # BFS
         $raw_to_graph{$root} = 0;
         $graph_to_raw{0} = $root;
@@ -252,7 +260,7 @@ OUTER: for ( my $i = 0; $i < 2**$number_of_elements; $i++ ) {
         my $ones = $binary =~ tr/1/1/;
         next if ( $ones < $min or $ones > $max );
         my @binary = split( //, $binary );
-	$powerset->insert( Set::Object->new( map( $elements[$_], grep( $binary[$_], ( 0 .. $#binary ) ) ) ) );
+        $powerset->insert( Set::Object->new( map( $elements[$_], grep( $binary[$_], ( 0 .. $#binary ) ) ) ) );
     }
     return $powerset;
 }
@@ -265,12 +273,13 @@ sub powerset_node_based {
 OUTER: for ( my $i = 0; $i < 2**$number_of_elements; $i++ ) {
         my $binary = sprintf( "%0${number_of_elements}b", $i );
         my $ones = $binary =~ tr/1/1/;
+
         #next if ( $ones < $min or $ones > $max );
-	next if ( $ones < $min );
+        next if ( $ones < $min );
         my @binary = split( //, $binary );
-	my $new_set = Set::Object->new( map( $elements[$_], grep( $binary[$_], ( 0 .. $#binary ) ) ) );
-	my $nodes = Set::Object->new( map {$_->[$index]} $new_set->elements() );
-        $powerset->insert( $new_set ) if ( $nodes->size() <= $max );
+        my $new_set = Set::Object->new( map( $elements[$_], grep( $binary[$_], ( 0 .. $#binary ) ) ) );
+        my $nodes = Set::Object->new( map { $_->[$index] } $new_set->elements() );
+        $powerset->insert($new_set) if ( $nodes->size() <= $max );
     }
     return $powerset;
 }
@@ -316,7 +325,7 @@ sub emit {
         $outgoing = $outgoing ne "" ? ">($outgoing)" : "";
         $nodes{$vertex} = $incoming . $outgoing;
     }
-    @sorted_nodes = sort { $nodes{$a} cmp $nodes{$b} } keys %nodes;
+    @sorted_nodes = sort { $nodes{$a} cmp $nodes{$b} || $a <=> $b } keys %nodes;
     for ( my $i = 0; $i <= $#sorted_nodes; $i++ ) {
         my $node_1 = $sorted_nodes[$i];
         for ( my $j = 0; $j <= $#sorted_nodes; $j++ ) {

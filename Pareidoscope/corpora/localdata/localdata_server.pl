@@ -117,7 +117,7 @@ sub scan_cached_records {
             $minindex = $middle + 1;
         }
     }
-    die("Error while reading n-grams") if ( $success < 0 );
+    die("Error while reading $index-gram " . join " ", unpack( "H*", $ngram ) ) if ( $success < 0 );
 }
 
 1;
@@ -201,6 +201,7 @@ sub handle_connection {
                     $c1        = $localdata->get_ngram_freq($packed_ngram);
                     $lastngram = $ngram;
                     $lastc1    = $c1;
+		    # print join " ", unpack( "H*", $packed_ngram ) . "\n";
                 }
                 my $g2 = &statistics::g( $o11, $r1, $c1, $n );
                 push( @outstring, "$c1,$g2" );
