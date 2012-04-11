@@ -7,6 +7,7 @@ use warnings;
 use open qw(:utf8 :std);
 use utf8;
 use English qw( -no_match_vars );
+
 #use Data::Dumper;
 
 use CWB;
@@ -28,7 +29,7 @@ Readonly my $UNLIMITED_NUMBER_OF_FIELDS  => -1;
 Readonly my $GET_ATTRIBUTE_USAGE         => 'Usage: $att_handle = $self->_get_attribute($name);';
 Readonly my $RELATION_IDS                => Storable::retrieve('dependency_relations.dump');
 Readonly my $FREQUENCY_THRESHOLD         => 2;
-Readonly my $N => 46014807335;
+Readonly my $N                           => 46_977_373_460;
 
 use localdata_client;
 
@@ -74,7 +75,7 @@ SENTENCE:
         DEBUG( sprintf "%d/%d", $loop_counter, scalar @matches );
 
         #my $s_id = $s_id_handle->cpos2str($match);
-	#next unless ($s_id eq '4eca80480572f4e02707f2e6');
+        #next unless ($s_id eq '4eca80480572f4e02707f2e6');
         #DEBUG( "$s_id\n");
         my ( $start, $end ) = $s_handle->cpos2struc2cpos($match);
         my @indeps  = $indep_handle->cpos2str( $start .. $end );
@@ -185,24 +186,24 @@ sub _enumerate_connected_subgraphs_recursive {
         }
     }
 
-    my $first_powerset = _cross_set( _powerset_node_based( $out_edges, 0, $MAXIMUM_SUBGRAPH_SIZE - $subgraph->vertices ), _powerset_node_based( $in_edges, 0, $MAXIMUM_SUBGRAPH_SIZE - $subgraph->vertices ), $MAXIMUM_SUBGRAPH_SIZE - $subgraph->vertices );
+    my $first_powerset = _cross_set( _powerset_node_based( $out_edges, 0, $MAXIMUM_SUBGRAPH_SIZE - $subgraph->vertices, 1 ), _powerset_node_based( $in_edges, 0, $MAXIMUM_SUBGRAPH_SIZE - $subgraph->vertices, 0 ), $MAXIMUM_SUBGRAPH_SIZE - $subgraph->vertices );
 
-    foreach my $set ( $first_powerset->elements ) {
-        next if ( $set->size == 0 );
-        my $new_nodes = Set::Object::intersection( $neighbours, Set::Object->new( map {@{$_}} $set->elements ) );
+    foreach my $set ( $first_powerset->elements() ) {
+        next if ( $set->size() == 0 );
+        my $new_nodes = Set::Object::intersection( $neighbours, Set::Object->new( map { @{$_} } $set->elements() ) );
 
         # all combinations of edges between the newly added nodes
         my $edges        = Set::Object->new();
         my $string_edges = Set::Object->new();
         foreach my $new_node ( $new_nodes->elements() ) {
-            $edges->insert( grep {$new_nodes->contains( $_->[1] )} $graph->edges_from($new_node) );
+            $edges->insert( grep { $new_nodes->contains( $_->[1] ) } $graph->edges_from($new_node) );
         }
         $string_edges->insert( map { $_->[0] . q{-} . $_->[1] } $edges->elements() );
 
-        my $second_powerset = _powerset_edges( $edges, 0, $edges->size );
-        foreach my $new_set ( $second_powerset->elements ) {
+        my $second_powerset = _powerset_edges( $edges, 0, $edges->size() );
+        foreach my $new_set ( $second_powerset->elements() ) {
             my $local_subgraph = $subgraph->copy_graph;
-            $local_subgraph->add_edges( $set->elements, $new_set->elements );
+            $local_subgraph->add_edges( $set->elements(), $new_set->elements() );
             _emit( $match, $local_subgraph, $relation_ref, $result_ref );
 
             #if ( $local_subgraph->vertices < $MAXIMUM_SUBGRAPH_SIZE ) {
@@ -219,15 +220,15 @@ sub _enumerate_connected_subgraphs_recursive {
 sub _cross_set {
     my ( $set1, $set2, $max ) = @_;
     my $cross_set = Set::Object->new();
-    foreach my $e1 ( $set1->elements ) {
-        foreach my $e2 ( $set2->elements ) {
+    foreach my $e1 ( $set1->elements() ) {
+        foreach my $e2 ( $set2->elements() ) {
             my $e3 = Set::Object::union( $e1, $e2 );
-            if ( $e3->size <= $max ) {
+            if ( $e3->size() <= $max ) {
                 $cross_set->insert($e3);
             }
             else {
-                my $nodes = Set::Object->new( map( $_->[1], $e1->elements ), map( $_->[0], $e2->elements ) );
-                $cross_set->insert($e3) if ( $nodes->size <= $max );
+                my $nodes = Set::Object->new( map { $_->[1] } $e1->elements(), map { $_->[0] } $e2->elements() );
+                $cross_set->insert($e3) if ( $nodes->size() <= $max );
             }
         }
     }
@@ -240,11 +241,11 @@ sub _powerset_edges {
     my $powerset           = Set::Object->new();
     my $number_of_elements = $set->size();
 OUTER: for ( my $i = 0; $i < 2**$number_of_elements; $i++ ) {
-        my $binary = sprintf( "%0${number_of_elements}b", $i );
+        my $binary = sprintf "%0${number_of_elements}b", $i;
         my $ones = $binary =~ tr/1/1/;
         next if ( $ones < $min or $ones > $max );
-        my @binary = split( //, $binary );
-        $powerset->insert( Set::Object->new( map( $elements[$_], grep( $binary[$_], ( 0 .. $#binary ) ) ) ) );
+        my @binary = split //xms, $binary;
+        $powerset->insert( Set::Object->new( map { $elements[$_] } grep { $binary[$_] } ( 0 .. $#binary ) ) );
     }
     return $powerset;
 }
@@ -255,14 +256,15 @@ sub _powerset_node_based {
     my $powerset           = Set::Object->new();
     my $number_of_elements = $set->size();
 OUTER: for ( my $i = 0; $i < 2**$number_of_elements; $i++ ) {
-        my $binary = sprintf( "%0${number_of_elements}b", $i );
+        my $binary = sprintf "%0${number_of_elements}b", $i;
         my $ones = $binary =~ tr/1/1/;
+
         #next if ( $ones < $min or $ones > $max );
-	next if ( $ones < $min );
-        my @binary = split( //, $binary );
-	my $new_set = Set::Object->new( map( $elements[$_], grep( $binary[$_], ( 0 .. $#binary ) ) ) );
-	my $nodes = Set::Object->new( map {$_->[$index]} $new_set->elements() );
-        $powerset->insert( $new_set ) if ( $nodes->size() <= $max );
+        next if ( $ones < $min );
+        my @binary = split //xms, $binary;
+        my $new_set = Set::Object->new( map { $elements[$_] } grep { $binary[$_] } ( 0 .. $#binary ) );
+        my $nodes = Set::Object->new( map { $_->[$index] } $new_set->elements() );
+        $powerset->insert($new_set) if ( $nodes->size() <= $max );
     }
     return $powerset;
 }
@@ -276,36 +278,36 @@ sub _emit {
     my @sorted_nodes;
     my @emit_structure;
     foreach my $edge ( $subgraph->edges() ) {
-        my ( $start, $end ) = @$edge;
+        my ( $start, $end ) = @{$edge};
         my $relation = $relation_ref->{$start}->{$end};
         $edges{$start}->{$end}         = $relation;
         $incoming_edge{$end}->{$start} = $relation;
-        push( @list_representation, sprintf( "%s(%d, %d)", $relation, $start, $end ) );
+        push @list_representation, sprintf( "%s(%d, %d)", $relation, $start, $end);
     }
     foreach my $vertex ( $subgraph->vertices() ) {
         my ( @incoming, @outgoing );
 
         # incoming edges
         foreach my $local_vertex ( keys %{ $incoming_edge{$vertex} } ) {
-            my $ins  = join( ",", sort map( $edges{$_}->{$local_vertex}, keys %{ $incoming_edge{$local_vertex} } ) );
-            my $outs = join( ",", sort map( $edges{$local_vertex}->{$_}, keys %{ $edges{$local_vertex} } ) );
-            $ins  = $ins  ne "" ? "<($ins)"  : "";
-            $outs = $outs ne "" ? ">($outs)" : "";
-            push( @incoming, sprintf( "%s(%s%s)", $edges{$local_vertex}->{$vertex}, $ins, $outs ) );
+            my $ins  = join q{,}, sort map {$edges{$_}->{$local_vertex}} keys %{ $incoming_edge{$local_vertex} };
+            my $outs = join q{,}, sort map {$edges{$local_vertex}->{$_}} keys %{ $edges{$local_vertex} };
+            $ins  = $ins  ne q{} ? "<($ins)"  : q{};
+            $outs = $outs ne q{} ? ">($outs)" : q{};
+            push @incoming, sprintf( "%s(%s%s)", $edges{$local_vertex}->{$vertex}, $ins, $outs );
         }
 
         # outgoing edges
         foreach my $local_vertex ( keys %{ $edges{$vertex} } ) {
-            my $ins  = join( ",", sort map( $edges{$_}->{$local_vertex}, keys %{ $incoming_edge{$local_vertex} } ) );
-            my $outs = join( ",", sort map( $edges{$local_vertex}->{$_}, keys %{ $edges{$local_vertex} } ) );
-            $ins  = $ins  ne "" ? "<($ins)"  : "";
-            $outs = $outs ne "" ? ">($outs)" : "";
-            push( @outgoing, sprintf( "%s(%s%s)", $edges{$vertex}->{$local_vertex}, $ins, $outs ) );
+            my $ins  = join q{,}, sort map {$edges{$_}->{$local_vertex}} keys %{ $incoming_edge{$local_vertex} };
+            my $outs = join q{,}, sort map {$edges{$local_vertex}->{$_}} keys %{ $edges{$local_vertex} };
+            $ins  = $ins  ne q{} ? "<($ins)"  : q{};
+            $outs = $outs ne q{} ? ">($outs)" : q{};
+            push @outgoing, sprintf( "%s(%s%s)", $edges{$vertex}->{$local_vertex}, $ins, $outs );
         }
-        my $incoming = join( ",", sort @incoming );
-        my $outgoing = join( ",", sort @outgoing );
-        $incoming = $incoming ne "" ? "<($incoming)" : "";
-        $outgoing = $outgoing ne "" ? ">($outgoing)" : "";
+        my $incoming = join q{,}, sort @incoming;
+        my $outgoing = join q{,}, sort @outgoing;
+        $incoming = $incoming ne q{} ? "<($incoming)" : q{};
+        $outgoing = $outgoing ne q{} ? ">($outgoing)" : q{};
         $nodes{$vertex} = $incoming . $outgoing;
     }
     @sorted_nodes = sort { $nodes{$a} cmp $nodes{$b} } keys %nodes;
@@ -319,22 +321,15 @@ sub _emit {
             my $node_2 = $sorted_nodes[$j];
             if ( $edges{$node_1}->{$node_2} ) {
                 $emit_structure[$i]->[$j] = $RELATION_IDS->{ $edges{$node_1}->{$node_2} };
-                die( "Self-loop: " . join( ", ", @list_representation ) ) if ( $i == $j );
+                croak "Self-loop: " . join( ", ", @list_representation ) if ( $i == $j );
             }
             else {
                 $emit_structure[$i]->[$j] = 0;
             }
         }
     }
-
-    #printf OUT ( "%s\t%d\n", join( " ", map( join( " ", @$_ ), @emit_structure ) ), scalar(@emit_structure) );
-    #printf ( "%s\t%d\n", join( " ", map( join( " ", @$_ ), @emit_structure ) ), scalar(@emit_structure) );
-    #$result_ref->[ scalar @emit_structure ]->{ join " ", map { join " ", @$_ } @emit_structure }->{$node_index}++;
-    #my @bins = pack "(S*)>", map {@$_} @emit_structure;
-    #my @strings = join " ", map { join " ", @$_ } @emit_structure;
-    #DEBUG join( " ", map { join " ", @$_ } @emit_structure) . ": " . pack( "(S*)>", map {@$_} @emit_structure) . "\n";
-    #DEBUG Dumper(\%nodes) if (join( " ", map {@$_} @emit_structure ) eq '0 0 0 0 0 0 0 0 24 144 0 0 143 0 0 0');
-    $result_ref->[ scalar @emit_structure ]->{ unpack( "H*", pack( "(S*)>", map {@$_} @emit_structure ) ) }->{$node_index}++;
+    $result_ref->[ scalar @emit_structure ]->{ unpack "H*", pack( "(S*)>", map {@{$_}} @emit_structure ) }->{$node_index}++;
+    return;
 }
 
 sub _get_attribute {
@@ -371,9 +366,10 @@ __PACKAGE__->run(@ARGV) unless caller;
 sub run {
     my ( $class, @args ) = @_;
     my $get_subgraphs = connect_to_corpus($class);
-    #my $subgraphs     = $get_subgraphs->get_subgraphs("give");
-    my $subgraphs = Storable::retrieve('subgraphs.ref');
-    $get_subgraphs->_get_frequencies( $subgraphs, "give" );
+    my $subgraphs     = $get_subgraphs->get_subgraphs("resemblance");
+
+    #my $subgraphs = Storable::retrieve('subgraphs.ref');
+    $get_subgraphs->_get_frequencies( $subgraphs, "resemblance" );
     return;
 }
 

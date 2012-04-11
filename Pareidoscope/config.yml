@@ -1,4 +1,4 @@
-B# This is the main configuration file of your Dancer app
+# This is the main configuration file of your Dancer app
 # env-related settings should go to environments/$env.yml
 # all the settings in this file will be loaded at Dancer's startup.
 
@@ -72,7 +72,7 @@ corpora:
       subgraph_size: 5
       pos_ngrams: 9037677843
       chunk_ngrams: 113826088
-      subgraphs: 46014807335
+      subgraphs: 46977373460
 #      localdata: "/opt/pareidoscope/oanc"
       localdata: "oanc"
       machines:

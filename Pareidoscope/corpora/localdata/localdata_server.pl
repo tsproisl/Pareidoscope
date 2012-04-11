@@ -49,7 +49,7 @@ sub get_ngram_freq {
     my ( $self, $ngram ) = @_;
     my $length = length($ngram);
     my $index = $self->{"file"} eq "subgraphs" ? sqrt($length / 2) : $length;
-    print "ngram: " . join(" ", unpack('H*', $ngram)) . ", length: $length, index: $index\n";
+    # print "ngram: " . join(" ", unpack('H*', $ngram)) . ", length: $length, index: $index\n";
     return $self->scan_cached_records($ngram) if ( $self->{"records"}->[$index] and ( $self->{"firstrecords"}->[$index] le $ngram ) and ( $self->{"lastrecords"}->[$index] ge $ngram ) );
     my $max      = scalar( @{ $self->{"ngramidxs"}->[$index] } ) / 2 - 1;
     my $maxindex = $max;
@@ -80,7 +80,7 @@ sub get_ngram_freq {
     }
 
     die( "N-gram not found: hex " . join( " ", unpack( "H*", $ngram ) ) . "\n" ) if ( $success < 0 );
-    print "index: $index\n";
+    # print "index: $index\n";
     my $record;
     flock( $self->{"NGDs"}->[$index], LOCK_EX );
     seek( $self->{"NGDs"}->[$index], $success, 0 ) or die("Error while seeking index file");
@@ -102,7 +102,7 @@ sub scan_cached_records {
     my $minindex = 0;
     my $success  = -1;
     while ( $success < 0 and $minindex <= $maxindex ) {
-	print "minindex: $minindex, maxindex: $maxindex\n";
+	# print "minindex: $minindex, maxindex: $maxindex\n";
         my $middle = POSIX::floor( $minindex + ( ( $maxindex - $minindex ) / 2 ) );
         my $start = $middle * ( $length + 4 );
         my $record = substr( $self->{"records"}->[$index], $start, $length );
