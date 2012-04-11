@@ -127,7 +127,7 @@ OUTER: while ( my $match = <TAB> ) {
         }
 
         # get all connected subgraphs
-        enumerate_connected_subgraphs( $graph, $max_n, \%relations, \%reverse_relations );
+        enumerate_connected_subgraphs( $graph, $max_n, \%relations, \%reverse_relations, \%graph_to_raw );
     }
     close(TAB) or die("Cannot close $dependencies: $!");
 }
@@ -150,27 +150,27 @@ OUTER: while ( my $match = <TAB> ) {
 # }
 
 sub enumerate_connected_subgraphs {
-    my ( $graph, $max_n, $relations, $reverse_relations ) = @_;
+    my ( $graph, $max_n, $relations, $reverse_relations, $graph_to_raw_ref ) = @_;
     foreach my $node ( sort { $b <=> $a } $graph->vertices ) {
 
         # emit node $i
         my $subgraph = Graph::Directed->new;
         $subgraph->add_vertex($node);
-        &emit( $subgraph, $relations );
+        &emit( $subgraph, $relations, $graph_to_raw_ref );
 
         #my $prohibited_nodes = Set::Object->new();
         #$prohibited_nodes->insert( 0 .. $node );
         #&enumerate_connected_subgraphs_recursive( $graph, $subgraph, $prohibited_nodes, $max_n, $relations, $reverse_relations );
         my $prohibited_edges = Set::Object->new();
         $prohibited_edges->insert( map( $_->[0] . '-' . $_->[1], map { $graph->edges_at($_) } ( 0 .. $node - 1 ) ) );
-        &enumerate_connected_subgraphs_recursive( $graph, $subgraph, $prohibited_edges, $max_n, $relations, $reverse_relations );
+        &enumerate_connected_subgraphs_recursive( $graph, $subgraph, $prohibited_edges, $max_n, $relations, $reverse_relations, $graph_to_raw_ref );
     }
 }
 
 sub enumerate_connected_subgraphs_recursive {
 
     #my ( $graph, $subgraph, $prohibited_nodes, $max_n, $relations, $reverse_relations ) = @_;
-    my ( $graph, $subgraph, $prohibited_edges, $max_n, $relations, $reverse_relations ) = @_;
+    my ( $graph, $subgraph, $prohibited_edges, $max_n, $relations, $reverse_relations, $graph_to_raw_ref ) = @_;
 
     # determine all edges to neighbouring nodes that are not
     # prohibited
@@ -220,11 +220,11 @@ sub enumerate_connected_subgraphs_recursive {
         foreach my $new_set ( $second_powerset->elements ) {
             my $local_subgraph = $subgraph->copy_graph;
             $local_subgraph->add_edges( $set->elements, $new_set->elements );
-            &emit( $local_subgraph, $relations );
+            &emit( $local_subgraph, $relations, $graph_to_raw_ref );
             if ( $local_subgraph->vertices < $max_n ) {
 
                 #&enumerate_connected_subgraphs_recursive( $graph, $local_subgraph, Set::Object::union( $prohibited_nodes, $neighbours ), $max_n, $relations, $reverse_relations );
-                &enumerate_connected_subgraphs_recursive( $graph, $local_subgraph, Set::Object::union( $prohibited_edges, $neighbouring_edges, $string_edges ), $max_n, $relations, $reverse_relations );
+                &enumerate_connected_subgraphs_recursive( $graph, $local_subgraph, Set::Object::union( $prohibited_edges, $neighbouring_edges, $string_edges ), $max_n, $relations, $reverse_relations, $graph_to_raw_ref );
             }
         }
     }
@@ -291,7 +291,7 @@ OUTER: for ( my $i = 0; $i < 2**$number_of_elements; $i++ ) {
 }
 
 sub emit {
-    my ( $subgraph, $relations ) = @_;
+    my ( $subgraph, $relations, $graph_to_raw_ref ) = @_;
     my %edges;
     my %incoming_edge;
     my @list_representation;
@@ -331,7 +331,7 @@ sub emit {
         $outgoing = $outgoing ne "" ? ">($outgoing)" : "";
         $nodes{$vertex} = $incoming . $outgoing;
     }
-    @sorted_nodes = sort { $nodes{$a} cmp $nodes{$b} || $a <=> $b } keys %nodes;
+    @sorted_nodes = sort { $nodes{$a} cmp $nodes{$b} || $graph_to_raw_ref->{$a} <=> $graph_to_raw_ref->{$b} } keys %nodes;
     for ( my $i = 0; $i <= $#sorted_nodes; $i++ ) {
         my $node_1 = $sorted_nodes[$i];
         for ( my $j = 0; $j <= $#sorted_nodes; $j++ ) {
