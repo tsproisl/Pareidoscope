@@ -13,6 +13,7 @@ use DBI;
 use List::Util qw(max min);
 use List::MoreUtils;
 use localdata_client;
+use collectsubgraphs;
 
 #-------------------
 # SINGLE ITEM QUERY
@@ -103,7 +104,10 @@ sub single_item_query {
             params->{'w1'}  = $wfline->[1];
             params->{'tt1'} = $old_tt1;
         }
-        return &_strucn( $data, $freq );
+        return param('return_type') eq 'pos'   ? _strucn( $data, $freq )
+	     : param('return_type') eq 'chunk' ? _strucn( $data, $freq )
+	     : param('return_type') eq 'dep'   ? collectsubgraphs::get_subgraphs( $data, $freq )
+	     ;
     };
     $return_vars->{"call_strucn"} = $call_strucn;
     return $return_vars;
