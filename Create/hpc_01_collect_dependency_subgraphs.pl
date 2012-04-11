@@ -41,9 +41,9 @@ OUTER: while ( my $match = <TAB> ) {
         my @outdeps = split( / /, $outdeps );
         my @roots   = split( / /, $roots );
         my @cposs   = split( / /, $cposs );
-        my $root    = $cposs[0];
         my $raw_graph = Graph::Directed->new;
         my $graph     = Graph::Directed->new;
+        my $root;
         my ( %raw_relations, %relations, %reverse_relations );
         my ( %raw_to_graph, %graph_to_raw );
         my $number_of_nodes_with_relations;
@@ -82,6 +82,12 @@ OUTER: while ( my $match = <TAB> ) {
             }
         }
 
+        # Skip rootless sentences
+        if ( !defined $root ) {
+            print STDERR sprintf( "Skipped %s (rootless)\n", $s_id );
+            next OUTER;
+        }
+
         # Skip unconnected graphs (necessary because of a bug in the current version of the Stanford Dependencies converter)
         if ( ( $raw_graph->vertices() > 1 ) && ( !$raw_graph->is_weakly_connected() ) ) {
             print STDERR sprintf( "Skipped %s (not connected)\n", $s_id );
@@ -90,7 +96,7 @@ OUTER: while ( my $match = <TAB> ) {
 
         # check if all vertices are reachable from the root
         my $raw_graph_successors = Set::Object->new( $root, $raw_graph->all_successors($root) );
-        my $raw_graph_vertices   = Set::Object->new( $raw_graph->vertices() );
+        my $raw_graph_vertices = Set::Object->new( $raw_graph->vertices() );
         if ( $raw_graph_successors->not_equal($raw_graph_vertices) ) {
             print STDERR sprintf( "Skipped %s (unreachable nodes)\n", $s_id );
             next OUTER;
