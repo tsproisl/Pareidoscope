@@ -63,7 +63,8 @@ sub get_subgraphs {
     my $s_id_handle   = $self->_get_attribute("s_id");
     my $indep_handle  = $self->_get_attribute("indep");
     my $outdep_handle = $self->_get_attribute("outdep");
-    $self->{"cqp"}->exec( sprintf "A = [word = \"%s\" %%c]", $word );
+    # $self->{"cqp"}->exec( sprintf "A = [word = \"%s\" %%c]", $word );
+    $self->{"cqp"}->exec( sprintf "A = [lemma = \"%s\" %%c]", $word );
     my @matches      = $self->{"cqp"}->exec("tabulate A match");
     my $loop_counter = 0;
 
@@ -227,7 +228,7 @@ sub _cross_set {
                 $cross_set->insert($e3);
             }
             else {
-                my $nodes = Set::Object->new( map { $_->[1] } $e1->elements(), map { $_->[0] } $e2->elements() );
+                my $nodes = Set::Object->new( map( $_->[1], $e1->elements()), map( $_->[0], $e2->elements()) );
                 $cross_set->insert($e3) if ( $nodes->size() <= $max );
             }
         }
@@ -366,10 +367,10 @@ __PACKAGE__->run(@ARGV) unless caller;
 sub run {
     my ( $class, @args ) = @_;
     my $get_subgraphs = connect_to_corpus($class);
-    my $subgraphs     = $get_subgraphs->get_subgraphs("resemblance");
+    my $subgraphs     = $get_subgraphs->get_subgraphs("give");
 
     #my $subgraphs = Storable::retrieve('subgraphs.ref');
-    $get_subgraphs->_get_frequencies( $subgraphs, "resemblance" );
+    $get_subgraphs->_get_frequencies( $subgraphs, "give" );
     return;
 }
 
