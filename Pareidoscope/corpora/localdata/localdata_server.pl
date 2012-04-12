@@ -8,7 +8,6 @@ use strict;
 use Fcntl ':flock';
 use Storable;
 use POSIX qw();
-use Data::Dumper;
 use MIME::Base64 qw();
 
 sub init {
@@ -32,7 +31,7 @@ sub init {
         "firstrecords" => [],
         "lastrecords"  => [],
         "ngramidxs"    => \@ngramidxs,
-	"file"         => $file
+        "file"         => $file
     };
     bless( $self, $class );
     return $self;
@@ -40,15 +39,16 @@ sub init {
 
 sub fini {
     my ($self) = @_;
-    for (my $i = 1; $i < @{$self->{"NGDs"}}; $i++) {
-	close($self->{"NGDs"}->[$i]) or die("Cannot close file: $!");
+    for ( my $i = 1; $i < @{ $self->{"NGDs"} }; $i++ ) {
+        close( $self->{"NGDs"}->[$i] ) or die("Cannot close file: $!");
     }
 }
 
 sub get_ngram_freq {
     my ( $self, $ngram ) = @_;
     my $length = length($ngram);
-    my $index = $self->{"file"} eq "subgraphs" ? sqrt($length / 2) : $length;
+    my $index = $self->{"file"} eq "subgraphs" ? sqrt( $length / 2 ) : $length;
+
     # print "ngram: " . join(" ", unpack('H*', $ngram)) . ", length: $length, index: $index\n";
     return $self->scan_cached_records($ngram) if ( $self->{"records"}->[$index] and ( $self->{"firstrecords"}->[$index] le $ngram ) and ( $self->{"lastrecords"}->[$index] ge $ngram ) );
     my $max      = scalar( @{ $self->{"ngramidxs"}->[$index] } ) / 2 - 1;
@@ -80,6 +80,7 @@ sub get_ngram_freq {
     }
 
     die( "N-gram not found: hex " . join( " ", unpack( "H*", $ngram ) ) . "\n" ) if ( $success < 0 );
+
     # print "index: $index\n";
     my $record;
     flock( $self->{"NGDs"}->[$index], LOCK_EX );
@@ -97,12 +98,13 @@ sub get_ngram_freq {
 sub scan_cached_records {
     my ( $self, $ngram ) = @_;
     my $length   = length($ngram);
-    my $index = $self->{"file"} eq "subgraphs" ? sqrt($length / 2) : $length;
+    my $index    = $self->{"file"} eq "subgraphs" ? sqrt( $length / 2 ) : $length;
     my $maxindex = length( $self->{"records"}->[$index] ) / ( $length + 4 ) - 1;
     my $minindex = 0;
     my $success  = -1;
     while ( $success < 0 and $minindex <= $maxindex ) {
-	# print "minindex: $minindex, maxindex: $maxindex\n";
+
+        # print "minindex: $minindex, maxindex: $maxindex\n";
         my $middle = POSIX::floor( $minindex + ( ( $maxindex - $minindex ) / 2 ) );
         my $start = $middle * ( $length + 4 );
         my $record = substr( $self->{"records"}->[$index], $start, $length );
@@ -117,7 +119,7 @@ sub scan_cached_records {
             $minindex = $middle + 1;
         }
     }
-    die("Error while reading $index-gram " . join " ", unpack( "H*", $ngram ) ) if ( $success < 0 );
+    die( "Error while reading $index-gram " . join " ", unpack( "H*", $ngram ) ) if ( $success < 0 );
 }
 
 1;
@@ -193,15 +195,16 @@ sub handle_connection {
             foreach my $pair ( split( /,/, $input ) ) {
                 my ( $ngram, $o11 ) = split( /:/, $pair );
                 my $c1;
-                if ( $ngram eq $lastngram ) {
-                    $c1 = $lastc1;
-                }
-                else {
+		if ($ngram eq $lastngram) {
+		    $c1 = $lastc1;
+		}
+		else {
                     my $packed_ngram = MIME::Base64::decode($ngram);
                     $c1        = $localdata->get_ngram_freq($packed_ngram);
-                    $lastngram = $ngram;
-                    $lastc1    = $c1;
-		    # print join " ", unpack( "H*", $packed_ngram ) . "\n";
+		    $lastc1 = $c1;
+		    $lastngram = $ngram;
+
+                    # print join " ", unpack( "H*", $packed_ngram ) . "\n";
                 }
                 my $g2 = &statistics::g( $o11, $r1, $c1, $n );
                 push( @outstring, "$c1,$g2" );
