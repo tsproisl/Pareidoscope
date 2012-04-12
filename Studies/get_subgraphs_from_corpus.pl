@@ -83,7 +83,7 @@ SENTENCE:
         my @indeps  = $indep_handle->cpos2str( $start .. $end );
         my @outdeps = $outdep_handle->cpos2str( $start .. $end );
         my $root = first_index { $_ eq 'root' } $root_handle->cpos2str( $start .. $end );
-	$root += $start;
+	$root += $start if ( defined $root );
         my %relation;
         my %reverse_relation;
         my $graph = Graph::Directed->new();
@@ -104,6 +104,9 @@ SENTENCE:
                 $graph->add_edge( $cpos, $target );
             }
         }
+
+        # Skip rootless sentences
+        next SENTENCE if ( !defined $root );
 
         # Skip unconnected graphs (necessary because of a bug in the current version of the Stanford Dependencies converter)
         next SENTENCE if ( ( $graph->vertices() > 1 ) && ( !$graph->is_weakly_connected() ) );

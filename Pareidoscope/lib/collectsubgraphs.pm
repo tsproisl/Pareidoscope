@@ -28,6 +28,7 @@ sub get_subgraphs {
     my $s_id_handle   = $self->_get_attribute("s_id");
     my $indep_handle  = $self->_get_attribute("indep");
     my $outdep_handle = $self->_get_attribute("outdep");
+    my $root_handle = $self->_get_attribute("root");
     $self->{"cqp"}->exec( sprintf "A = [word = \"%s\" %%c]", $word_or_lemma );
     my @matches      = $self->{"cqp"}->exec("tabulate A match");
     my $loop_counter = 0;
@@ -38,6 +39,8 @@ SENTENCE:
         my ( $start, $end ) = $s_handle->cpos2struc2cpos($match);
         my @indeps  = $indep_handle->cpos2str( $start .. $end );
         my @outdeps = $outdep_handle->cpos2str( $start .. $end );
+        my $root = first_index { $_ eq 'root' } $root_handle->cpos2str( $start .. $end );
+	$root += $start if ( defined $root );
         my %relation;
         my %reverse_relation;
         my $graph = Graph::Directed->new();
@@ -59,8 +62,16 @@ SENTENCE:
             }
         }
 
+        # Skip rootless sentences
+        next SENTENCE if ( !defined $root );
+
         # Skip unconnected graphs (necessary because of a bug in the current version of the Stanford Dependencies converter)
         next SENTENCE if ( ( $graph->vertices() > 1 ) && ( !$graph->is_weakly_connected() ) );
+
+        # check if all vertices are reachable from the root
+        my $graph_successors = Set::Object->new( $root, $graph->all_successors($root) );
+        my $graph_vertices   = Set::Object->new( $graph->vertices() );
+        next SENTENCE if ( $graph_successors->not_equal($graph_vertices) );
 
         my $subgraph = Graph::Directed->new();
         $subgraph->add_vertex($match);
@@ -264,7 +275,7 @@ sub _emit {
         $outgoing = $outgoing ne q{} ? ">($outgoing)" : q{};
         $nodes{$vertex} = $incoming . $outgoing;
     }
-    @sorted_nodes = sort { $nodes{$a} cmp $nodes{$b} } keys %nodes;
+    @sorted_nodes = sort { $nodes{$a} cmp $nodes{$b} || $a <=> $b } keys %nodes;
     my $node_index;
     for ( my $i = 0; $i <= $#sorted_nodes; $i++ ) {
         my $node_1 = $sorted_nodes[$i];
