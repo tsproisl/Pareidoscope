@@ -31,7 +31,8 @@ sub init {
         "firstrecords" => [],
         "lastrecords"  => [],
         "ngramidxs"    => \@ngramidxs,
-        "file"         => $file
+        "file"         => $file,
+        "lastsuccess"  => [],
     };
     bless( $self, $class );
     return $self;
@@ -80,6 +81,7 @@ sub get_ngram_freq {
     }
 
     die( "N-gram not found: hex " . join( " ", unpack( "H*", $ngram ) ) . "\n" ) if ( $success < 0 );
+    $self->{"lastsuccess"}->[$index] = $success;
 
     # print "index: $index\n";
     my $record;
@@ -110,7 +112,7 @@ sub scan_cached_records {
         my $record = substr( $self->{"records"}->[$index], $start, $length );
         if ( $ngram eq $record ) {
             $success = unpack( "L", substr( $self->{"records"}->[$index], $start + $length, 4 ) );
-            return ($success);
+            return ( $success, ( $self->{"lastsuccess"}->[$index] + $start ) / ( $length + 4 ) );
         }
         elsif ( $ngram lt $record ) {
             $maxindex = $middle - 1;
@@ -181,33 +183,42 @@ sub handle_connection {
         return;
     }
     $file_prefix = substr( $file_prefix, 4 );
-    my $localdata = localdata->init( $dir, $file_prefix );
-    my $lastngram = "";
-    my $lastc1    = 0;
+    my $localdata    = localdata->init( $dir, $file_prefix );
+    my $lastngram    = "";
+    my $lastc1       = -1;
+    my $lastindex = -1;
     while ( my $input = <$socket> ) {
 
         #print $input;
         chomp($input);
-        if ( $input =~ s/^gngf:(\d+):(\d+):,// ) {
-            my $r1 = $1;
-            my $n  = $2;
+        if ( $input =~ s/^(gng[fi]):(\d+):(\d+):,// ) {
+            my $mode = $1;
+            my $r1   = $2;
+            my $n    = $3;
             my @outstring;
             foreach my $pair ( split( /,/, $input ) ) {
                 my ( $ngram, $o11 ) = split( /:/, $pair );
-                my $c1;
-		if ($ngram eq $lastngram) {
-		    $c1 = $lastc1;
-		}
-		else {
+                my ( $c1, $index );
+                if ( $ngram eq $lastngram ) {
+                    $c1    = $lastc1;
+                    $index = $lastindex;
+                }
+                else {
                     my $packed_ngram = MIME::Base64::decode($ngram);
-                    $c1        = $localdata->get_ngram_freq($packed_ngram);
-		    $lastc1 = $c1;
-		    $lastngram = $ngram;
+                    ( $c1, $index ) = $localdata->get_ngram_freq($packed_ngram);
+                    $lastc1    = $c1;
+                    $lastindex = $index;
+                    $lastngram = $ngram;
 
                     # print join " ", unpack( "H*", $packed_ngram ) . "\n";
                 }
-                my $g2 = &statistics::g( $o11, $r1, $c1, $n );
-                push( @outstring, "$c1,$g2" );
+                if ( $mode eq 'gngf' ) {
+                    my $g2 = &statistics::g( $o11, $r1, $c1, $n );
+                    push( @outstring, "$c1,$g2" );
+                }
+                elsif ( $mode eq 'gngi' ) {
+                    push( @outstring, $index );
+                }
             }
             my $outstr = join( ",", @outstring ) . "\n";
             print $output $outstr;
