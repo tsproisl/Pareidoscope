@@ -72,7 +72,7 @@ corpora:
       subgraph_size: 5
       pos_ngrams: 9037677843
       chunk_ngrams: 113826088
-      subgraphs: 46977373460
+      subgraphs: 46975306715
 #      localdata: "/opt/pareidoscope/oanc"
       localdata: "oanc"
       machines:
