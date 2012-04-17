@@ -124,6 +124,19 @@ sub scan_cached_records {
     die( "Error while reading $index-gram " . join " ", unpack( "H*", $ngram ) ) if ( $success < 0 );
 }
 
+sub get_ngram_by_index {
+    my ( $self, $position, $index ) = @_;
+    my $length = $self->{"file"} eq "subgraphs" ? ( $index**2 ) * 2 : $index;
+    my $record;
+    flock( $self->{"NGDs"}->[$index], LOCK_EX );
+    seek( $self->{"NGDs"}->[$index], $position * ( $length + 4 ), 0 ) or die("Error while seeking index file");
+    my $chrs = read( $self->{"NGDs"}->[$index], $record, $length + 4 );
+    flock( $self->{"NGDs"}->[$index], LOCK_UN );
+    my $ngram = substr $record, 0, $length;
+    my $c1 = unpack "L", substr( $record, $length, 4 );
+    return ( $c1, $ngram );
+}
+
 1;
 
 package main;
@@ -183,14 +196,17 @@ sub handle_connection {
         return;
     }
     $file_prefix = substr( $file_prefix, 4 );
-    my $localdata    = localdata->init( $dir, $file_prefix );
-    my $lastngram    = "";
-    my $lastc1       = -1;
-    my $lastindex = -1;
+    my $localdata  = localdata->init( $dir, $file_prefix );
+    my $lastngram  = "";
+    my $lastc1     = -1;
+    my $lastindex  = -1;
+    my $lastlength = -1;
     while ( my $input = <$socket> ) {
 
         #print $input;
         chomp($input);
+
+        # {g}et {n}-{g}ram {f}requency/{i}ndex
         if ( $input =~ s/^(gng[fi]):(\d+):(\d+):,// ) {
             my $mode = $1;
             my $r1   = $2;
@@ -217,8 +233,33 @@ sub handle_connection {
                     push( @outstring, "$c1,$g2" );
                 }
                 elsif ( $mode eq 'gngi' ) {
-                    push( @outstring, $index );
+                    push( @outstring, "$c1,$index" );
                 }
+            }
+            my $outstr = join( ",", @outstring ) . "\n";
+            print $output $outstr;
+        }
+
+        # {g}et {n}-{g}ram {b}y {i}ndex
+        elsif ( $input =~ s/^gngbi:,// ) {
+            my @outstring;
+            foreach my $pair ( split /,/, $input ) {
+                my ( $index, $length ) = split /:/, $pair;
+                my ( $c1, $ngram );
+                if ( $index == $lastindex && $length == $lastlength ) {
+                    $c1    = $lastc1;
+                    $ngram = $lastngram;
+                }
+                else {
+                    my $packed_ngram;
+                    ( $packed_ngram, $c1 ) = $localdata->get_ngram_by_index($index);
+                    ( $c1, $ngram ) = MIME::Base64::encode( $packed_ngram, $length );
+                    $lastngram  = $ngram;
+                    $lastc1     = $c1;
+                    $lastlength = $length;
+                    $lastindex  = $index;
+                }
+                push( @outstring, "$c1,$ngram" );
             }
             my $outstr = join( ",", @outstring ) . "\n";
             print $output $outstr;
