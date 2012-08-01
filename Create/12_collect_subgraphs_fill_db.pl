@@ -20,14 +20,14 @@ my $outdir  = shift(@ARGV);
 my $dbname  = shift(@ARGV);
 croak("Not a directory: $outdir") unless ( -d $outdir );
 
+my $maxloglevel = 3;
+
 my %subgraphs;
 my @dumps = map {Storable::retrieve($_)} @ARGV;
 for my $word_form (uniq(map {keys %{$_}} @dumps)){
     $subgraphs{$word_form} = sum(map {$_->{$word_form} || 0} @dumps);
 }
 common_functions::log( "N (Perl) = " . sum(values %subgraphs), 1, $maxloglevel );
-
-my $maxloglevel = 3;
 
 my $dbh         = DBI->connect("dbi:SQLite:$outdir/$dbname") or croak("Cannot connect: $DBI::errstr");
 $dbh->do(qq{PRAGMA encoding = 'UTF-8'});

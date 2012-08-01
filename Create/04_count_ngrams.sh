@@ -30,7 +30,7 @@ perl -i -pe 's/^\s*(\d+)\s+(.+)$/$2\t$1/' $filepath.uniq
 #rm $filepath.uniqa
 
 printf "[%s] %s\n" $(date "+%T") "Determine N"
-n=$(awk '{ SUM += ($2*$3)} END { print SUM }' $filepath.uniq)
+n=$(awk -F $'\t' '{ SUM += ($2*$3)} END { print SUM }' $filepath.uniq)
 printf "[%s] %s\n" $(date "+%T") "N = $n"
 printf "[%s] %s\n" $(date "+%T") "$file N = $n" >> logfile.txt
 

@@ -39,7 +39,7 @@ printf "[%s] %s\n" $(date "+%T") "Determine N"
 n=0
 for (( i=1 ; i<=$max_n ; i++))
 do
-    n=$(( $n + $(awk '{ SUM += ($2*$3)} END { print SUM }' subgraphs_$i.uniq) ))
+    n=$(( $n + $(awk -F $'\t' '{ SUM += ($2*$3)} END { print SUM }' subgraphs_$i.uniq) ))
 done
 printf "[%s] %s\n" $(date "+%T") "Subgraph N = $n"
 printf "[%s] %s\n" $(date "+%T") "Subgraph N = $n" >> logfile.txt
