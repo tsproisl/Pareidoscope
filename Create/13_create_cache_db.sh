@@ -4,7 +4,7 @@
 
 if [ $# -ne 2 ]
 then
-    echo "./12_create_cache_db.sh outdir dbname"
+    echo "./13_create_cache_db.sh outdir dbname"
     exit -1
 fi
 

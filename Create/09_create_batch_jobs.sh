@@ -62,6 +62,8 @@ cd \$HOME/Pareidoscope/dependencies_batch
 cp $relations_basename $infiles \$TMPDIR
 cd \$TMPDIR
 
+export PERL5LIB="/home/hpc/slli/slli02/local/lib/perl5/site_perl/5.8.8/x86_64-linux-thread-multi:\$PERL5LIB"
+
 for (( i=0 ; i < \${#files[@]} ; i++ ))
 do
     perl \$HOME/Pareidoscope/hpc_01_collect_dependency_subgraphs.pl \${files[\$i]} $relations_basename subgraphs_${jobnr}_\$i.txt $max_n &
@@ -69,6 +71,10 @@ done
 
 # Don't execute the next command until subshells finish.
 wait
+
+perl -MStorable -MList::Util -MList::MoreUtils -e 'my %o; my @d = map {Storable::retrieve(\$_)} @ARGV; for my \$w (List::MoreUtils::uniq(map {keys %{\$_}} @d)){\$o{\$w} = List::Util::sum(map {\$_->{\$w} || 0} @d)} Storable::nstore(\\%o, "subgraphs_${jobnr}.dump")' subgraphs_${jobnr}_*.txt.dump
+mv subgraphs_${jobnr}.dump \$WOODYHOME/subgraphs_${jobnr}.dump
+rm subgraphs_${jobnr}_*.txt.dump
 
 for (( i=1 ; i <= $max_n ; i++ ))
 do
@@ -80,8 +86,8 @@ do
     done
     percentage=\$(( 50 / $max_n ))
     # this is a tabulator:
-    #grep -h "	\$i\$" subgraphs_${jobnr}_*.txt > \$FASTTMP/subgraphs_${jobnr}_\$i.txt &
-    grep -h "	\$i\$" subgraphs_${jobnr}_*.txt | sort -S \${percentage}% -T \$TMPDIR -n \$keys | gzip > \$FASTTMP/subgraphs_${jobnr}_\$i.txt.gz &
+    #grep -h "	\$i\$" subgraphs_${jobnr}_*.txt > \$WOODYHOME/subgraphs_${jobnr}_\$i.txt &
+    grep -h "	\$i\$" subgraphs_${jobnr}_*.txt | sort -S \${percentage}% -T \$TMPDIR -n \$keys | gzip > \$WOODYHOME/subgraphs_${jobnr}_\$i.txt.gz &
 
 done
 

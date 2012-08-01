@@ -104,10 +104,11 @@ sub single_item_query {
             params->{'w1'}  = $wfline->[1];
             params->{'tt1'} = $old_tt1;
         }
-        return param('return_type') eq 'pos'   ? _strucn( $data, $freq )
-	     : param('return_type') eq 'chunk' ? _strucn( $data, $freq )
-	     : param('return_type') eq 'dep'   ? collectsubgraphs::get_subgraphs( $data, $freq )
-	     ;
+        return
+              param('return_type') eq 'pos'   ? _strucn( $data, $freq )
+            : param('return_type') eq 'chunk' ? _strucn( $data, $freq )
+            : param('return_type') eq 'dep' ? collectsubgraphs::get_subgraphs( $data, $freq )
+            :                                 undef;
     };
     $return_vars->{"call_strucn"} = $call_strucn;
     return $return_vars;
@@ -137,7 +138,7 @@ sub ngram_query {
     $vars->{"query"} =~ s/>/&gt;/g;
     $vars->{"query"} =~ s/'/&apos;/g;
     $vars->{"query"} =~ s/"/&quot;/g;
-    $vars->{"variables"} = &_strucn( $data, $size );
+    $vars->{"variables"} = _strucn( $data, $size );
     return $vars;
 }
 
@@ -159,7 +160,7 @@ sub strucn_query {
     $return_vars->{"query"} =~ s/"/&quot;/g;
     $id = $data->{"cache"}->query( -corpus => $data->{"active"}->{"corpus"}, -query => $query );
     ($freq) = $data->{'cqp'}->exec("size $id");
-    $return_vars->{"variables"} = &_strucn( $data, $freq );
+    $return_vars->{"variables"} = _strucn( $data, $freq );
     return $return_vars;
 }
 
@@ -1000,7 +1001,7 @@ sub new_print_table {
     foreach my $param ( keys %{ params() } ) {
         next if ( param($param) eq q{} );
         if ( List::MoreUtils::any { $_ eq $param } qw(fch flen frel ftag fwc fpos) ) {
-	    $vars->{$param} = param($param);
+            $vars->{$param} = param($param);
         }
         else {
             $vars->{"hidden_states"}->{$param} = param($param);

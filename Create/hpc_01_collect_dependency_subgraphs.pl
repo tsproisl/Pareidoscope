@@ -12,6 +12,7 @@ use lib "/home/hpc/slli/slli02/local/lib/perl5/site_perl/5.8.8";
 use Graph::Directed;
 use lib "/home/hpc/slli/slli02/local/lib/perl5/site_perl/5.8.8/x86_64-linux-thread-multi";
 use Set::Object;
+use List::MoreUtils qw(zip);
 
 die("./hpc_01_collect_dependency_subgraphs.pl dependencies.out dependency_relations.dump output_file max_n") unless ( scalar(@ARGV) == 4 );
 my $dependencies = shift(@ARGV);
@@ -21,9 +22,13 @@ my $max_n        = shift(@ARGV);
 
 my $relation_ids = Storable::retrieve($relations);
 
+my %structures;
+
 open( OUT, ">:encoding(utf8)", $outfile ) or die("Cannot open $outfile: $!");
 &read_corpus( $outfile, $dependencies, $max_n );
 close(OUT) or die("Cannot close $outfile: $!");
+
+Storable::nstore(\%structures, $outfile . '.dump');
 
 sub read_corpus {
     my ( $outfile, $dependencies, $max_n ) = @_;
@@ -34,15 +39,17 @@ OUTER: while ( my $match = <TAB> ) {
         #last if ( $. == 5000 );
         #my $match = shift(@tablines);
         chomp($match);
-        my ( $indeps, $outdeps, $roots, $cposs, $s_id ) = split( /\t/, $match );
+        my ( $indeps, $outdeps, $roots, $cposs, $s_id, $word_forms ) = split( /\t/, $match );
 
         #next unless ( $s_id eq "4eca801b0572f4e02700021d" );
-        my @indeps  = split( / /, $indeps );
-        my @outdeps = split( / /, $outdeps );
-        my @roots   = split( / /, $roots );
-        my @cposs   = split( / /, $cposs );
-        my $raw_graph = Graph::Directed->new;
-        my $graph     = Graph::Directed->new;
+        my @indeps     = split( / /, $indeps );
+        my @outdeps    = split( / /, $outdeps );
+        my @roots      = split( / /, $roots );
+        my @cposs      = split( / /, $cposs );
+        my @word_forms = split( / /, $word_forms );
+	my %cpos_to_word_form = zip @cposs, @word_forms;
+        my $raw_graph  = Graph::Directed->new;
+        my $graph      = Graph::Directed->new;
         my $root;
         my ( %raw_relations, %relations, %reverse_relations );
         my ( %raw_to_graph, %graph_to_raw );
@@ -127,7 +134,7 @@ OUTER: while ( my $match = <TAB> ) {
         }
 
         # get all connected subgraphs
-        enumerate_connected_subgraphs( $graph, $max_n, \%relations, \%reverse_relations, \%graph_to_raw );
+        enumerate_connected_subgraphs( $graph, $max_n, \%relations, \%reverse_relations, \%graph_to_raw, \%cpos_to_word_form );
     }
     close(TAB) or die("Cannot close $dependencies: $!");
 }
@@ -150,27 +157,27 @@ OUTER: while ( my $match = <TAB> ) {
 # }
 
 sub enumerate_connected_subgraphs {
-    my ( $graph, $max_n, $relations, $reverse_relations, $graph_to_raw_ref ) = @_;
+    my ( $graph, $max_n, $relations, $reverse_relations, $graph_to_raw_ref, $cpos_to_word_form_ref ) = @_;
     foreach my $node ( sort { $b <=> $a } $graph->vertices ) {
 
         # emit node $i
         my $subgraph = Graph::Directed->new;
         $subgraph->add_vertex($node);
-        &emit( $subgraph, $relations, $graph_to_raw_ref );
+        &emit( $subgraph, $relations, $graph_to_raw_ref, $cpos_to_word_form_ref );
 
         #my $prohibited_nodes = Set::Object->new();
         #$prohibited_nodes->insert( 0 .. $node );
         #&enumerate_connected_subgraphs_recursive( $graph, $subgraph, $prohibited_nodes, $max_n, $relations, $reverse_relations );
         my $prohibited_edges = Set::Object->new();
         $prohibited_edges->insert( map( $_->[0] . '-' . $_->[1], map { $graph->edges_at($_) } ( 0 .. $node - 1 ) ) );
-        &enumerate_connected_subgraphs_recursive( $graph, $subgraph, $prohibited_edges, $max_n, $relations, $reverse_relations, $graph_to_raw_ref );
+        &enumerate_connected_subgraphs_recursive( $graph, $subgraph, $prohibited_edges, $max_n, $relations, $reverse_relations, $graph_to_raw_ref, $cpos_to_word_form_ref );
     }
 }
 
 sub enumerate_connected_subgraphs_recursive {
 
     #my ( $graph, $subgraph, $prohibited_nodes, $max_n, $relations, $reverse_relations ) = @_;
-    my ( $graph, $subgraph, $prohibited_edges, $max_n, $relations, $reverse_relations, $graph_to_raw_ref ) = @_;
+    my ( $graph, $subgraph, $prohibited_edges, $max_n, $relations, $reverse_relations, $graph_to_raw_ref, $cpos_to_word_form_ref ) = @_;
 
     # determine all edges to neighbouring nodes that are not
     # prohibited
@@ -220,11 +227,11 @@ sub enumerate_connected_subgraphs_recursive {
         foreach my $new_set ( $second_powerset->elements ) {
             my $local_subgraph = $subgraph->copy_graph;
             $local_subgraph->add_edges( $set->elements, $new_set->elements );
-            &emit( $local_subgraph, $relations, $graph_to_raw_ref );
+            &emit( $local_subgraph, $relations, $graph_to_raw_ref, $cpos_to_word_form_ref );
             if ( $local_subgraph->vertices < $max_n ) {
 
                 #&enumerate_connected_subgraphs_recursive( $graph, $local_subgraph, Set::Object::union( $prohibited_nodes, $neighbours ), $max_n, $relations, $reverse_relations );
-                &enumerate_connected_subgraphs_recursive( $graph, $local_subgraph, Set::Object::union( $prohibited_edges, $neighbouring_edges, $string_edges ), $max_n, $relations, $reverse_relations, $graph_to_raw_ref );
+                &enumerate_connected_subgraphs_recursive( $graph, $local_subgraph, Set::Object::union( $prohibited_edges, $neighbouring_edges, $string_edges ), $max_n, $relations, $reverse_relations, $graph_to_raw_ref, $cpos_to_word_form_ref );
             }
         }
     }
@@ -291,7 +298,7 @@ OUTER: for ( my $i = 0; $i < 2**$number_of_elements; $i++ ) {
 }
 
 sub emit {
-    my ( $subgraph, $relations, $graph_to_raw_ref ) = @_;
+    my ( $subgraph, $relations, $graph_to_raw_ref, $cpos_to_word_form_ref ) = @_;
     my %edges;
     my %incoming_edge;
     my @list_representation;
@@ -307,6 +314,9 @@ sub emit {
     }
     foreach my $vertex ( $subgraph->vertices() ) {
         my ( @incoming, @outgoing );
+
+	# count occurrences in structure
+	$structures{$cpos_to_word_form_ref->{$graph_to_raw_ref->{$vertex}}}++;
 
         # incoming edges
         foreach my $local_vertex ( keys %{ $incoming_edge{$vertex} } ) {

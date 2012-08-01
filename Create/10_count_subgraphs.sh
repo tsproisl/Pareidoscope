@@ -18,6 +18,8 @@ cores=$(( $packages * $cores_per_cpu ))
 
 cd $outdir
 
+printf "[%s] %s\n" $(date "+%T") "Using $cores cores in $packages packages ($cores_per_cpu cores per CPU)"
+
 for (( n=1 ; n<=$max_n ; n++))
 do
     keys=""

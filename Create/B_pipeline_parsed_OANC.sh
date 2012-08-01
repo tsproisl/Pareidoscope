@@ -14,3 +14,4 @@ export PERL5LIB="/home/linguistik/tsproisl/local/lib/perl5:/home/linguistik/tspr
 
 ./10_count_subgraphs.sh $subgraphdir $max_n && \
 ./11_compile_subgraphs_and_create_index.pl $subgraphdir $max_n
+./12_collect_subgraphs_fill_db.pl $outdir $dbname $subgraphdir/subgraphs_*.dump

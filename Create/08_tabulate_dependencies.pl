@@ -40,7 +40,7 @@ sub fill_database {
     my $corpus_handle = new CWB::CL::Corpus $corpus;
     $cqp->exec("A = <s> [] expand to s");
     my ($size) = $cqp->exec("size A");
-    $cqp->exec("tabulate A match .. matchend indep, match .. matchend outdep, match .. matchend root, match .. matchend, match s_id > \"$outdir/dependencies.out\"");
+    $cqp->exec("tabulate A match .. matchend indep, match .. matchend outdep, match .. matchend root, match .. matchend, match s_id, match .. matchend word > \"$outdir/dependencies.out\"");
     open( TAB, "<:encoding(utf8)", "$outdir/dependencies.out" ) or die("Cannot open $outdir/dependencies.out: $!");
 
     while ( defined( my $match = <TAB> ) ) {
