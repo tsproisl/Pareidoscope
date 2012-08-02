@@ -24,7 +24,7 @@ my %chunks;
 my $chunks = join( "|", @chunks );
 
 my $maxloglevel = 3;
-my $cwb_decode  = "cwb-decode -r /localhome/Databases/CWB/registry -n -H $corpus -P word -S s " . join( " ", map( "-S $_", @chunks ) );
+my $cwb_decode  = "cwb-decode -r /localhome/Databases/CWB/registry -n -H $corpus -P word -S s -S h " . join( " ", map( "-S $_", @chunks ) );
 my $dbh         = DBI->connect("dbi:SQLite:$outdir/$dbname") or die("Cannot connect: $DBI::errstr");
 $dbh->do(qq{PRAGMA encoding = 'UTF-8'});
 $dbh->do(qq{DROP TABLE IF EXISTS chunks});
@@ -60,7 +60,7 @@ sub create_indexes {
     # fill in chunks
     foreach my $chunk (@chunks) {
         $chunks{$chunk} = &insertandreturnid( $insertchunk, $fetchchunkid, [$chunk] );
-	$chunkfreq{$chunks{$chunk}} = 0;
+        $chunkfreq{ $chunks{$chunk} } = 0;
     }
 
     # current sentence
@@ -69,7 +69,7 @@ sub create_indexes {
     #         word
 
     # events: <s> </s> <$chunks> </$chunks> ELSE
-    my ( $sentpos, @chunkseq, @cposseq, $activechunk );
+    my ( $sentpos, @chunkseq, @cposseq, $activechunk, %is_head );
     &common_functions::log( "Start processing", 1, $maxloglevel );
     while ( defined( my $line = <$decode> ) ) {
         chomp($line);
@@ -84,11 +84,12 @@ sub create_indexes {
             }
             elsif ( $token eq "</s>" ) {
                 $insertsentence->execute( $sentpos, join( " ", @chunkseq ), join( " ", @cposseq ) );
-                &ngrams( \@chunkseq, scalar(@chunkseq), 1, 9, \@typids, \%typids, \@cposseq );
+                &ngrams( \@chunkseq, scalar(@chunkseq), 1, 9, \@typids, \%typids, \@cposseq, \%is_head );
                 undef($sentpos);
                 @chunkseq = ();
                 @cposseq  = ();
                 @typids   = ();
+                %is_head  = ();
             }
             elsif ( $token =~ m/<($chunks)>/ ) {
                 $activechunk = $1;
@@ -98,6 +99,9 @@ sub create_indexes {
             }
             elsif ( $token =~ m/<\/($chunks)>/ ) {
                 undef($activechunk);
+            }
+            elsif ( $token eq "<h>" ) {
+                $is_head{ $cpos - $sentpos }++;
             }
         }
     }
@@ -111,7 +115,7 @@ sub create_indexes {
 }
 
 sub ngrams {
-    my ( $tagsref, $slen, $gmin, $gmax, $arrayref, $hashref, $cposref ) = @_;
+    my ( $tagsref, $slen, $gmin, $gmax, $arrayref, $hashref, $cposref, $is_head_ref ) = @_;
     die("How long is this sentence?") if ( scalar(@$tagsref) != $slen );
     for ( my $start = 0; $start <= $slen - $gmin; $start++ ) {
         my $maxlength = $slen - $start > $gmax ? $gmax : $slen - $start;
@@ -122,7 +126,7 @@ sub ngrams {
             print $co "$ngram\t$length\n";
             my $end = defined( $cposref->[ $start + $length ] ) ? $cposref->[ $start + $length ] - 1 : $#$arrayref;
             foreach ( $cposref->[$start] .. $end ) {
-                $hashref->{ $arrayref->[$_] }++;
+                $hashref->{ $arrayref->[$_] }++ if ( $is_head_ref->{$_} );
             }
         }
     }
