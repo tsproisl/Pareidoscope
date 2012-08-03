@@ -13,7 +13,7 @@ use DBI;
 use List::Util qw(max min);
 use List::MoreUtils;
 use localdata_client;
-use collectsubgraphs;
+#use collectsubgraphs;
 
 #-------------------
 # SINGLE ITEM QUERY

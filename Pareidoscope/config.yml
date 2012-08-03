@@ -70,10 +70,11 @@ corpora:
       database: "corpora/databases/oanc.sqlite"
       ngram_length: 9
       subgraph_size: 5
+      subgraph_depth: 2
+      subgraph_edges: 10
       pos_ngrams: 626977826
       chunk_ngrams: 378760528
       subgraphs: 1503972681
-#      localdata: "/opt/pareidoscope/oanc"
       localdata: "oanc"
       machines:
           - ["127.0.0.1", 4878, 8487]

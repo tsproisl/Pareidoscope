@@ -10,14 +10,9 @@ use DBI;
 use Carp;    # carp croak
 
 use Readonly;
-Readonly my $MAXIMUM_NUMBER_OF_RELATIONS => 10;
-Readonly my $MAXIMUM_SUBGRAPH_SIZE       => 5;
-Readonly my $MAXIMUM_DEPTH               => 2;
 Readonly my $UNLIMITED_NUMBER_OF_FIELDS  => -1;
 Readonly my $GET_ATTRIBUTE_USAGE         => 'Usage: $att_handle = $self->_get_attribute($name);';
 Readonly my $RELATION_IDS                => Storable::retrieve('dependency_relations.dump');
-Readonly my $FREQUENCY_THRESHOLD         => 2;
-Readonly my $N                           => 46_977_373_460;
 
 use localdata_client;
 
@@ -50,7 +45,7 @@ SENTENCE:
             $outdeps[$i] =~ s/^[|]//xms;
             $outdeps[$i] =~ s/[|]$//xms;
             my @out = split /[|]/xms, $outdeps[$i];
-            next SENTENCE if ( scalar( () = split /[|]/xms, $indeps[$i], $UNLIMITED_NUMBER_OF_FIELDS ) + scalar @out > $MAXIMUM_NUMBER_OF_RELATIONS );
+            next SENTENCE if ( scalar( () = split /[|]/xms, $indeps[$i], $UNLIMITED_NUMBER_OF_FIELDS ) + scalar @out > $data->{"active"}->{"subgraph_edges"} );
             my $cpos = $start + $i;
             foreach my $dep (@out) {
                 $dep =~ m/^(?<relation>[^(]+)[(]0(?:&apos;)*,(?<offset>-?\d+)(?:&apos;)*/xms;
@@ -87,12 +82,12 @@ sub _get_frequencies {
     my ( $self, $result_ref, $word_or_lemma ) = @_;
     my @queue;
     my $r1 = 0;
-    foreach my $size ( 1 .. $MAXIMUM_SUBGRAPH_SIZE ) {
+    foreach my $size ( 1 .. $data->{"active"}->{"subgraph_size"} ) {
         foreach my $subgraph ( sort keys %{ $result_ref->[$size] } ) {
             foreach my $position ( sort keys %{ $result_ref->[$size]->{$subgraph} } ) {
                 my $frequency = $result_ref->[$size]->{$subgraph}->{$position};
                 $r1 += $frequency;
-                push @queue, [ $subgraph, $position, 1, $frequency ] if ( $frequency >= $FREQUENCY_THRESHOLD );
+                push @queue, [ $subgraph, $position, 1, $frequency ] if ( $frequency >= param("threshold") );
             }
         }
     }
@@ -113,7 +108,7 @@ sub _get_frequencies {
 		     )}
     );
     $dbh->disconnect();
-    $self->{"localdata"}->add_freq_and_am( \@queue, $r1, $N, "${word_or_lemma}_subgraphs.sqlite" );
+    $self->{"localdata"}->add_freq_and_am( \@queue, $r1, $data->{"active"}->{"subgraphs"}, "${word_or_lemma}_subgraphs.sqlite" );
     return;
 }
 
@@ -151,7 +146,7 @@ sub _enumerate_connected_subgraphs_recursive {
         }
     }
 
-    my $first_powerset = _cross_set( _powerset_node_based( $out_edges, 0, $MAXIMUM_SUBGRAPH_SIZE - $subgraph->vertices, 1 ), _powerset_node_based( $in_edges, 0, $MAXIMUM_SUBGRAPH_SIZE - $subgraph->vertices, 0 ), $MAXIMUM_SUBGRAPH_SIZE - $subgraph->vertices );
+    my $first_powerset = _cross_set( _powerset_node_based( $out_edges, 0, $data->{"active"}->{"subgraph_size"} - $subgraph->vertices, 1 ), _powerset_node_based( $in_edges, 0, $data->{"active"}->{"subgraph_size"} - $subgraph->vertices, 0 ), $data->{"active"}->{"subgraph_size"} - $subgraph->vertices );
 
     foreach my $set ( $first_powerset->elements() ) {
         next if ( $set->size() == 0 );
@@ -171,8 +166,8 @@ sub _enumerate_connected_subgraphs_recursive {
             $local_subgraph->add_edges( $set->elements(), $new_set->elements() );
             _emit( $match, $local_subgraph, $relation_ref, $result_ref );
 
-            #if ( $local_subgraph->vertices < $MAXIMUM_SUBGRAPH_SIZE ) {
-            if ( $local_subgraph->vertices < $MAXIMUM_SUBGRAPH_SIZE && $depth < $MAXIMUM_DEPTH ) {
+            #if ( $local_subgraph->vertices < $data->{"active"}->{"subgraph_size"} ) {
+            if ( $local_subgraph->vertices < $data->{"active"}->{"subgraph_size"} && $depth < $data->{"active"}->{"subgraph_depth"} ) {
 
                 #_enumerate_connected_subgraphs_recursive( $match, $graph, $local_subgraph, Set::Object::union( $prohibited_nodes, $neighbours ), $relation_ref, $reverse_relation_ref, $depth + 1, $result_ref );
                 _enumerate_connected_subgraphs_recursive( $match, $graph, $local_subgraph, Set::Object::union( $prohibited_edges, $neighbouring_edges, $string_edges ), $relation_ref, $reverse_relation_ref, $depth + 1, $result_ref );
