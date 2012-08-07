@@ -87,11 +87,16 @@ sub add_freq_and_am {
     my $insert_result = $dbh->prepare(qq{INSERT INTO results (qid, result, position, mlen, o11, c1, am) VALUES (?, ?, ?, ?, ?, ?, ?)});
     my $cons = scalar(@{$self->{"con"}});
     my %specifics;
+    my $byte_length = 2;
     if(param("return_type") eq "pos"){
 	%specifics = ("prefix" => "ngrams");
     }
     elsif(param("return_type") eq "chunk"){
 	%specifics = ("prefix" => "chunks");
+    }
+    elsif(param("return_type") eq "dep"){
+	%specifics = ("prefix" => "subgraphs");
+	$byte_length = 4;
     }
     foreach my $con (@{$self->{"con"}}){
 	my ($remote_host, $remote_port, $local_port) = @$con;
@@ -126,7 +131,8 @@ sub add_freq_and_am {
 		my $match_length = $record->[2];
 		#$marked_ngram =~ s/^((?:[0-9a-f]{2}){$position})((?:[0-9a-f]{2}){$match_length})((?:[0-9a-f]{2})*)$/${1}<${2}>${3}/;
 		# Subgraphs: {4}
-		$marked_ngram =~ m/^((?:[0-9a-f]{2}){$position})((?:[0-9a-f]{2}){$match_length})((?:[0-9a-f]{2})*)$/;
+		# $marked_ngram =~ m/^((?:[0-9a-f]{2}){$position})((?:[0-9a-f]{2}){$match_length})((?:[0-9a-f]{2})*)$/;
+		$marked_ngram =~ m/^((?:[0-9a-f]{$byte_length}){$position})((?:[0-9a-f]{$byte_length}){$match_length})((?:[0-9a-f]{$byte_length})*)$/;
 		my ($pre, $match, $post) = ($1, $2, $3);
 		$marked_ngram = $pre . "<" . $match . ">". $post;
 		push(@localresults, [$marked_ngram, $position, $match_length, $record->[3]]);
@@ -140,11 +146,11 @@ sub add_freq_and_am {
 	    chomp($line);
 	    my @line = split(",", $line);
 	    $dbh->do(qq{BEGIN TRANSACTION});
-	    foreach my $wr (@$localresultsref){
+	    foreach my $wr (@{$localresultsref}){
 		my $c1 = shift(@line);
 		my $g2 = shift(@line);
 		croak("NICHT DEFINIERT: $c1, $g2") unless(defined($c1) and defined($g2));
-		$insert_result->execute($dbname, @$wr, $c1, $g2);
+		$insert_result->execute($dbname, @{$wr}, $c1, $g2);
 	    }
 	    $dbh->do(qq{COMMIT});
 	}

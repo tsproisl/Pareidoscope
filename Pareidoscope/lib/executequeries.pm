@@ -625,7 +625,7 @@ sub _strucn {
     if ( scalar(@$qids) == 1 ) {
         my $qid = $qids->[0]->[0];
         $update_timestamp->execute($qid);
-        my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$qid" ) or die("Cannot connect: $DBI::errstr");
+        my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$qid" ) or croak("Cannot connect: $DBI::errstr");
         $dbh->do("PRAGMA encoding = 'UTF-8'");
         my $get_ngram_types = $dbh->prepare(qq{SELECT COUNT(*) FROM results WHERE qid=?});
         $get_ngram_types->execute($qid);
@@ -725,7 +725,7 @@ sub _strucn {
 #---------------
 sub create_new_db {
     my ($qid) = @_;
-    my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$qid" ) or die( "Cannot connect to " . config->{"user_data"} . "/$qid: $DBI::errstr" );
+    my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$qid" ) or croak( "Cannot connect to " . config->{"user_data"} . "/$qid: $DBI::errstr" );
     $dbh->do("PRAGMA encoding = 'UTF-8'");
     $dbh->do("PRAGMA cache_size = 50000");
     $dbh->do(
@@ -955,7 +955,7 @@ sub new_print_table {
     croak("Error while processing cache database.") unless ( scalar(@$qids) == 1 );
     $qid          = $qids->[0]->[0];
     $query_length = $qids->[0]->[1];
-    my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$qid" ) or die("Cannot connect: $DBI::errstr");
+    my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$qid" ) or croak("Cannot connect: $DBI::errstr");
     $dbh->do("PRAGMA encoding = 'UTF-8'");
     $dbh->do("PRAGMA cache_size = 50000");
     $filter_length = 'AND length(result) ' . $filter_relations{ param("frel") } . ' ' . ( param("flen") * 2 + 2 ) if ( defined( param("flen") ) and defined( param("frel") ) );
@@ -1075,7 +1075,7 @@ sub retrieve_ngrams {
 #--------------------------
 sub print_ngram_query_tables {
     my ( $data, $qid, $ngramref, $general ) = @_;
-    my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$qid" ) or die("Cannot connect: $DBI::errstr");
+    my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$qid" ) or croak("Cannot connect: $DBI::errstr");
     $dbh->do("PRAGMA encoding = 'UTF-8'");
     my $get_top_50    = $dbh->prepare(qq{SELECT result, position, o11, c1, am FROM results WHERE position=? ORDER BY am DESC, o11 DESC LIMIT 0, 40});
     my $get_positions = $dbh->prepare(qq{SELECT DISTINCT position FROM results ORDER BY position ASC});
@@ -1118,7 +1118,7 @@ sub print_ngram_query_tables {
 sub print_ngram_overview_table {
     my ( $data, $qid, $ngramref ) = @_;
     my $vars;
-    my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$qid" ) or die("Cannot connect: $DBI::errstr");
+    my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$qid" ) or croak("Cannot connect: $DBI::errstr");
     $dbh->do("PRAGMA encoding = 'UTF-8'");
     my $get_top_10    = $dbh->prepare(qq{SELECT result, position, o11, c1, am FROM results WHERE position=? ORDER BY am DESC, o11 DESC LIMIT 0, 10});
     my $get_positions = $dbh->prepare(qq{SELECT DISTINCT position FROM results ORDER BY position ASC});

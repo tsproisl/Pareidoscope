@@ -1,120 +1,169 @@
 package collectsubgraphs;
 use Dancer ':syntax';
 
+use Dancer::Plugin::Database;
 use English qw( -no_match_vars );
 
 use Graph::Directed;
 use Set::Object;
 use DBI;
+use Time::HiRes;
 
 use Carp;    # carp croak
 
 use Readonly;
-Readonly my $UNLIMITED_NUMBER_OF_FIELDS  => -1;
-Readonly my $GET_ATTRIBUTE_USAGE         => 'Usage: $att_handle = $self->_get_attribute($name);';
-Readonly my $RELATION_IDS                => Storable::retrieve('dependency_relations.dump');
+Readonly my $UNLIMITED_NUMBER_OF_FIELDS => -1;
+Readonly my $GET_ATTRIBUTE_USAGE        => 'Usage: $att_handle = $self->_get_attribute($name);';
 
+use executequeries;
 use localdata_client;
 
 sub get_subgraphs {
-    my ( $self, $word_or_lemma ) = @_;
-    my $result_ref    = [];
-    my $s_handle      = $self->_get_attribute("s");
-    my $s_id_handle   = $self->_get_attribute("s_id");
-    my $indep_handle  = $self->_get_attribute("indep");
-    my $outdep_handle = $self->_get_attribute("outdep");
-    my $root_handle = $self->_get_attribute("root");
-    $self->{"cqp"}->exec( sprintf "A = [word = \"%s\" %%c]", $word_or_lemma );
-    my @matches      = $self->{"cqp"}->exec("tabulate A match");
-    my $loop_counter = 0;
-
-SENTENCE:
-    foreach my $match (@matches) {
-        $loop_counter++;
-        my ( $start, $end ) = $s_handle->cpos2struc2cpos($match);
-        my @indeps  = $indep_handle->cpos2str( $start .. $end );
-        my @outdeps = $outdep_handle->cpos2str( $start .. $end );
-        my $root = first_index { $_ eq 'root' } $root_handle->cpos2str( $start .. $end );
-	$root += $start if ( defined $root );
-        my %relation;
-        my %reverse_relation;
-        my $graph = Graph::Directed->new();
-        foreach my $i ( 0 .. $#outdeps ) {
-            $indeps[$i]  =~ s/^[|]//xms;
-            $indeps[$i]  =~ s/[|]$//xms;
-            $outdeps[$i] =~ s/^[|]//xms;
-            $outdeps[$i] =~ s/[|]$//xms;
-            my @out = split /[|]/xms, $outdeps[$i];
-            next SENTENCE if ( scalar( () = split /[|]/xms, $indeps[$i], $UNLIMITED_NUMBER_OF_FIELDS ) + scalar @out > $data->{"active"}->{"subgraph_edges"} );
-            my $cpos = $start + $i;
-            foreach my $dep (@out) {
-                $dep =~ m/^(?<relation>[^(]+)[(]0(?:&apos;)*,(?<offset>-?\d+)(?:&apos;)*/xms;
-                my $target = $cpos + $LAST_PAREN_MATCH{"offset"};
-                next if ( $cpos == $target );
-                $relation{$cpos}->{$target}         = $LAST_PAREN_MATCH{"relation"};
-                $reverse_relation{$target}->{$cpos} = $LAST_PAREN_MATCH{"relation"};
-                $graph->add_edge( $cpos, $target );
-            }
-        }
-
-        # Skip rootless sentences
-        next SENTENCE if ( !defined $root );
-
-        # Skip unconnected graphs (necessary because of a bug in the current version of the Stanford Dependencies converter)
-        next SENTENCE if ( ( $graph->vertices() > 1 ) && ( !$graph->is_weakly_connected() ) );
-
-        # check if all vertices are reachable from the root
-        my $graph_successors = Set::Object->new( $root, $graph->all_successors($root) );
-        my $graph_vertices   = Set::Object->new( $graph->vertices() );
-        next SENTENCE if ( $graph_successors->not_equal($graph_vertices) );
-
-        my $subgraph = Graph::Directed->new();
-        $subgraph->add_vertex($match);
-        _emit( $match, $subgraph, \%relation, $result_ref );
-        my $prohibited_edges = Set::Object->new();
-        _enumerate_connected_subgraphs_recursive( $match, $graph, $subgraph, $prohibited_edges, \%relation, \%reverse_relation, 1, $result_ref );
-    }
-
-    _get_frequencies( $result_ref, $word_or_lemma );
-}
-
-sub _get_frequencies {
-    my ( $self, $result_ref, $word_or_lemma ) = @_;
-    my @queue;
-    my $r1 = 0;
-    foreach my $size ( 1 .. $data->{"active"}->{"subgraph_size"} ) {
-        foreach my $subgraph ( sort keys %{ $result_ref->[$size] } ) {
-            foreach my $position ( sort keys %{ $result_ref->[$size]->{$subgraph} } ) {
-                my $frequency = $result_ref->[$size]->{$subgraph}->{$position};
-                $r1 += $frequency;
-                push @queue, [ $subgraph, $position, 1, $frequency ] if ( $frequency >= param("threshold") );
-            }
-        }
-    }
-    my $dbh = DBI->connect("dbi:SQLite:${word_or_lemma}_subgraphs.sqlite") or croak "Cannot connect to ${word_or_lemma}_subgraphs.sqlite: $DBI::errstr";
-    $dbh->do("PRAGMA encoding = 'UTF-8'");
-    $dbh->do("PRAGMA cache_size = 50000");
-    $dbh->do(
-        qq{CREATE TABLE results (
-			 rid INTEGER PRIMARY KEY,
-			 qid INTEGER NOT NULL,
-			 result TEXT NOT NULL,
-			 position INTEGER NOT NULL,
-                         mlen INTEGER NOT NULL,
-			 o11 INTEGER NOT NULL,
-			 c1 INTEGER NOT NULL,
-			 am REAL,
-			 UNIQUE (qid, result, position)
-		     )}
+    my ( $data, $word_or_lemma ) = @_;
+    my $return_vars;
+    my $frequency_threshold      = 200000;
+    my $subgraph_types_threshold = 750000;
+    my $s_handle                 = $data->get_attribute("s");
+    my $s_id_handle              = $data->get_attribute("s_id");
+    my $indep_handle             = $data->get_attribute("indep");
+    my $outdep_handle            = $data->get_attribute("outdep");
+    my $root_handle              = $data->get_attribute("root");
+    my $get_relation_ids         = database->prepare(qq{SELECT relation, depid FROM dependencies});
+    my $check_cache              = database->prepare(qq{SELECT qid, r1, n FROM queries WHERE corpus=? AND class=? AND query=? AND threshold=?});
+    my $insert_query             = database->prepare(qq{INSERT INTO queries (corpus, class, query, threshold, qlen, time, r1, n) VALUES (?, ?, ?, ?, ?, strftime('%s','now'), ?, ?)});
+    my $update_timestamp         = database->prepare(qq{UPDATE queries SET time=strftime('%s','now') WHERE qid=?});
+    $get_relation_ids->execute();
+    my %relation_id = map { @{$_} } @{ $get_relation_ids->fetchall_arrayref() };
+    my %specifics = (
+        "name"  => "dep",
+        "class" => "strucd"
     );
-    $dbh->disconnect();
-    $self->{"localdata"}->add_freq_and_am( \@queue, $r1, $data->{"active"}->{"subgraphs"}, "${word_or_lemma}_subgraphs.sqlite" );
+    my ( $query, $unlex_query, $title, $anchor, $length, $ngram_ref ) = executequeries::build_query($data);
+    $return_vars->{"query_anchor"}       = $anchor;
+    $return_vars->{"query_title"}        = $title;
+    $return_vars->{"threshold"}          = param("threshold");
+    $return_vars->{"return_type"}        = param("return_type");
+    $return_vars->{"frequency"}          = $freq;
+    $return_vars->{"frequency_too_high"} = $freq >= $frequency_threshold;
+    $return_vars->{"frequency_too_low"}  = $freq < param("threshold");
+    return $return_vars if ( $freq == 0 );
+    return $return_vars if ( $return_vars->{"frequency_too_high"} );
+    return $return_vars if ( $return_vars->{"frequency_too_low"} );
+
+    # check cache database
+    $check_cache->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $query, param("threshold") );
+    $qids           = $check_cache->fetchall_arrayref;
+    $subgraph_types = 0;
+    if ( scalar(@$qids) == 1 ) {
+        my $qid = $qids->[0]->[0];
+        $update_timestamp->execute($qid);
+        my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$qid" ) or croak("Cannot connect: $DBI::errstr");
+        $dbh->do("PRAGMA encoding = 'UTF-8'");
+        my $get_subgraph_types = $dbh->prepare(qq{SELECT COUNT(*) FROM results WHERE qid=?});
+        $get_subgraph_types->execute($qid);
+        $subgraph_types                        = ( $get_subgraph_types->fetchrow_array )[0];
+        $return_vars->{"ngram_tokens"}         = $qids->[0]->[1];
+        $return_vars->{"ngram_types"}          = $subgraph_types;
+        $return_vars->{"too_many_ngram_types"} = $subgraph_types >= $subgraph_types_threshold;
+    }
+    elsif ( scalar(@$qids) == 0 ) {
+        my $result_ref      = [];
+        my $r1              = 0;
+        my $t0              = [ &Time::HiRes::gettimeofday() ];
+        my $cached_query_id = $data->{"cache"}->query( -corpus => $data->{"active"}->{"corpus"}, -query => $query );
+        my $t1              = [ &Time::HiRes::gettimeofday() ];
+        my $sentence        = $data->get_attribute("s");
+        my @matches         = $data->{"cqp"}->exec("tabulate $cached_query_id match, $matchend");
+        my $t2              = [ &Time::HiRes::gettimeofday() ];
+
+    SENTENCE:
+        foreach my $m (@matches) {
+            my ( $match, $matchend ) = split( /\t/, $m );
+            my $match_length = ( $matchend - $match ) + 1;
+            croak("Match length: $match_length != 1") if ( $match_length != 1 );
+            my ( $start, $end ) = $s_handle->cpos2struc2cpos($match);
+            my @indeps  = $indep_handle->cpos2str( $start .. $end );
+            my @outdeps = $outdep_handle->cpos2str( $start .. $end );
+            my $root    = first_index { $_ eq 'root' } $root_handle->cpos2str( $start .. $end );
+
+            # Skip rootless sentences
+            next SENTENCE if ( !defined $root );
+
+            $root += $start;
+            my %relation;
+            my %reverse_relation;
+            my $graph = Graph::Directed->new();
+
+            foreach my $i ( 0 .. $#outdeps ) {
+                $indeps[$i]  =~ s/^[|]//xms;
+                $indeps[$i]  =~ s/[|]$//xms;
+                $outdeps[$i] =~ s/^[|]//xms;
+                $outdeps[$i] =~ s/[|]$//xms;
+                my @out = split /[|]/xms, $outdeps[$i];
+                next SENTENCE if ( scalar( () = split /[|]/xms, $indeps[$i], $UNLIMITED_NUMBER_OF_FIELDS ) + scalar @out > $data->{"active"}->{"subgraph_edges"} );
+                my $cpos = $start + $i;
+                foreach my $dep (@out) {
+                    $dep =~ m/^(?<relation>[^(]+)[(]0(?:&apos;)*,(?<offset>-?\d+)(?:&apos;)*/xms;
+                    my $target = $cpos + $LAST_PAREN_MATCH{"offset"};
+                    next if ( $cpos == $target );
+                    $relation{$cpos}->{$target}         = $LAST_PAREN_MATCH{"relation"};
+                    $reverse_relation{$target}->{$cpos} = $LAST_PAREN_MATCH{"relation"};
+                    $graph->add_edge( $cpos, $target );
+                }
+            }
+
+            # Skip unconnected graphs (necessary because of a bug in the current version of the Stanford Dependencies converter)
+            next SENTENCE if ( ( $graph->vertices() > 1 ) && ( !$graph->is_weakly_connected() ) );
+
+            # check if all vertices are reachable from the root
+            my $graph_successors = Set::Object->new( $root, $graph->all_successors($root) );
+            my $graph_vertices = Set::Object->new( $graph->vertices() );
+            next SENTENCE if ( $graph_successors->not_equal($graph_vertices) );
+
+            my $subgraph = Graph::Directed->new();
+            $subgraph->add_vertex($match);
+            _emit( $match, $subgraph, \%relation, $result_ref );
+            my $prohibited_edges = Set::Object->new();
+            _enumerate_connected_subgraphs_recursive( $match, $graph, $subgraph, $prohibited_edges, \%relation, \%reverse_relation, 1, $result_ref );
+        }
+        my @queue;
+        foreach my $size ( 1 .. $data->{"active"}->{"subgraph_size"} ) {
+            foreach my $subgraph ( sort keys %{ $result_ref->[$size] } ) {
+                foreach my $position ( sort keys %{ $result_ref->[$size]->{$subgraph} } ) {
+                    my $frequency = $result_ref->[$size]->{$subgraph}->{$position};
+                    $r1 += $frequency;
+                    push @queue, [ $subgraph, $position, 1, $frequency ] if ( $frequency >= param("threshold") );
+                }
+            }
+        }
+        $return_vars->{"ngram_tokens"} = $r1;
+        return $return_vars if ( $r1 == 0 );
+        $return_vars->{"ngram_types"}          = scalar @queue;
+        $return_vars->{"too_many_ngram_types"} = $return_vars->{"ngram_types"} >= $subgraph_types_threshold;
+        return $return_vars if ( $return_vars->{"too_many_ngram_types"} );
+
+        # insert into cache database
+        $insert_query->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $query, param("threshold"), $query_length, $r1, $data->{"active"}->{ $specifics{"name"} . "_ngrams" } );
+        $check_cache->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $query, param("threshold") );
+        my $qid = ( $check_cache->fetchrow_array )[0];
+        my $t3  = [ &Time::HiRes::gettimeofday() ];
+
+        my $dbh = executequeries::create_new_db($qid);
+        $dbh->disconnect();
+        $self->{"localdata"}->add_freq_and_am( \@queue, $r1, $data->{"active"}->{"subgraphs"}, $qid );
+        my $t4 = [ &Time::HiRes::gettimeofday() ];
+        $return_vars->{"execution_times"} = [ map( sprintf( "%.2f", $_ ), ( Time::HiRes::tv_interval( $t0, $t1 ), Time::HiRes::tv_interval( $t1, $t2 ), Time::HiRes::tv_interval( $t2, $t3 ), Time::HiRes::tv_interval( $t3, $t4 ) ) ) ];
+    }
+    else {
+        croak("Feel proud: you witness an extremely unlikely behaviour of this website.");
+    }
+
+    ### TODO
+
     return;
 }
 
 sub _enumerate_connected_subgraphs_recursive {
-
-    #my ( $match, $graph, $subgraph, $prohibited_nodes, $relation_ref, $reverse_relation_ref, $depth, $result_ref ) = @_;
     my ( $match, $graph, $subgraph, $prohibited_edges, $relation_ref, $reverse_relation_ref, $depth, $result_ref ) = @_;
 
     # determine all edges to neighbouring nodes that are not
@@ -127,8 +176,6 @@ sub _enumerate_connected_subgraphs_recursive {
 
         # outgoing edges
         foreach my $target ( keys %{ $relation_ref->{$node} } ) {
-
-            #next if ( $prohibited_nodes->contains($target) );
             next if ( $prohibited_edges->contains("$node-$target") );
             $out_edges->insert( [ $node, $target ] );
             $neighbours->insert($target);
@@ -137,8 +184,6 @@ sub _enumerate_connected_subgraphs_recursive {
 
         # incoming edges
         foreach my $origin ( keys %{ $reverse_relation_ref->{$node} } ) {
-
-            #next if ( $prohibited_nodes->contains($origin) );
             next if ( $prohibited_edges->contains("$origin-$node") );
             $in_edges->insert( [ $origin, $node ] );
             $neighbours->insert($origin);
@@ -165,11 +210,7 @@ sub _enumerate_connected_subgraphs_recursive {
             my $local_subgraph = $subgraph->copy_graph;
             $local_subgraph->add_edges( $set->elements(), $new_set->elements() );
             _emit( $match, $local_subgraph, $relation_ref, $result_ref );
-
-            #if ( $local_subgraph->vertices < $data->{"active"}->{"subgraph_size"} ) {
             if ( $local_subgraph->vertices < $data->{"active"}->{"subgraph_size"} && $depth < $data->{"active"}->{"subgraph_depth"} ) {
-
-                #_enumerate_connected_subgraphs_recursive( $match, $graph, $local_subgraph, Set::Object::union( $prohibited_nodes, $neighbours ), $relation_ref, $reverse_relation_ref, $depth + 1, $result_ref );
                 _enumerate_connected_subgraphs_recursive( $match, $graph, $local_subgraph, Set::Object::union( $prohibited_edges, $neighbouring_edges, $string_edges ), $relation_ref, $reverse_relation_ref, $depth + 1, $result_ref );
             }
         }
@@ -280,7 +321,7 @@ sub _emit {
         for ( my $j = 0; $j <= $#sorted_nodes; $j++ ) {
             my $node_2 = $sorted_nodes[$j];
             if ( $edges{$node_1}->{$node_2} ) {
-                $emit_structure[$i]->[$j] = $RELATION_IDS->{ $edges{$node_1}->{$node_2} };
+                $emit_structure[$i]->[$j] = $relation_id{ $edges{$node_1}->{$node_2} };
                 croak "Self-loop: " . join( ", ", @list_representation ) if ( $i == $j );
             }
             else {
