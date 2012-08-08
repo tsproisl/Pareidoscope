@@ -8,6 +8,7 @@ use Graph::Directed;
 use Set::Object;
 use DBI;
 use Time::HiRes;
+use List::MoreUtils qw(first_index);
 
 use Carp;    # carp croak
 
@@ -19,8 +20,9 @@ use executequeries;
 use localdata_client;
 
 sub get_subgraphs {
-    my ( $data, $word_or_lemma ) = @_;
+    my ( $data, $freq ) = @_;
     my $return_vars;
+    my ( $qids, $qid );
     my $frequency_threshold      = 200000;
     my $subgraph_types_threshold = 750000;
     my $s_handle                 = $data->get_attribute("s");
@@ -28,7 +30,7 @@ sub get_subgraphs {
     my $indep_handle             = $data->get_attribute("indep");
     my $outdep_handle            = $data->get_attribute("outdep");
     my $root_handle              = $data->get_attribute("root");
-    my $get_relation_ids         = database->prepare(qq{SELECT relation, depid FROM dependencies});
+    my $get_relation_ids         = $data->{"dbh"}->prepare(qq{SELECT relation, depid FROM dependencies});
     my $check_cache              = database->prepare(qq{SELECT qid, r1, n FROM queries WHERE corpus=? AND class=? AND query=? AND threshold=?});
     my $insert_query             = database->prepare(qq{INSERT INTO queries (corpus, class, query, threshold, qlen, time, r1, n) VALUES (?, ?, ?, ?, ?, strftime('%s','now'), ?, ?)});
     my $update_timestamp         = database->prepare(qq{UPDATE queries SET time=strftime('%s','now') WHERE qid=?});
@@ -38,7 +40,8 @@ sub get_subgraphs {
         "name"  => "dep",
         "class" => "strucd"
     );
-    my ( $query, $unlex_query, $title, $anchor, $length, $ngram_ref ) = executequeries::build_query($data);
+    my $localdata = localdata_client->init( $data->{"active"}->{"localdata"}, @{ $data->{"active"}->{"machines"} } );
+    my ( $query, $unlex_query, $title, $anchor, $query_length, $ngram_ref ) = executequeries::build_query($data);
     $return_vars->{"query_anchor"}       = $anchor;
     $return_vars->{"query_title"}        = $title;
     $return_vars->{"threshold"}          = param("threshold");
@@ -52,16 +55,15 @@ sub get_subgraphs {
 
     # check cache database
     $check_cache->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $query, param("threshold") );
-    $qids           = $check_cache->fetchall_arrayref;
-    $subgraph_types = 0;
+    $qids = $check_cache->fetchall_arrayref;
     if ( scalar(@$qids) == 1 ) {
-        my $qid = $qids->[0]->[0];
+        $qid = $qids->[0]->[0];
         $update_timestamp->execute($qid);
         my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$qid" ) or croak("Cannot connect: $DBI::errstr");
         $dbh->do("PRAGMA encoding = 'UTF-8'");
         my $get_subgraph_types = $dbh->prepare(qq{SELECT COUNT(*) FROM results WHERE qid=?});
         $get_subgraph_types->execute($qid);
-        $subgraph_types                        = ( $get_subgraph_types->fetchrow_array )[0];
+        my $subgraph_types = ( $get_subgraph_types->fetchrow_array )[0];
         $return_vars->{"ngram_tokens"}         = $qids->[0]->[1];
         $return_vars->{"ngram_types"}          = $subgraph_types;
         $return_vars->{"too_many_ngram_types"} = $subgraph_types >= $subgraph_types_threshold;
@@ -73,7 +75,7 @@ sub get_subgraphs {
         my $cached_query_id = $data->{"cache"}->query( -corpus => $data->{"active"}->{"corpus"}, -query => $query );
         my $t1              = [ &Time::HiRes::gettimeofday() ];
         my $sentence        = $data->get_attribute("s");
-        my @matches         = $data->{"cqp"}->exec("tabulate $cached_query_id match, $matchend");
+        my @matches         = $data->{"cqp"}->exec("tabulate $cached_query_id match, matchend");
         my $t2              = [ &Time::HiRes::gettimeofday() ];
 
     SENTENCE:
@@ -122,9 +124,9 @@ sub get_subgraphs {
 
             my $subgraph = Graph::Directed->new();
             $subgraph->add_vertex($match);
-            _emit( $match, $subgraph, \%relation, $result_ref );
+            _emit( $match, $subgraph, \%relation, $result_ref, \%relation_id );
             my $prohibited_edges = Set::Object->new();
-            _enumerate_connected_subgraphs_recursive( $match, $graph, $subgraph, $prohibited_edges, \%relation, \%reverse_relation, 1, $result_ref );
+            _enumerate_connected_subgraphs_recursive( $data, $match, $graph, $subgraph, $prohibited_edges, \%relation, \%reverse_relation, 1, $result_ref, \%relation_id );
         }
         my @queue;
         foreach my $size ( 1 .. $data->{"active"}->{"subgraph_size"} ) {
@@ -143,14 +145,15 @@ sub get_subgraphs {
         return $return_vars if ( $return_vars->{"too_many_ngram_types"} );
 
         # insert into cache database
-        $insert_query->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $query, param("threshold"), $query_length, $r1, $data->{"active"}->{ $specifics{"name"} . "_ngrams" } );
+        $insert_query->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $query, param("threshold"), $query_length, $r1, $data->{"active"}->{'subgraphs'} ) or croak( $insert_query->errstr );
         $check_cache->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $query, param("threshold") );
-        my $qid = ( $check_cache->fetchrow_array )[0];
-        my $t3  = [ &Time::HiRes::gettimeofday() ];
+        $qid = ( $check_cache->fetchrow_array )[0];
+        croak('qid is undef!') if ( !defined $qid );
+        my $t3 = [ &Time::HiRes::gettimeofday() ];
 
         my $dbh = executequeries::create_new_db($qid);
         $dbh->disconnect();
-        $self->{"localdata"}->add_freq_and_am( \@queue, $r1, $data->{"active"}->{"subgraphs"}, $qid );
+        $localdata->add_freq_and_am( \@queue, $r1, $data->{"active"}->{"subgraphs"}, $qid );
         my $t4 = [ &Time::HiRes::gettimeofday() ];
         $return_vars->{"execution_times"} = [ map( sprintf( "%.2f", $_ ), ( Time::HiRes::tv_interval( $t0, $t1 ), Time::HiRes::tv_interval( $t1, $t2 ), Time::HiRes::tv_interval( $t2, $t3 ), Time::HiRes::tv_interval( $t3, $t4 ) ) ) ];
     }
@@ -159,12 +162,84 @@ sub get_subgraphs {
     }
 
     ### TODO
+    %$return_vars = ( %$return_vars, %{ _create_table( $data, $query, $qid ) } );
 
-    return;
+    foreach my $param ( keys %{ params() } ) {
+        next if ( param($param) eq q{} );
+        $return_vars->{"previous_href"}->{$param} = $return_vars->{"next_href"}->{$param} = param($param);
+    }
+    $return_vars->{"previous_href"}->{"start"} = param("start") - 40;
+    $return_vars->{"next_href"}->{"start"}     = param("start") + 40;
+    return $return_vars;
+}
+
+sub _create_table {
+    my ( $data, $query, $qid ) = @_;
+    my $vars;
+    my %specifics = (
+        "map"   => "number_to_relation",
+        "class" => "strucd"
+    );
+    my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$qid" ) or croak("Cannot connect: $DBI::errstr");
+    $dbh->do("PRAGMA encoding = 'UTF-8'");
+    $dbh->do("PRAGMA cache_size = 50000");
+    my $filter_length = q{};
+    my $filter_pos    = q{};
+    my $get_top_40    = $dbh->prepare( qq{SELECT result, position, mlen, o11, c1, am FROM results WHERE qid=? $filter_length $filter_pos ORDER BY am DESC, o11 DESC LIMIT } . param("start") . qq{, 40} );
+    $get_top_40->execute($qid);
+    my $rows = $get_top_40->fetchall_arrayref;
+
+    ###$vars->{"hidden_states"} = $config->keep_states_listref_of_hashrefs( $cgi, {}, qw(m c rt dt start t tt p w i ht h ct) );
+    # id fch flen frel ftag fwc fpos q rt
+    foreach my $param ( keys %{ params() } ) {
+        next if ( param($param) eq q{} );
+        if ( List::MoreUtils::any { $_ eq $param } qw(fch flen frel ftag fwc fpos) ) {
+            $vars->{$param} = param($param);
+        }
+        else {
+            $vars->{"hidden_states"}->{$param} = param($param);
+        }
+    }
+    $vars->{"hidden_states"}->{"start"} = 0;
+
+    ### NOTWENDIG?
+    $vars->{"pos_tags"} = $data->{"number_to_tag"};
+    $vars->{"word_classes"} = [ "", sort keys %{ config->{"tagsets"}->{ $data->{"active"}->{"tagset"} } } ];
+    my $counter = param("start");
+
+    foreach my $row (@$rows) {
+        my ( $result, $position, $mlen, $o11, $c1, $g2 ) = @$row;
+        $row             = {};
+        $g2              = sprintf( "%.5f", $g2 );
+        $row->{"g"}      = $g2;
+        $row->{"cofreq"} = $o11;
+        $row->{"ngfreq"} = $c1;
+        my ( $strucnlink, $lexnlink, $freqlink, $ngfreqlink, $g2span );
+        my ( @result, @ngram, @display_ngram, $display_ngram, );
+        $result =~ s/[<>]//g;
+        @ngram                    = map( $data->{ $specifics{"map"} }->[$_], map( hex($_), unpack( "(a4)*", $result ) ) );
+        @display_ngram            = @ngram;
+	#$display_ngram = join ' ', grep {defined} @display_ngram;
+	$display_ngram = "graph=$result&position=$position";
+        #$display_ngram[$position] = "<em>$display_ngram[$position]";
+        #$display_ngram[ $position + $mlen - 1 ] .= "</em>";
+        #$display_ngram = join( " ", @display_ngram );
+        $row->{"display_ngram"} = $display_ngram;
+
+        # CREATE LEX AND STRUC LINKS
+        $row->{"struc_href"}  = 'foo';
+        $row->{"lex_href"}    = 'foo';
+        $row->{"cofreq_href"} = 'foo';
+        $row->{"ngfreq_href"} = 'foo';
+        $counter++;
+        $row->{"number"} = $counter;
+    }
+    $vars->{"rows"} = $rows;
+    return $vars;
 }
 
 sub _enumerate_connected_subgraphs_recursive {
-    my ( $match, $graph, $subgraph, $prohibited_edges, $relation_ref, $reverse_relation_ref, $depth, $result_ref ) = @_;
+    my ( $data, $match, $graph, $subgraph, $prohibited_edges, $relation_ref, $reverse_relation_ref, $depth, $result_ref, $relation_id_ref ) = @_;
 
     # determine all edges to neighbouring nodes that are not
     # prohibited
@@ -209,9 +284,9 @@ sub _enumerate_connected_subgraphs_recursive {
         foreach my $new_set ( $second_powerset->elements() ) {
             my $local_subgraph = $subgraph->copy_graph;
             $local_subgraph->add_edges( $set->elements(), $new_set->elements() );
-            _emit( $match, $local_subgraph, $relation_ref, $result_ref );
+            _emit( $match, $local_subgraph, $relation_ref, $result_ref, $relation_id_ref );
             if ( $local_subgraph->vertices < $data->{"active"}->{"subgraph_size"} && $depth < $data->{"active"}->{"subgraph_depth"} ) {
-                _enumerate_connected_subgraphs_recursive( $match, $graph, $local_subgraph, Set::Object::union( $prohibited_edges, $neighbouring_edges, $string_edges ), $relation_ref, $reverse_relation_ref, $depth + 1, $result_ref );
+                _enumerate_connected_subgraphs_recursive( $data, $match, $graph, $local_subgraph, Set::Object::union( $prohibited_edges, $neighbouring_edges, $string_edges ), $relation_ref, $reverse_relation_ref, $depth + 1, $result_ref, $relation_id_ref );
             }
         }
     }
@@ -271,7 +346,7 @@ OUTER: for ( my $i = 0; $i < 2**$number_of_elements; $i++ ) {
 }
 
 sub _emit {
-    my ( $match, $subgraph, $relation_ref, $result_ref ) = @_;
+    my ( $match, $subgraph, $relation_ref, $result_ref, $relation_id_ref ) = @_;
     my %edges;
     my %incoming_edge;
     my @list_representation;
@@ -321,7 +396,7 @@ sub _emit {
         for ( my $j = 0; $j <= $#sorted_nodes; $j++ ) {
             my $node_2 = $sorted_nodes[$j];
             if ( $edges{$node_1}->{$node_2} ) {
-                $emit_structure[$i]->[$j] = $relation_id{ $edges{$node_1}->{$node_2} };
+                $emit_structure[$i]->[$j] = $relation_id_ref->{ $edges{$node_1}->{$node_2} };
                 croak "Self-loop: " . join( ", ", @list_representation ) if ( $i == $j );
             }
             else {

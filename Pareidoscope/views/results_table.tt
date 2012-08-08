@@ -31,10 +31,10 @@
   frequency: [% frequency %]
   [% IF !frequency_too_low and !frequency_too_high %]
   <br />
-  occurs in [% ngram_tokens %] [% return_type %] n-gram tokens
+  occurs in [% ngram_tokens %] [% IF return_type == 'dep' %]subgraph[% ELSE %][% return_type %] n-gram[% END %] tokens
   [% IF ngram_tokens > 0 %]
   <br />
-  occurs in [% ngram_types %] [% return_type %] n-gram types with a frequency of at least [% threshold %]
+  occurs in [% ngram_types %] [% IF return_type == 'dep' %]subgraph[% ELSE %][% return_type %] n-gram[% END %] types with a frequency of at least [% threshold %]
   [% END %]
   [% END %]
   [% IF frequency_too_high or too_many_ngram_types %]
@@ -51,8 +51,8 @@
   [% IF execution_times %]
   corpus query: [% execution_times.0 %]s<br />
   tabulating results: [% execution_times.1 %]s<br />
-  extracting pos n-grams: [% execution_times.2 %]s<br />
-  retrieving pos n-gram frequencies and calculating associations: [% execution_times.3 %]s
+  extracting [% IF return_type == 'dep' %]subgraphs[% ELSE %]n-grams[% END %]: [% execution_times.2 %]s<br />
+  retrieving [% IF return_type == 'dep' %]subgraph[% ELSE %]n-gram[% END %] frequencies and calculating associations: [% execution_times.3 %]s
   [% ELSE %]
   Using cache database
   [% END %]
@@ -107,7 +107,7 @@
       #
     </th>
     <th>
-      n-gram
+      [% IF return_type == 'dep' %]subgraph[% ELSE %]n-gram[% END %]
     </th>
     <th>
       co-freq
@@ -126,7 +126,7 @@
   [% FOREACH row IN rows %]
   <tr [% IF rowa == 1%]class="row-a"[% rowa = 0 %][% ELSE %]class="row-b"[% rowa = 1 %][% END %]>
     <td style="text-align:right;" class="first">[% row.number %]</td>
-    <td>[% row.display_ngram %]</td>
+    <td>[% IF return_type == 'dep' %]<img src="[% graphviz_url %]?[% row.display_ngram %]&label=[% query_title %]"/>[% ELSE %][% row.display_ngram %][% END %]</td>
     <td style="text-align:right;"><a href="[% concordance_url %][% FOREACH arg IN row.cofreq_href %][% IF loop.first %]?[% ELSE %]&[% END %][% arg.key %]=[% arg.value %][% END %]">[% row.cofreq %]</a>
     </td>
     <td style="text-align:right;"><a href="[% concordance_url %][% FOREACH arg IN row.ngfreq_href %][% IF loop.first %]?[% ELSE %]&[% END %][% arg.key %]=[% arg.value %][% END %]">[% row.ngfreq %]</a>

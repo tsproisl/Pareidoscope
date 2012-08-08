@@ -71,6 +71,11 @@ img.float-right {
 img.float-left {
     margin: 5px 10px 10px 0px;
 }
+tr img {
+    background: none;
+    border: none;
+    padding: 0px;
+}
 
 h1, h2, h3, h4, p {
     padding: 10px 15px;		

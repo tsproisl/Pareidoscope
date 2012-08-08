@@ -41,6 +41,7 @@ hook 'before_template' => sub {
     $tokens->{lex_url}                     = uri_for('/results/lexical_ngram_query');
     $tokens->{struc_url}                   = uri_for('/results/structural_ngram_query');
     $tokens->{'display_context_url'}       = uri_for('results/display_context');
+    $tokens->{graphviz_url}                     = uri_for('/visualization/graph');
 
     # Corpus
     $tokens->{'url_args'}->{'corpus'} = param('corpus');
@@ -127,13 +128,8 @@ any [ 'get', 'post' ] => '/results/word_form_query' => sub {
     my %vars;
     $vars{'query_type'} = 'Word form query';
     $vars{'current'}    = uri_for('/results/word_form_query');
-    if ( param('return_type') eq 'pos' || param('return_type') eq 'chunk' ) {
-        %vars = ( %vars, %{ &executequeries::single_item_query($data) } );
-        template( 'single_item_query_results', \%vars );
-    }
-    elsif ( param('return_type') eq 'dep' ) {
-        ...;
-    }
+    %vars = ( %vars, %{ &executequeries::single_item_query($data) } );
+    template( 'single_item_query_results', \%vars );
 };
 
 any [ 'get', 'post' ] => '/results/lemma_query' => sub {
@@ -141,13 +137,8 @@ any [ 'get', 'post' ] => '/results/lemma_query' => sub {
     $vars{'query_type'} = 'Lemma query';
     $vars{'current'}    = uri_for('/results/lemma_query');
     %vars = ( %vars, %{ &executequeries::single_item_query($data) } );
-    if ( param('return_type') eq 'pos' || param('return_type') eq 'chunk' ) {
-        %vars = ( %vars, %{ &executequeries::single_item_query($data) } );
-        template( 'single_item_query_results', \%vars );
-    }
-    elsif ( param('return_type') eq 'dep' ) {
-        ...;
-    }
+    %vars = ( %vars, %{ &executequeries::single_item_query($data) } );
+    template( 'single_item_query_results', \%vars );
 };
 
 any [ 'get', 'post' ] => '/results/complex_query' => sub {
