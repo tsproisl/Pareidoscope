@@ -128,7 +128,7 @@ any [ 'get', 'post' ] => '/results/word_form_query' => sub {
     my %vars;
     $vars{'query_type'} = 'Word form query';
     $vars{'current'}    = uri_for('/results/word_form_query');
-    %vars = ( %vars, %{ &executequeries::single_item_query($data) } );
+    %vars = ( %vars, %{ executequeries::single_item_query($data) } );
     template( 'single_item_query_results', \%vars );
 };
 
@@ -136,43 +136,43 @@ any [ 'get', 'post' ] => '/results/lemma_query' => sub {
     my %vars;
     $vars{'query_type'} = 'Lemma query';
     $vars{'current'}    = uri_for('/results/lemma_query');
-    %vars = ( %vars, %{ &executequeries::single_item_query($data) } );
-    %vars = ( %vars, %{ &executequeries::single_item_query($data) } );
+    %vars = ( %vars, %{ executequeries::single_item_query($data) } );
+    %vars = ( %vars, %{ executequeries::single_item_query($data) } );
     template( 'single_item_query_results', \%vars );
 };
 
 any [ 'get', 'post' ] => '/results/complex_query' => sub {
     my %vars;
     $vars{'current'} = uri_for('/results/complex_query');
-    %vars = %{ &executequeries::ngram_query($data) };
+    %vars = %{ executequeries::ngram_query($data) };
     template( 'complex_query_results', \%vars );
 };
 
 get '/results/concordance' => sub {
     my %vars;
     $vars{'current'} = uri_for('/results/concordance');
-    %vars = ( %vars, %{ &executequeries::cqp_query($data) } );
+    %vars = ( %vars, %{ executequeries::cqp_query($data) } );
     template( 'kwic', \%vars );
 };
 
 get '/results/display_context' => sub {
     my %vars;
     $vars{'current'} = uri_for('/results/display_context');
-    $vars{'ps'}      = &kwic::display_context($data);
+    $vars{'ps'}      = kwic::display_context($data);
     template( 'context_display', \%vars );
 };
 
 get '/results/lexical_ngram_query' => sub {
     my %vars;
     $vars{'current'} = uri_for('/results/lexical_ngram_query');
-    %vars = ( %vars, %{ &executequeries::lexn_query($data) } );
+    %vars = ( %vars, %{ executequeries::lexn_query($data) } );
     template( 'lexical_query_results', \%vars );
 };
 
 any [ 'get', 'post' ] => '/results/structural_ngram_query' => sub {
     my %vars;
     $vars{'current'} = uri_for('/results/structural_ngram_query');
-    %vars = ( %vars, %{ &executequeries::strucn_query($data) } );
+    %vars = ( %vars, %{ executequeries::strucn_query($data) } );
     template( 'complex_query_results', \%vars );
 };
 

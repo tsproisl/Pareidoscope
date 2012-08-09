@@ -59,6 +59,10 @@ cache_size: 4096
 # maximal storage time before query results expire (in hours)
 cache_expire: 12
 
+# CWB-treebank
+cwb-treebank_host: clue43.linguistik.uni-erlangen.de
+cwb-treebank_port: 5931
+
 # corpora
 corpora:
     - available: 1
