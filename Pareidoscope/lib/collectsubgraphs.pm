@@ -9,7 +9,7 @@ use Set::Object;
 use DBI;
 use Time::HiRes;
 use List::MoreUtils qw(first_index);
-
+use JSON;
 use Carp;    # carp croak
 
 use Readonly;
@@ -161,7 +161,6 @@ sub get_subgraphs {
         croak("Feel proud: you witness an extremely unlikely behaviour of this website.");
     }
 
-    ### TODO
     %$return_vars = ( %$return_vars, %{ _create_table( $data, $query, $qid ) } );
 
     foreach my $param ( keys %{ params() } ) {
@@ -171,6 +170,18 @@ sub get_subgraphs {
     $return_vars->{"previous_href"}->{"start"} = param("start") - 40;
     $return_vars->{"next_href"}->{"start"}     = param("start") + 40;
     return $return_vars;
+}
+
+sub lexical_subgraph_query {
+    my ($data) = @_;
+    # gibt es Lexikalisierung?
+    # unlexikalisierte Struktur abfragen
+    # lexikalisierte Struktur abgfragen
+    # Kookkurrenzen aggregieren
+    # Assoziationsmaß berechnen
+    # Im Cache ablegen
+    # Visualisierung: wie die Beziehung zwischen einer Spalte und einem bestimmten Knoten deutlich machen? Farben?
+    ...
 }
 
 sub _create_table {
@@ -227,8 +238,17 @@ sub _create_table {
         $row->{"display_ngram"} = $display_ngram;
 
         # CREATE LEX AND STRUC LINKS
+	my $query_copy = $query;
+	$query_copy  =~ s/^\[//xms;
+	$query_copy  =~ s/\] within s$//xms;
+	$query_copy  =~ s/%c//xmsg;
+	$query_copy  =~ s/\s+/ /xmsg;
+	my %node_restriction;
+	while ($query_copy =~ m/(?<key>\S+)='(?<value>[^']+)'/xmsg) {
+	    $node_restriction{$LAST_PAREN_MATCH{'key'}} = $LAST_PAREN_MATCH{'value'};
+	}
         $row->{"struc_href"}  = 'foo';
-        $row->{"lex_href"}    = 'foo';
+        $row->{"lex_href"}    = {'graph' => $result, 'position' => $position, 'ignore_case' => params->{'ignore_case'}, %node_restriction};
         $row->{"cofreq_href"} = 'foo';
         $row->{"ngfreq_href"} = 'foo';
         $counter++;

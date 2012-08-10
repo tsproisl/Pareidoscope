@@ -41,7 +41,7 @@ hook 'before_template' => sub {
     $tokens->{lex_url}                     = uri_for('/results/lexical_ngram_query');
     $tokens->{struc_url}                   = uri_for('/results/structural_ngram_query');
     $tokens->{'display_context_url'}       = uri_for('results/display_context');
-    $tokens->{graphviz_url}                     = uri_for('/visualization/graph');
+    $tokens->{graphviz_url}                = uri_for('/visualization/graph');
 
     # Corpus
     $tokens->{'url_args'}->{'corpus'} = param('corpus');
@@ -165,7 +165,12 @@ get '/results/display_context' => sub {
 get '/results/lexical_ngram_query' => sub {
     my %vars;
     $vars{'current'} = uri_for('/results/lexical_ngram_query');
-    %vars = ( %vars, %{ executequeries::lexn_query($data) } );
+    if ( param("graph") ) {
+        %vars = ( %vars, %{ collectsubgraphs::lexical_subgraph_query($data) } );
+    }
+    elsif ( param("return_type") eq "dep" ) {
+        %vars = ( %vars, %{ executequeries::lexn_query($data) } );
+    }
     template( 'lexical_query_results', \%vars );
 };
 
