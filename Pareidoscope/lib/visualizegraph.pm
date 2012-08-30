@@ -5,7 +5,8 @@ use open qw(:utf8 :std);
 use utf8;
 
 use Data::Dumper;
-use List::MoreUtils qw(any);
+#use List::MoreUtils qw(any);
+use List::MoreUtils;
 use GraphViz;
 
 sub visualize_graph {
@@ -17,7 +18,8 @@ sub visualize_graph {
     my $position = param('position');
     my $label    = param('label');
     my $bgcolor  = 'transparent';
-    if ( any { ( !defined $_ ) || ( $_ eq q{} ) } ( $graph, $position, $label ) ) {
+    #if ( any { ( !defined $_ ) || ( $_ eq q{} ) } ( $graph, $position, $label ) ) {
+    if ( List::MoreUtils::any { ( !defined $_ ) || ( $_ eq q{} ) } ( $graph, $position, $label ) ) {
         my $gv = GraphViz->new(
             node => {
                 shape    => 'plaintext',

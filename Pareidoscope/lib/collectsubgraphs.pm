@@ -9,7 +9,6 @@ use Set::Object;
 use DBI;
 use Time::HiRes;
 use List::MoreUtils qw(first_index);
-use JSON;
 use Carp;    # carp croak
 
 use Readonly;
