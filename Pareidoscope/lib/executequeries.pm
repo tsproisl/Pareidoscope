@@ -816,6 +816,7 @@ sub create_freq_link_lex {
     my %argument;
     $argument{"corpus"} = param("corpus");
     $argument{"s"}      = "Link";
+    $argument{"return_type"} = param("return_type");
     my $localparams = Storable::dclone(params);
     if ( param("return_type") eq "pos" ) {
         $localparams->{ "t" .  ( $position + 1 ) } = $head;
@@ -839,6 +840,7 @@ sub create_ngfreq_link_lex {
     my %argument;
     $argument{"corpus"} = param("corpus");
     $argument{"s"}      = "Link";
+    $argument{"return_type"} = param("return_type");
     my $localparams = Storable::dclone(params);
     my @deletions   = qw(t tt w ht h);
     push( @deletions, "p" ) if ( param("return_type") eq "chunk" );
@@ -869,6 +871,7 @@ sub create_freq_link_struc {
     my %argument;
     $argument{"corpus"}    = param("corpus");
     $argument{"threshold"} = param("threshold");
+    $argument{"return_type"} = param("return_type");
     my $localparams = Storable::dclone(params);
     my @deletions   = qw(ct t tt w ht h p);
     foreach my $param (@deletions) {
@@ -906,6 +909,7 @@ sub create_ngfreq_link_struc {
     my %argument;
     $argument{"corpus"}    = param("corpus");
     $argument{"threshold"} = param("threshold");
+    $argument{"return_type"} = param("return_type");
     my $localparams = Storable::dclone(params);
     my @deletions   = qw(ct t tt w ht h p);
     foreach my $param (@deletions) {

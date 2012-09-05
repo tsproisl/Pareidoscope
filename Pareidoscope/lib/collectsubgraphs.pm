@@ -41,6 +41,8 @@ sub get_subgraphs {
     );
     my $localdata = localdata_client->init( $data->{"active"}->{"localdata"}, @{ $data->{"active"}->{"machines"} } );
     my ( $query, $unlex_query, $title, $anchor, $query_length, $ngram_ref ) = executequeries::build_query($data);
+    # TODO
+    # "word"/"lemma" und Wortform/Lemma aus $query extrahieren
     $return_vars->{"query_anchor"}       = $anchor;
     $return_vars->{"query_title"}        = $title;
     $return_vars->{"threshold"}          = param("threshold");
@@ -173,6 +175,7 @@ sub get_subgraphs {
 
 sub lexical_subgraph_query {
     my ($data) = @_;
+
     # gibt es Lexikalisierung?
     # unlexikalisierte Struktur abfragen
     # lexikalisierte Struktur abgfragen
@@ -180,7 +183,7 @@ sub lexical_subgraph_query {
     # Assoziationsmaß berechnen
     # Im Cache ablegen
     # Visualisierung: wie die Beziehung zwischen einer Spalte und einem bestimmten Knoten deutlich machen? Farben?
-    ...
+    ...;
 }
 
 sub _create_table {
@@ -227,29 +230,31 @@ sub _create_table {
         my ( $strucnlink, $lexnlink, $freqlink, $ngfreqlink, $g2span );
         my ( @result, @ngram, @display_ngram, $display_ngram, );
         $result =~ s/[<>]//g;
-        @ngram                    = map( $data->{ $specifics{"map"} }->[$_], map( hex($_), unpack( "(a4)*", $result ) ) );
-        @display_ngram            = @ngram;
-	#$display_ngram = join ' ', grep {defined} @display_ngram;
-	$display_ngram = "graph=$result&position=$position";
+        @ngram = map( $data->{ $specifics{"map"} }->[$_], map( hex($_), unpack( "(a4)*", $result ) ) );
+        @display_ngram = @ngram;
+
+        #$display_ngram = join ' ', grep {defined} @display_ngram;
+        $display_ngram = "graph=$result&position=$position";
+
         #$display_ngram[$position] = "<em>$display_ngram[$position]";
         #$display_ngram[ $position + $mlen - 1 ] .= "</em>";
         #$display_ngram = join( " ", @display_ngram );
         $row->{"display_ngram"} = $display_ngram;
 
         # CREATE LEX AND STRUC LINKS
-	my $query_copy = $query;
-	$query_copy  =~ s/^\[//xms;
-	$query_copy  =~ s/\] within s$//xms;
-	$query_copy  =~ s/%c//xmsg;
-	$query_copy  =~ s/\s+/ /xmsg;
-	my %node_restriction;
-	while ($query_copy =~ m/(?<key>\S+)='(?<value>[^']+)'/xmsg) {
-	    $node_restriction{$LAST_PAREN_MATCH{'key'}} = $LAST_PAREN_MATCH{'value'};
-	}
+        my $query_copy = $query;
+        $query_copy =~ s/^\[//xms;
+        $query_copy =~ s/\] within s$//xms;
+        $query_copy =~ s/%c//xmsg;
+        $query_copy =~ s/\s+/ /xmsg;
+        my %node_restriction;
+        while ( $query_copy =~ m/(?<key>\S+)='(?<value>[^']+)'/xmsg ) {
+            $node_restriction{ $LAST_PAREN_MATCH{'key'} } = $LAST_PAREN_MATCH{'value'};
+        }
         $row->{"struc_href"}  = 'foo';
-        $row->{"lex_href"}    = {'graph' => $result, 'position' => $position, 'ignore_case' => params->{'ignore_case'}, %node_restriction};
-        $row->{"cofreq_href"} = 'foo';
-        $row->{"ngfreq_href"} = 'foo';
+        $row->{"lex_href"}    = { 'graph' => $result, 'position' => $position, 'ignore_case' => params->{'ignore_case'}, %node_restriction };
+        $row->{"cofreq_href"} = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'query' => 'foo' };
+        $row->{"ngfreq_href"} = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'query' => 'foo' };
         $counter++;
         $row->{"number"} = $counter;
     }

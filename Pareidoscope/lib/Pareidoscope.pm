@@ -137,7 +137,6 @@ any [ 'get', 'post' ] => '/results/lemma_query' => sub {
     $vars{'query_type'} = 'Lemma query';
     $vars{'current'}    = uri_for('/results/lemma_query');
     %vars = ( %vars, %{ executequeries::single_item_query($data) } );
-    %vars = ( %vars, %{ executequeries::single_item_query($data) } );
     template( 'single_item_query_results', \%vars );
 };
 
@@ -165,11 +164,11 @@ get '/results/display_context' => sub {
 get '/results/lexical_ngram_query' => sub {
     my %vars;
     $vars{'current'} = uri_for('/results/lexical_ngram_query');
-    if ( param("graph") ) {
-        %vars = ( %vars, %{ collectsubgraphs::lexical_subgraph_query($data) } );
+    if ( param("return_type") eq "pos" || param("return_type") eq "chunk" ) {
+        %vars = ( %vars, %{ executequeries::lexn_query($data) } );
     }
     elsif ( param("return_type") eq "dep" ) {
-        %vars = ( %vars, %{ executequeries::lexn_query($data) } );
+        %vars = ( %vars, %{ collectsubgraphs::lexical_subgraph_query($data) } );
     }
     template( 'lexical_query_results', \%vars );
 };
