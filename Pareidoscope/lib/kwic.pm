@@ -4,6 +4,7 @@ use Dancer ':syntax';
 use Carp;
 use List::Util qw(max);
 use URI::Escape;
+use JSON qw();
 
 sub display{
     my ($data) = @_;
@@ -161,6 +162,54 @@ sub escapeHTML {
     $_[0] =~ s/'/&apos;/g;
     $_[0] =~ s/"/&quot;/g;
     return $_[0];
+}
+
+sub display_dep {
+    my ($data) = @_;
+    my %state;
+    $state{"corpus"} = param("corpus");
+    $state{"id"} = param("id");
+    $state{"s"} = "Link";
+    my $qid = param('id');
+    my ($size, $end);
+    my $vars;
+
+    my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$qid" ) or croak "Cannot connect: $DBI::errstr";
+    $dbh->do("PRAGMA encoding = 'UTF-8'");
+    my $get_number_of_results = $dbh->prepare(qq{SELECT COUNT(*) FROM results WHERE qid=?});
+    my $get_results = $dbh->prepare(qq{SELECT result FROM results WHERE qid=? LIMIT } . param("start") . qq{, 40});
+    $get_number_of_results->execute($qid);
+    $size = ($get_number_of_results->fetchrow_array)[0];
+    $get_results->execute($qid);
+    my $results_ref = $get_results->fetchall_arrayref;
+    undef $get_results;
+    undef $get_number_of_results;
+    $dbh->disconnect();
+
+    foreach my $result_json (@{$results_ref}) {
+	my $result = JSON::decode_json($result_json->[0]);
+	my $id = $result->{'s_id'};
+	my $dispid = $result->{'s_original_id'};
+	my $row = {};
+	$dispid =~ s/-/&nbsp;/g;
+	$row->{"id"} = $dispid;
+	#$row->{"id_href"} = "pareidoscope.cgi?m=dc&id=" . param("id") . "&q=$id&s=Link&$state";
+	$row->{"id_href"} = {%state};
+	$row->{"id_href"}->{"sentence_id"} = $id;
+	my %is_matching = map {$_ => 1} @{$result->{'tokens'}};
+	$row->{"formatted"} = join q{ }, map {$is_matching{$_} ? "<strong class='kwic'>$result->{'sentence'}->[$_]</strong>" : $result->{'sentence'}->[$_]} (0 .. $#{$result->{'sentence'}});
+	push(@{$vars->{"rows"}}, {%{$row}});	    
+    }
+
+    $end = param("start") + 39 > $size - 1 ? $size - 1 : param("start") + 39;
+    $vars->{"match_start"} = param("start") + 1;
+    $vars->{"match_end"} = $end + 1;
+    $vars->{"matches"} = $size;
+    $vars->{"previous_href"} = {%state};
+    $vars->{"previous_href"}->{"start"} = max(param("start") - 40, 0);
+    $vars->{"next_href"} = {%state};
+    $vars->{"next_href"}->{"start"} = param("start") + 40;
+    return $vars;
 }
 
 1;

@@ -150,7 +150,13 @@ any [ 'get', 'post' ] => '/results/complex_query' => sub {
 get '/results/concordance' => sub {
     my %vars;
     $vars{'current'} = uri_for('/results/concordance');
-    %vars = ( %vars, %{ executequeries::cqp_query($data) } );
+    $vars{'return_type'} = param('return_type');
+    if ( param("return_type") eq "pos" || param("return_type") eq "chunk" ) {
+	%vars = ( %vars, %{ executequeries::cqp_query($data) } );
+    }
+    elsif ( param("return_type") eq "dep" ) {
+	%vars = ( %vars, %{ collectsubgraphs::concordance($data, "sentence") } );
+    }
     template( 'kwic', \%vars );
 };
 

@@ -10,6 +10,8 @@ use DBI;
 use Time::HiRes;
 use List::MoreUtils qw(first_index);
 use Carp;    # carp croak
+use IO::Socket;
+use JSON qw();
 
 use Readonly;
 Readonly my $UNLIMITED_NUMBER_OF_FIELDS => -1;
@@ -41,8 +43,17 @@ sub get_subgraphs {
     );
     my $localdata = localdata_client->init( $data->{"active"}->{"localdata"}, @{ $data->{"active"}->{"machines"} } );
     my ( $query, $unlex_query, $title, $anchor, $query_length, $ngram_ref ) = executequeries::build_query($data);
-    # TODO
-    # "word"/"lemma" und Wortform/Lemma aus $query extrahieren
+
+    # # TODO
+    # # "word"/"lemma" und Wortform/Lemma aus $query extrahieren
+    # my %node_restriction;
+    # if ($query =~ m/^[[](?<type>word|lemma)='(?<type_value>[^']+)' .*? (?:(?<gram>pos|wc)='(?<gram_value>[^']+)')?/xms) {
+    # 	$node_restriction{$LAST_PAREN_MATCH{'type'}} = $LAST_PAREN_MATCH{'type_value'};
+    # 	$node_restriction{$LAST_PAREN_MATCH{'gram'}} = $LAST_PAREN_MATCH{'gram_value'} if (defined $LAST_PAREN_MATCH{'gram'});
+    # }
+    # else {
+    #    croak "Unexpected query: '$query'";
+    # }
     $return_vars->{"query_anchor"}       = $anchor;
     $return_vars->{"query_title"}        = $title;
     $return_vars->{"threshold"}          = param("threshold");
@@ -251,10 +262,10 @@ sub _create_table {
         while ( $query_copy =~ m/(?<key>\S+)='(?<value>[^']+)'/xmsg ) {
             $node_restriction{ $LAST_PAREN_MATCH{'key'} } = $LAST_PAREN_MATCH{'value'};
         }
-        $row->{"struc_href"}  = 'foo';
-        $row->{"lex_href"}    = { 'graph' => $result, 'position' => $position, 'ignore_case' => params->{'ignore_case'}, %node_restriction };
-        $row->{"cofreq_href"} = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'query' => 'foo' };
-        $row->{"ngfreq_href"} = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'query' => 'foo' };
+        $row->{"struc_href"}  = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'graph' => $result, 'position' => $position, 'ignore_case' => params->{'ignore_case'}, %node_restriction };
+        $row->{"lex_href"}    = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'graph' => $result, 'position' => $position, 'ignore_case' => params->{'ignore_case'}, %node_restriction };
+        $row->{"cofreq_href"} = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'graph' => $result, 'position' => $position, 'ignore_case' => params->{'ignore_case'}, %node_restriction };
+        $row->{"ngfreq_href"} = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'graph' => $result, 'ignore_case' => params->{'ignore_case'} };
         $counter++;
         $row->{"number"} = $counter;
     }
@@ -430,6 +441,93 @@ sub _emit {
     }
     $result_ref->[ scalar @emit_structure ]->{ unpack "H*", pack( "(S*)>", map { @{$_} } @emit_structure ) }->{$node_index}++;
     return;
+}
+
+sub _get_json_graph {
+    my ($data) = @_;
+    my @linear_matrix = map { defined $_ ? { 'relation' => $_ } : {} } map { $data->{'number_to_relation'}->[$_] or undef } unpack( "(S*)>", pack( "H*", param('graph') ) );
+    foreach my $param qw(word lemma pos wc) {
+        if ( param($param) ) {
+            $linear_matrix[ param('position') ]->{$param} = param($param);
+        }
+    }
+    my $number_of_nodes = sqrt $#linear_matrix + 1;
+    my @matrix          = map { [ @linear_matrix[ $_ * $number_of_nodes .. $_ * $number_of_nodes + $number_of_nodes - 1 ] ] } ( 0 .. $number_of_nodes - 1 );
+    my $json_graph      = JSON::encode_json( \@matrix );
+    debug $json_graph;
+    return $json_graph, $number_of_nodes;
+}
+
+sub concordance {
+    my ( $data, $mode ) = @_;
+
+    my $check_cache      = database->prepare(qq{SELECT qid, r1, n FROM queries WHERE corpus=? AND class=? AND query=? AND threshold=?});
+    my $insert_query     = database->prepare(qq{INSERT INTO queries (corpus, class, query, threshold, qlen, time, r1, n) VALUES (?, ?, ?, ?, ?, strftime('%s','now'), ?, ?)});
+    my $update_timestamp = database->prepare(qq{UPDATE queries SET time=strftime('%s','now') WHERE qid=?});
+    my $update_n = database->prepare(qq{UPDATE queries SET n=? WHERE qid=?});
+
+    my $class = "cwb-treebank-$mode-" . ( param('ignore_case') ? "ci" : "cs" );
+
+    # unpack graph
+    my ($json_graph, $query_length) = _get_json_graph($data);
+
+    my ($qids, $qid);
+    $check_cache->execute( $data->{"active"}->{"corpus"}, $class, $json_graph, 0 );
+    $qids = $check_cache->fetchall_arrayref;
+    if ( scalar(@$qids) == 1 ) {
+        $qid = $qids->[0]->[0];
+        $update_timestamp->execute($qid);
+    }
+    elsif ( scalar(@$qids) == 0 ) {
+        $insert_query->execute( $data->{"active"}->{"corpus"}, $class, $json_graph, 0, $query_length, 0, 0 ) or croak $insert_query->errstr;
+	$check_cache->execute( $data->{"active"}->{"corpus"}, $class, $json_graph, 0 );
+        $qid = ( $check_cache->fetchrow_array )[0];
+        croak 'qid is undef!' if ( !defined $qid );
+        my $dbh = executequeries::create_new_db($qid);
+	my $insert_result = $dbh->prepare(qq{INSERT INTO results (qid, result, position, mlen, o11, c1, am) VALUES (?, ?, 0, 0, 0, 0, 0)});
+
+        my $socket = IO::Socket::INET->new(
+            PeerAddr  => config->{"cwb-treebank_host"},
+            PeerPort  => config->{"cwb-treebank_port"},
+            Proto     => "tcp",
+            ReuseAddr => 1,
+            Timeout   => 5,
+            Type      => SOCK_STREAM
+        ) or croak "Couldn't connect to " . config->{"cwb-treebank_host"} . ":" . config->{"cwb-treebank_port"} . ": $@";
+        binmode( $socket, ":utf8" );
+
+        print $socket "corpus " . $data->{"active"}->{"corpus"} . "\n";
+        print $socket "mode $mode\n";
+        print $socket "case-sensitivity " . ( param('ignore_case') ? "yes" : "no" ) . "\n";
+        print $socket $json_graph, "\n";
+
+	$dbh->do(qq{BEGIN TRANSACTION});
+	my $n = 0;
+        while ( my $out_json = <$socket> ) {
+            last if ( $out_json eq "finito\n" );
+	    chomp $out_json;
+	    my $out = JSON::decode_json($out_json);
+	    my $tmp = JSON::decode_json($out_json);
+	    foreach my $tokens_ref (@{$out->{'tokens'}}) {
+		$tmp->{'tokens'} = $tokens_ref;
+		my $tmp_json = JSON::encode_json($tmp);
+		$insert_result->execute($qid, $tmp_json);
+		$n++;
+	    }
+        }
+	$dbh->do(qq{COMMIT});
+
+        close $socket;
+        $dbh->disconnect();
+
+	$update_n->execute($n, $qid);
+    }
+
+    params->{"id"} = $qid;
+    params->{"start"} = 0 unless ( param("start") );
+    my $vars = {};
+    %$vars = ( %$vars, %{ kwic::display_dep($data) } );
+    return $vars;
 }
 
 1;

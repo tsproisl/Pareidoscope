@@ -268,6 +268,9 @@ sub lexn_query {
                     @words = $word->cpos2str( grep( defined( $head->cpos2struc($_) ), ( $match .. $matchend ) ) );
                 }
                 croak( scalar(@words) . " != $query_length\n" ) unless ( @words == $query_length );
+                if ( param("ignore_case") ) {
+                    @words = map { lc $_ } @words;
+                }
                 for ( my $i = 0; $i <= $#words; $i++ ) {
                     $ms->[1]->[$i]->{ $words[$i] }++;
                 }
@@ -753,6 +756,7 @@ sub create_n_link_struc {
     $argument{"corpus"}      = param("corpus");
     $argument{"threshold"}   = param("threshold");
     $argument{"return_type"} = param("return_type");
+    $argument{"ignore_case"} = param("ignore_case");
     my @params = qw(t tt);
     if ( param("return_type") eq "chunk" ) {
         push @params, qw(p w h ht);
@@ -781,7 +785,9 @@ sub create_n_link_lex {
     $argument{"corpus"}      = param("corpus");
     $argument{"return_type"} = param("return_type");
     $argument{"s"}           = "Link";
-    $argument{"ignore_case"} = 0;
+
+    #$argument{"ignore_case"} = 0;
+    $argument{"ignore_case"} = param("ignore_case");
     $argument{"threshold"}   = param("threshold");
     my @params = qw(p w t tt);
 
@@ -814,8 +820,8 @@ sub create_n_link_lex {
 sub create_freq_link_lex {
     my ( $data, $freq, $ngramref, $position, $head ) = @_;
     my %argument;
-    $argument{"corpus"} = param("corpus");
-    $argument{"s"}      = "Link";
+    $argument{"corpus"}      = param("corpus");
+    $argument{"s"}           = "Link";
     $argument{"return_type"} = param("return_type");
     my $localparams = Storable::dclone(params);
     if ( param("return_type") eq "pos" ) {
@@ -826,7 +832,7 @@ sub create_freq_link_lex {
         $localparams->{ "h" .  ( $position + 1 ) } = $head;
         $localparams->{ "ht" . ( $position + 1 ) } = "wordform";
     }
-    $localparams->{"ignore_case"} = 0;
+    #$localparams->{"ignore_case"} = 0;
     my ($query) = &build_query( $data, $localparams );
     $argument{"query"} = URI::Escape::uri_escape($query);
     return \%argument;
@@ -838,12 +844,13 @@ sub create_freq_link_lex {
 sub create_ngfreq_link_lex {
     my ( $data, $freq, $ngramref, $position, $head ) = @_;
     my %argument;
-    $argument{"corpus"} = param("corpus");
-    $argument{"s"}      = "Link";
+    $argument{"corpus"}      = param("corpus");
+    $argument{"s"}           = "Link";
     $argument{"return_type"} = param("return_type");
     my $localparams = Storable::dclone(params);
     my @deletions   = qw(t tt w ht h);
     push( @deletions, "p" ) if ( param("return_type") eq "chunk" );
+
     foreach my $param (@deletions) {
 
         foreach my $i ( 1 .. $data->{"active"}->{"ngram_length"} ) {
@@ -869,12 +876,13 @@ sub create_ngfreq_link_lex {
 sub create_freq_link_struc {
     my ( $data, $freq, $position, @ngram ) = @_;
     my %argument;
-    $argument{"corpus"}    = param("corpus");
-    $argument{"threshold"} = param("threshold");
+    $argument{"corpus"}      = param("corpus");
+    $argument{"threshold"}   = param("threshold");
     $argument{"return_type"} = param("return_type");
     my $localparams = Storable::dclone(params);
     my @deletions   = qw(ct t tt w ht h p);
     foreach my $param (@deletions) {
+
         foreach my $i ( 1 .. $data->{"active"}->{"ngram_length"} ) {
             undef( $localparams->{ $param . $i } );
         }
@@ -907,12 +915,13 @@ sub create_freq_link_struc {
 sub create_ngfreq_link_struc {
     my ( $data, $ngfreq, @ngram ) = @_;
     my %argument;
-    $argument{"corpus"}    = param("corpus");
-    $argument{"threshold"} = param("threshold");
+    $argument{"corpus"}      = param("corpus");
+    $argument{"threshold"}   = param("threshold");
     $argument{"return_type"} = param("return_type");
     my $localparams = Storable::dclone(params);
     my @deletions   = qw(ct t tt w ht h p);
     foreach my $param (@deletions) {
+
         foreach my $i ( 1 .. $data->{"active"}->{"ngram_length"} ) {
             undef( $localparams->{ $param . $i } );
         }
@@ -1035,10 +1044,10 @@ sub new_print_table {
         $row->{"display_ngram"} = $display_ngram;
 
         # CREATE LEX AND STRUC LINKS
-        $row->{"struc_href"} = &create_n_link_struc( \@ngram, $position );
-        $row->{"lex_href"}   = &create_n_link_struc( \@ngram, $position );
-        $row->{"cofreq_href"} = &create_freq_link_struc( $data, $o11, $position, @ngram );
-        $row->{"ngfreq_href"} = &create_ngfreq_link_struc( $data, $c1, @ngram );
+        $row->{"struc_href"} = create_n_link_struc( \@ngram, $position );
+        $row->{"lex_href"}   = create_n_link_struc( \@ngram, $position );
+        $row->{"cofreq_href"} = create_freq_link_struc( $data, $o11, $position, @ngram );
+        $row->{"ngfreq_href"} = create_ngfreq_link_struc( $data, $c1, @ngram );
         $counter++;
         $row->{"number"} = $counter;
     }
@@ -1100,10 +1109,10 @@ sub print_ngram_query_tables {
             $g2 = sprintf( "%.5f", $g2 );
             my ( $freqlink, $ngfreqlink, $lexnlink, $strucnlink );
             $slotrow->{"word"}        = $result;
-            $slotrow->{"cofreq_href"} = &create_freq_link_lex( $data, $o11, $ngramref, $position, $result );
-            $slotrow->{"ngfreq_href"} = &create_ngfreq_link_lex( $data, $c1, $ngramref, $position, $result ) unless ($general);
-            $slotrow->{"lex_href"}    = &create_n_link_lex( $data, $ngramref, $position, $result );
-            $slotrow->{"struc_href"}  = &create_n_link_lex( $data, $ngramref, $position, $result );
+            $slotrow->{"cofreq_href"} = create_freq_link_lex( $data, $o11, $ngramref, $position, $result );
+            $slotrow->{"ngfreq_href"} = create_ngfreq_link_lex( $data, $c1, $ngramref, $position, $result ) unless ($general);
+            $slotrow->{"lex_href"}    = create_n_link_lex( $data, $ngramref, $position, $result );
+            $slotrow->{"struc_href"}  = create_n_link_lex( $data, $ngramref, $position, $result );
             $counter++;
             $slotrow->{"number"} = $counter;
             $slotrow->{"cofreq"} = $o11;
