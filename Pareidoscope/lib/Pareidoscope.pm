@@ -175,7 +175,7 @@ get '/results/lexical_ngram_query' => sub {
         %vars = ( %vars, %{ executequeries::lexn_query($data) } );
     }
     elsif ( param("return_type") eq "dep" ) {
-        %vars = ( %vars, %{ collectsubgraphs::lexical_subgraph_query($data) } );
+        %vars = ( %vars, %{ collectsubgraphs::lexical_subgraph_query($data, 'collo') } );
     }
     template( 'lexical_query_results', \%vars );
 };

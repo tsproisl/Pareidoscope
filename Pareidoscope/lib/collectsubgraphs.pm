@@ -185,7 +185,9 @@ sub get_subgraphs {
 }
 
 sub lexical_subgraph_query {
-    my ($data) = @_;
+    my ($data, $mode) = @_;
+
+    # params->{"id"} = _cwb_treebank_query($data, $mode);
 
     # gibt es Lexikalisierung?
     # unlexikalisierte Struktur abfragen
@@ -445,33 +447,30 @@ sub _emit {
 
 sub _get_json_graph {
     my ($data) = @_;
-    my @linear_matrix = map { defined $_ ? { 'relation' => $_ } : {} } map { $data->{'number_to_relation'}->[$_] or undef } unpack( "(S*)>", pack( "H*", param('graph') ) );
+    my @linear_matrix   = map { defined $_ ? { 'relation' => $_ } : {} } map { $data->{'number_to_relation'}->[$_] or undef } unpack( "(S*)>", pack( "H*", param('graph') ) );
     my $number_of_nodes = sqrt $#linear_matrix + 1;
     my @matrix          = map { [ @linear_matrix[ $_ * $number_of_nodes .. $_ * $number_of_nodes + $number_of_nodes - 1 ] ] } ( 0 .. $number_of_nodes - 1 );
-    foreach my $param qw(word lemma pos wc) {
+    foreach my $param (qw(word lemma pos wc)) {
         if ( param($param) ) {
             $matrix[ param('position') ]->[ param('position') ]->{$param} = param($param);
         }
     }
-    my $json_graph      = JSON::encode_json( \@matrix );
+    my $json_graph = JSON::encode_json( \@matrix );
     debug $json_graph;
     return $json_graph, $number_of_nodes;
 }
 
-sub concordance {
-    my ( $data, $mode ) = @_;
+sub _cwb_treebank_query {
+    my ( $data, $mode, $json_graph, $query_length ) = @_;
 
     my $check_cache      = database->prepare(qq{SELECT qid, r1, n FROM queries WHERE corpus=? AND class=? AND query=? AND threshold=?});
     my $insert_query     = database->prepare(qq{INSERT INTO queries (corpus, class, query, threshold, qlen, time, r1, n) VALUES (?, ?, ?, ?, ?, strftime('%s','now'), ?, ?)});
     my $update_timestamp = database->prepare(qq{UPDATE queries SET time=strftime('%s','now') WHERE qid=?});
-    my $update_n = database->prepare(qq{UPDATE queries SET n=? WHERE qid=?});
+    my $update_n         = database->prepare(qq{UPDATE queries SET n=? WHERE qid=?});
 
     my $class = "cwb-treebank-$mode-" . ( param('ignore_case') ? "ci" : "cs" );
 
-    # unpack graph
-    my ($json_graph, $query_length) = _get_json_graph($data);
-
-    my ($qids, $qid);
+    my ( $qids, $qid );
     $check_cache->execute( $data->{"active"}->{"corpus"}, $class, $json_graph, 0 );
     $qids = $check_cache->fetchall_arrayref;
     if ( scalar(@$qids) == 1 ) {
@@ -480,11 +479,11 @@ sub concordance {
     }
     elsif ( scalar(@$qids) == 0 ) {
         $insert_query->execute( $data->{"active"}->{"corpus"}, $class, $json_graph, 0, $query_length, 0, 0 ) or croak $insert_query->errstr;
-	$check_cache->execute( $data->{"active"}->{"corpus"}, $class, $json_graph, 0 );
+        $check_cache->execute( $data->{"active"}->{"corpus"}, $class, $json_graph, 0 );
         $qid = ( $check_cache->fetchrow_array )[0];
         croak 'qid is undef!' if ( !defined $qid );
-        my $dbh = executequeries::create_new_db($qid);
-	my $insert_result = $dbh->prepare(qq{INSERT INTO results (qid, result, position, mlen, o11, c1, am) VALUES (?, ?, 0, 0, 0, 0, 0)});
+        my $dbh           = executequeries::create_new_db($qid);
+        my $insert_result = $dbh->prepare(qq{INSERT INTO results (qid, result, position, mlen, o11, c1, am) VALUES (?, ?, 0, 0, 0, 0, 0)});
 
         my $socket = IO::Socket::INET->new(
             PeerAddr  => config->{"cwb-treebank_host"},
@@ -501,29 +500,35 @@ sub concordance {
         print $socket "case-sensitivity " . ( param('ignore_case') ? "yes" : "no" ) . "\n";
         print $socket $json_graph, "\n";
 
-	$dbh->do(qq{BEGIN TRANSACTION});
-	my $n = 0;
+        $dbh->do(qq{BEGIN TRANSACTION});
+        my $n = 0;
         while ( my $out_json = <$socket> ) {
             last if ( $out_json eq "finito\n" );
-	    chomp $out_json;
-	    my $out = JSON::decode_json($out_json);
-	    my $tmp = JSON::decode_json($out_json);
-	    foreach my $tokens_ref (@{$out->{'tokens'}}) {
-		$tmp->{'tokens'} = $tokens_ref;
-		my $tmp_json = JSON::encode_json($tmp);
-		$insert_result->execute($qid, $tmp_json);
-		$n++;
-	    }
+            chomp $out_json;
+            my $out = JSON::decode_json($out_json);
+            my $tmp = JSON::decode_json($out_json);
+            foreach my $tokens_ref ( @{ $out->{'tokens'} } ) {
+                $tmp->{'tokens'} = $tokens_ref;
+                my $tmp_json = JSON::encode_json($tmp);
+                $insert_result->execute( $qid, $tmp_json );
+                $n++;
+            }
         }
-	$dbh->do(qq{COMMIT});
+        $dbh->do(qq{COMMIT});
 
         close $socket;
         $dbh->disconnect();
 
-	$update_n->execute($n, $qid);
+        $update_n->execute( $n, $qid );
     }
+    return $qid;
+}
 
-    params->{"id"} = $qid;
+sub concordance {
+    my ( $data, $mode ) = @_;
+    # unpack graph
+    my ( $json_graph, $query_length ) = _get_json_graph($data);
+    params->{"id"} = _cwb_treebank_query($data, $mode);
     params->{"start"} = 0 unless ( param("start") );
     my $vars = {};
     %$vars = ( %$vars, %{ kwic::display_dep($data) } );

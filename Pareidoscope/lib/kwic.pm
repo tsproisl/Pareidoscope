@@ -145,7 +145,6 @@ sub display_context {
     my ($data) = @_;
     my $sentid = param("sentence_id");
     my $s_id   = $data->get_attribute("s_id");
-    debug $sentid;
     my $query_id = $data->{"cache"}->query( -corpus => param('corpus'), -query => "<s_id = '$sentid'> []* </s_id>" );
     my ($size) = $data->{'cqp'}->exec("size $query_id");
     croak "There should be one match, not $size" if ($size != 1);

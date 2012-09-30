@@ -89,7 +89,7 @@ sub single_item_query {
     my $call_strucn = sub {
         my ($wfline) = @_;
         my $old_tt1 = param("tt1");
-        foreach my $p qw(t tt p w) {
+        foreach my $p (qw(t tt p w)) {
             foreach my $nr ( 1 .. $data->{"active"}->{"ngram_length"} ) {
                 params->{ $p . $nr } = "";
             }
@@ -832,6 +832,7 @@ sub create_freq_link_lex {
         $localparams->{ "h" .  ( $position + 1 ) } = $head;
         $localparams->{ "ht" . ( $position + 1 ) } = "wordform";
     }
+
     #$localparams->{"ignore_case"} = 0;
     my ($query) = &build_query( $data, $localparams );
     $argument{"query"} = URI::Escape::uri_escape($query);
@@ -890,7 +891,7 @@ sub create_freq_link_struc {
     for ( my $i = 0; $i <= $#ngram; $i++ ) {
         my $j = $i + 1 - $position;
         if ( $j > 0 ) {
-            foreach my $param qw(t tt h ht) {
+            foreach my $param (qw(t tt h ht)) {
                 $localparams->{ $param . ( $i + 1 ) } = param( $param . $j );
             }
         }
