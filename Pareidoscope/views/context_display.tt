@@ -1,12 +1,14 @@
 <h2>
   Context display
 </h2>
-[% FOREACH p IN ps %]
 <p>
+  [% IF return_type == 'dep' %]
+  [% p.formatted %]
+  [% ELSE %]
   [% p.pre %]
   <strong class="kwic">
     [% p.kwic %]
   </strong>
   [% p.post %]
+  [% END %]
 </p>
-[% END %]

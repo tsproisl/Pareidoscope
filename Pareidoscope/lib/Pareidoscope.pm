@@ -163,7 +163,8 @@ get '/results/concordance' => sub {
 get '/results/display_context' => sub {
     my %vars;
     $vars{'current'} = uri_for('/results/display_context');
-    $vars{'ps'}      = kwic::display_context($data);
+    $vars{'return_type'} = param('return_type');
+    $vars{'p'}      = kwic::display_context($data);
     template( 'context_display', \%vars );
 };
 

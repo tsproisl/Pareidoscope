@@ -30,6 +30,7 @@ sub display {
         my ( $s, $e, $t, $k ) = @{ $ranges[$idx] };
         my ( $cs, $ce, $ellip_start, $ellip_end ) = &context( $data, $s, $e, "1s" );
         my $id     = $sid->cpos2struc2str($s);
+	my ( $s_start, $s_end ) = $sid->cpos2struc2cpos($s);
         my $dispid = $id;
         $dispid =~ s/-/&nbsp;/g;
         $row->{"id"} = $dispid;
@@ -37,9 +38,10 @@ sub display {
         #$row->{"id_href"} = "pareidoscope.cgi?m=dc&id=" . param("id") . "&q=$id&s=Link&$state";
         $row->{"id_href"}                  = {%state};
         $row->{"id_href"}->{"sentence_id"} = $id;
-        $row->{"pre"}                      = &format( $data, $cs, $s - 1, $t, $k );
-        $row->{"kwic"}                     = &format( $data, $s, $e, $t, $k );
-        $row->{"post"}                     = &format( $data, $e + 1, $ce, $t, $k );
+        $row->{"id_href"}->{"offsets"}     = sprintf "%s-%s", $s - $s_start, $e - $s_start;
+        $row->{"pre"}                      = format_line( $data, $cs, $s - 1, $t, $k );
+        $row->{"kwic"}                     = format_line( $data, $s, $e, $t, $k );
+        $row->{"post"}                     = format_line( $data, $e + 1, $ce, $t, $k );
         push( @{ $vars->{"rows"} }, $row );
     }
     $state{"query"} = URI::Escape::uri_escape( param("query") );
@@ -107,8 +109,8 @@ sub context {
 
 # $html_string = My::KWIC::Format($lang, $start, $end [, $target, $keyword]);
 #   format corpus range $s .. $e as HTML string according to parameter settings
-sub format {
-    croak 'Usage:  $html_string = kwic::format($cgi, $config, $start, $end [, $target, $keyword]);' unless @_ >= 4 and @_ <= 6;
+sub format_line {
+    croak 'Usage:  $html_string = kwic::format($config, $start, $end [, $target, $keyword]);' unless @_ >= 3 and @_ <= 5;
     my ( $data, $start, $end, $target, $keyword ) = @_;
 
     # load relevant attributes (to avoid multiple lookups)
@@ -120,15 +122,19 @@ sub format {
     for my $cpos ( $start .. $end ) {
         my $html = "";                       # process token annotations
         my $word = $Word->cpos2str($cpos);
-        my $pos  = $POS->cpos2str($cpos);
+
+        #my $pos  = $POS->cpos2str($cpos);
 
         #$html = "<span title='" . &escapeHTML($word) . "/" . &escapeHTML($pos) . "'>" . &escapeHTML($word) . "</span>";
-        $html = "<span title='" . $word . "/" . $pos . "'>" . $word . "</span>";
-        if ( $cpos == $keyword ) {
-            $html = "<span class='keyword'>$html</span>";
-        }
-        if ( $cpos == $target ) {
-            $html = "<span class='target'>$html</span>";
+        #$html = "<span title='" . $word . "/" . $pos . "'>" . $word . "</span>";
+        $html = $word;
+        if ( defined $keyword and defined $target ) {
+            if ( $cpos == $keyword ) {
+                $html = "<span class='keyword'>$html</span>";
+            }
+            if ( $cpos == $target ) {
+                $html = "<span class='target'>$html</span>";
+            }
         }
         push @html, $html;
     }
@@ -138,31 +144,34 @@ sub format {
 sub display_context {
     my ($data) = @_;
     my $sentid = param("sentence_id");
-    my $ps;
+    my $s_id   = $data->get_attribute("s_id");
+    debug $sentid;
+    my $query_id = $data->{"cache"}->query( -corpus => param('corpus'), -query => "<s_id = '$sentid'> []* </s_id>" );
+    my ($size) = $data->{'cqp'}->exec("size $query_id");
+    croak "There should be one match, not $size" if ($size != 1);
+    my @matches = $data->{"cqp"}->exec("tabulate $query_id match");
+    croak "More than one match for $s_id" if ( @matches > 1 );
+    my $cpos = $matches[0];
+    my ( $start, $end ) = $s_id->cpos2struc2cpos($cpos);
+    my $p;
+    my ( $cs, $ce, $ellip_start, $ellip_end ) = context( $data, $start, $end, "5s" );
+    my @offsets = split /-/xms, param('offsets');
+
+    foreach my $o (@offsets) {
+        croak "Sanity check failed: $o" if ( $o < 0 );
+        croak "Sanity check failed: $o > $end - $start" if ( $o > $end - $start );
+    }
     if ( param('return_type') eq 'pos' or param('return_type') eq 'chunk' ) {
-        my $sid = $data->get_attribute("s_id");
-        $sentid =~ s/\s+/ /g;
-        $data->{"cache"}->retrieve( param("id") );
-        my @ranges = $data->{"cqp"}->dump( param("id") );
-        foreach my $range (@ranges) {
-            my ( $s, $e, $t, $k ) = @$range;
-            my $p;
-            my $id = $sid->cpos2struc2str($s);
-            next unless ( $id eq $sentid );
-            my ( $cs, $ce, $ellip_start, $ellip_end ) = &context( $data, $s, $e, "5s" );
-            $id =~ s/-/&nbsp;/g;
-            $p->{"pre"}  = &format( $data, $cs,    $s - 1, $t, $k );
-            $p->{"kwic"} = &format( $data, $s,     $e,     $t, $k );
-            $p->{"post"} = &format( $data, $e + 1, $ce,    $t, $k );
-            push( @$ps, $p );
-        }
+        $p->{"pre"}  = format_line( $data, $cs,                      $start - 1 + $offsets[0] );
+        $p->{"kwic"} = format_line( $data, $start + $offsets[0],     $start + $offsets[1] );
+        $p->{"post"} = format_line( $data, $start + 1 + $offsets[1], $ce );
     }
     elsif ( param('return_type') eq 'dep' ) {
-	# zwei Sätze vorher und zwei Sätze nachher über CQP-Anfrage finden
-	# my $qid = param('id');
-	...
+	my $word = $data->get_attribute("word");
+	my %is_matching = map {$_ => 1} @offsets;
+	$p->{'formatted'} = join q{ }, map { $is_matching{$_ - $start} ? sprintf("%s%s%s", "<strong class='kwic'>", $word->cpos2str($_), "</strong>") : $word->cpos2str($_) } ($cs .. $ce);
     }
-    return $ps;
+    return $p;
 }
 
 sub escapeHTML {
@@ -208,6 +217,7 @@ sub display_dep {
         #$row->{"id_href"} = "pareidoscope.cgi?m=dc&id=" . param("id") . "&q=$id&s=Link&$state";
         $row->{"id_href"} = {%state};
         $row->{"id_href"}->{"sentence_id"} = $id;
+        $row->{"id_href"}->{"offsets"} = join '-', @{ $result->{'tokens'} };
         my %is_matching = map { $_ => 1 } @{ $result->{'tokens'} };
         $row->{"formatted"} = join q{ }, map { $is_matching{$_} ? "<strong class='kwic'>$result->{'sentence'}->[$_]</strong>" : $result->{'sentence'}->[$_] } ( 0 .. $#{ $result->{'sentence'} } );
         push( @{ $vars->{"rows"} }, { %{$row} } );

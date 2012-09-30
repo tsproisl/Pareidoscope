@@ -446,13 +446,13 @@ sub _emit {
 sub _get_json_graph {
     my ($data) = @_;
     my @linear_matrix = map { defined $_ ? { 'relation' => $_ } : {} } map { $data->{'number_to_relation'}->[$_] or undef } unpack( "(S*)>", pack( "H*", param('graph') ) );
-    foreach my $param qw(word lemma pos wc) {
-        if ( param($param) ) {
-            $linear_matrix[ param('position') ]->{$param} = param($param);
-        }
-    }
     my $number_of_nodes = sqrt $#linear_matrix + 1;
     my @matrix          = map { [ @linear_matrix[ $_ * $number_of_nodes .. $_ * $number_of_nodes + $number_of_nodes - 1 ] ] } ( 0 .. $number_of_nodes - 1 );
+    foreach my $param qw(word lemma pos wc) {
+        if ( param($param) ) {
+            $matrix[ param('position') ]->[ param('position') ]->{$param} = param($param);
+        }
+    }
     my $json_graph      = JSON::encode_json( \@matrix );
     debug $json_graph;
     return $json_graph, $number_of_nodes;
