@@ -60,7 +60,8 @@ cache_size: 4096
 cache_expire: 12
 
 # CWB-treebank
-cwb-treebank_host: clue43.linguistik.uni-erlangen.de
+# cwb-treebank_host: clue43.linguistik.uni-erlangen.de
+cwb-treebank_host: "127.0.0.1"
 cwb-treebank_port: 5931
 
 # corpora
