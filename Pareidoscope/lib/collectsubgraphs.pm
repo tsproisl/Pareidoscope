@@ -185,18 +185,43 @@ sub get_subgraphs {
 }
 
 sub lexical_subgraph_query {
-    my ($data, $mode) = @_;
+    my ( $data, $mode ) = @_;
+
+    my ( $json_graph, $query_length ) = _get_json_graph($data);
+    my $unlex_matrix = JSON::decode_json($json_graph);
+    foreach my $node ( 0 .. $query_length - 1 ) {
+        $unlex_matrix->[$node]->[$node] = {};
+    }
+    my $unlex_json_graph = JSON::encode_json($unlex_matrix);
+
+    my $unlex_id = _cwb_treebank_query( $data, $mode, $unlex_json_graph, $query_length );
+    my $lex_id   = _cwb_treebank_query( $data, $mode, $json_graph,       $query_length );
+
+    my %result;
+    foreach my $query ( [ 'unlex', $unlex_id ], [ 'lex', $lex_id ] ) {
+        my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$query->[1]" ) or croak "Cannot connect: $DBI::errstr";
+        $dbh->do("PRAGMA encoding = 'UTF-8'");
+        my $get_results = $dbh->prepare(qq{SELECT result FROM results WHERE qid=?});
+        $get_results->execute( $query->[1] );
+        my $results_ref = $get_results->fetchall_arrayref;
+        foreach my $r ( @{$results_ref} ) {
+            my $r_string = $r->[0];
+            my $r_ref    = JSON::decode_json($r_string);
+            foreach my $position ( 0 .. $#{ $r_ref->{'tokens'} } ) {
+                $result{ $query->[0] }->[$position]->{ $r_ref->{'tokens'}->[$position] }++;
+            }
+        }
+    }
 
     # params->{"id"} = _cwb_treebank_query($data, $mode);
 
     # gibt es Lexikalisierung?
     # unlexikalisierte Struktur abfragen
-    # lexikalisierte Struktur abgfragen
+    # lexikalisierte Struktur abfragen
     # Kookkurrenzen aggregieren
     # Assoziationsmaß berechnen
     # Im Cache ablegen
     # Visualisierung: wie die Beziehung zwischen einer Spalte und einem bestimmten Knoten deutlich machen? Farben?
-    ...;
 }
 
 sub _create_table {
@@ -526,9 +551,10 @@ sub _cwb_treebank_query {
 
 sub concordance {
     my ( $data, $mode ) = @_;
+
     # unpack graph
     my ( $json_graph, $query_length ) = _get_json_graph($data);
-    params->{"id"} = _cwb_treebank_query($data, $mode);
+    params->{"id"} = _cwb_treebank_query( $data, $mode );
     params->{"start"} = 0 unless ( param("start") );
     my $vars = {};
     %$vars = ( %$vars, %{ kwic::display_dep($data) } );
