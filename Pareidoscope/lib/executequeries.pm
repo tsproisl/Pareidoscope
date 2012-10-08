@@ -285,7 +285,9 @@ sub lexn_query {
         $dbh->do(qq{BEGIN TRANSACTION});
         if ( $query eq $smallquery ) {
             my %wordfreqs;
-            my $getc1 = $data->{"dbh"}->prepare( "SELECT sum(" . $specifics{"name"} . "seq) FROM types WHERE type=?" );
+	    # TODO: case-sensitivity beachten
+	    my $type_of_type = param('ignore_case') ? 'lowertype' : 'type';
+            my $getc1 = $data->{"dbh"}->prepare( "SELECT sum(" . $specifics{"name"} . "seq) FROM types WHERE $type_of_type=?" );
             for ( my $i = 0; $i <= $#cofreq; $i++ ) {
                 foreach my $type ( keys %{ $cofreq[$i] } ) {
                     $wordfreqs{$type} = 0;

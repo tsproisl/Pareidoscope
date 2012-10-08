@@ -19,6 +19,7 @@ hook 'before' => sub {
     params->{'corpus'} = config->{'corpora'}->[0]->{'corpus'} unless ( defined( param('corpus') ) );
     params->{'start'} = 0 unless ( defined( param('start') ) );
     $data->init_corpus( param('corpus') );
+    params->{'ignore_case'} = (defined(param('ignore_case')) and param('ignore_case') eq '1') ? 1 : 0;
 };
 
 hook 'before_template' => sub {

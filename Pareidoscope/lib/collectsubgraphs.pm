@@ -19,6 +19,7 @@ Readonly my $GET_ATTRIBUTE_USAGE        => 'Usage: $att_handle = $self->_get_att
 
 use executequeries;
 use localdata_client;
+use statistics;
 
 sub get_subgraphs {
     my ( $data, $freq ) = @_;
@@ -187,6 +188,11 @@ sub get_subgraphs {
 sub lexical_subgraph_query {
     my ( $data, $mode ) = @_;
 
+    my $vars;
+    my $check_cache      = database->prepare(qq{SELECT qid, r1, n FROM queries WHERE corpus=? AND class=? AND query=? AND threshold=?});
+    my $insert_query     = database->prepare(qq{INSERT INTO queries (corpus, class, query, threshold, qlen, time, r1, n) VALUES (?, ?, ?, ?, ?, strftime('%s','now'), ?, ?)});
+    my $update_timestamp = database->prepare(qq{UPDATE queries SET time=strftime('%s','now') WHERE qid=?});
+
     my ( $json_graph, $query_length ) = _get_json_graph($data);
     my $unlex_matrix = JSON::decode_json($json_graph);
     foreach my $node ( 0 .. $query_length - 1 ) {
@@ -194,26 +200,73 @@ sub lexical_subgraph_query {
     }
     my $unlex_json_graph = JSON::encode_json($unlex_matrix);
 
-    my $unlex_id = _cwb_treebank_query( $data, $mode, $unlex_json_graph, $query_length );
-    my $lex_id   = _cwb_treebank_query( $data, $mode, $json_graph,       $query_length );
-
-    my %result;
-    foreach my $query ( [ 'unlex', $unlex_id ], [ 'lex', $lex_id ] ) {
-        my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$query->[1]" ) or croak "Cannot connect: $DBI::errstr";
-        $dbh->do("PRAGMA encoding = 'UTF-8'");
-        my $get_results = $dbh->prepare(qq{SELECT result FROM results WHERE qid=?});
-        $get_results->execute( $query->[1] );
-        my $results_ref = $get_results->fetchall_arrayref;
-        foreach my $r ( @{$results_ref} ) {
-            my $r_string = $r->[0];
-            my $r_ref    = JSON::decode_json($r_string);
-            foreach my $position ( 0 .. $#{ $r_ref->{'tokens'} } ) {
-                $result{ $query->[0] }->[$position]->{ $r_ref->{'tokens'}->[$position] }++;
+    # check cache database
+    my ($qids, $qid);
+    my $class = "lexdep-" . ( param('ignore_case') ? "ci" : "cs" );
+    $check_cache->execute( $data->{"active"}->{"corpus"}, $class, $json_graph, param("threshold") );
+    $qids = $check_cache->fetchall_arrayref;
+    if ( scalar(@$qids) == 1 ) {
+        $qid                       = $qids->[0]->[0];
+        $vars->{"matches"}         = $qids->[0]->[1];
+        $vars->{"analyze_matches"} = $qids->[0]->[2];
+        $update_timestamp->execute($qid);
+    }
+    elsif ( scalar(@$qids) == 0 ) {
+        my %result;
+        my $unlex_id = _cwb_treebank_query( $data, $mode, $unlex_json_graph, $query_length );
+        my $lex_id   = _cwb_treebank_query( $data, $mode, $json_graph,       $query_length );
+        foreach my $query ( [ 'unlex', $unlex_id, 'analyze_matches' ], [ 'lex', $lex_id, 'matches' ] ) {
+            my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$query->[1]" ) or croak "Cannot connect: $DBI::errstr";
+            $dbh->do("PRAGMA encoding = 'UTF-8'");
+            my $get_results = $dbh->prepare(qq{SELECT result FROM results WHERE qid=?});
+            $get_results->execute( $query->[1] );
+            my $results_ref = $get_results->fetchall_arrayref;
+            foreach my $r ( @{$results_ref} ) {
+                $vars->{ $query->[2] }++;
+                my $r_string = $r->[0];
+                my $r_ref    = JSON::decode_json($r_string);
+                foreach my $position ( 0 .. $#{ $r_ref->{'tokens'} } ) {
+                    $result{ $query->[0] }->[$position]->{ $r_ref->{'tokens'}->[$position] }++;
+                }
             }
         }
+        return $vars if ( $vars->{'analyze_matches'} * $vars->{'matches'} == 0 );
+        my $localn = $json_graph eq $unlex_json_graph ? $data->{"active"}->{'subgraphs'} : $vars->{'analyze_matches'};
+        $insert_query->execute( $data->{"active"}->{"corpus"}, $class, $json_graph, param("threshold"), $query_length, $vars->{'matches'}, $localn );
+        $check_cache->execute( $data->{"active"}->{"corpus"}, $class, $json_graph, param("threshold") );
+        $qid = ( $check_cache->fetchrow_array )[0];
+        my $dbh           = executequeries::create_new_db($qid);
+        my $insert_result = $dbh->prepare(qq{INSERT INTO results (qid, result, position, mlen, o11, c1, am) VALUES (?, ?, ?, ?, ?, ?, ?)});
+        $dbh->do(qq{BEGIN TRANSACTION});
+
+        my %c1;
+        my $type_of_type = param('ignore_case') ? 'lowertype' : 'type';
+        my $getc1 = $data->{"dbh"}->prepare("SELECT sum(depseq) FROM depseqs WHERE $type_of_type=?");
+        foreach my $position ( 0 .. $#{ $result{'lex'} } ) {
+            foreach my $type ( keys %{ $result{'lex'}->[$position] } ) {
+                my $o11 = $result{'lex'}->[$position]->{$type};
+                my $c1;
+                if ( $json_graph eq $unlex_json_graph ) {
+                    if ( !defined $c1{$type} ) {
+                        $getc1->execute($type);
+                        $c1{$type} = ( $getc1->fetchrow_array )[0];
+                    }
+                    $c1 = $c1{$type};
+                }
+                else {
+                    $c1 = $result{'unlex'}->[$position]->{$type};
+                }
+                my $g = statistics::g( $o11, $vars->{'matches'}, $c1, $localn );
+                $insert_result->execute( $qid, $type, $position, $query_length, $o11, $c1, $g );
+            }
+        }
+        $dbh->do(qq{COMMIT});
+	$dbh->disconnect();
     }
 
-    # params->{"id"} = _cwb_treebank_query($data, $mode);
+    %$vars = ( %$vars, %{ _lexdep_overview_table( $data, $qid ) } );
+    $vars->{"slots"} = _lexdep_tables( $data, $qid, ( $json_graph eq $unlex_json_graph ) );
+    return $vars;
 
     # gibt es Lexikalisierung?
     # unlexikalisierte Struktur abfragen
@@ -533,7 +586,8 @@ sub _cwb_treebank_query {
             my $out = JSON::decode_json($out_json);
             my $tmp = JSON::decode_json($out_json);
             foreach my $tokens_ref ( @{ $out->{'tokens'} } ) {
-                $tmp->{'tokens'} = $tokens_ref;
+                $tmp->{'tokens'} = param('ignore_case') ? [ map { lc $_ } @{$tokens_ref} ] : $tokens_ref;
+		$tmp->{'tokenset'}++;
                 my $tmp_json = JSON::encode_json($tmp);
                 $insert_result->execute( $qid, $tmp_json );
                 $n++;
@@ -560,5 +614,78 @@ sub concordance {
     %$vars = ( %$vars, %{ kwic::display_dep($data) } );
     return $vars;
 }
+
+sub _lexdep_tables {
+    my ( $data, $qid, $general ) = @_;
+    my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$qid" ) or croak("Cannot connect: $DBI::errstr");
+    $dbh->do("PRAGMA encoding = 'UTF-8'");
+    my $get_top_40    = $dbh->prepare(qq{SELECT result, position, o11, c1, am FROM results WHERE position=? ORDER BY am DESC, o11 DESC LIMIT 0, 40});
+    my $get_positions = $dbh->prepare(qq{SELECT DISTINCT position FROM results ORDER BY position ASC});
+    $get_positions->execute();
+    my $positionsref = $get_positions->fetchall_arrayref;
+    my $slots;
+
+    foreach my $position (@$positionsref) {
+        my $slot;
+        $position = $position->[0];
+        $get_top_40->execute($position);
+        my $rows = $get_top_40->fetchall_arrayref;
+        $slot->{"name"} = "node $position";
+        my $counter = 0;
+        foreach my $row (@$rows) {
+            my $slotrow;
+            my ( $result, $posit, $o11, $c1, $g2 ) = @$row;
+            $g2 = sprintf( "%.5f", $g2 );
+            my ( $freqlink, $ngfreqlink, $lexnlink, $strucnlink );
+            $slotrow->{"word"}        = $result;
+            #$slotrow->{"cofreq_href"} = create_freq_link_lex( $data, $o11, $ngramref, $position, $result );
+            #$slotrow->{"ngfreq_href"} = create_ngfreq_link_lex( $data, $c1, $ngramref, $position, $result ) unless ($general);
+            #$slotrow->{"lex_href"}    = create_n_link_lex( $data, $ngramref, $position, $result );
+            #$slotrow->{"struc_href"}  = create_n_link_lex( $data, $ngramref, $position, $result );
+            $counter++;
+            $slotrow->{"number"} = $counter;
+            $slotrow->{"cofreq"} = $o11;
+            $slotrow->{"ngfreq"} = $c1;
+            $slotrow->{"g"}      = $g2;
+            push( @{ $slot->{"rows"} }, $slotrow );
+        }
+        push( @$slots, $slot );
+    }
+    return $slots;
+}
+
+sub _lexdep_overview_table {
+    my ( $data, $qid ) = @_;
+    my $vars;
+    my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$qid" ) or croak("Cannot connect: $DBI::errstr");
+    $dbh->do("PRAGMA encoding = 'UTF-8'");
+    my $get_top_10    = $dbh->prepare(qq{SELECT result, position, o11, c1, am FROM results WHERE position=? ORDER BY am DESC, o11 DESC LIMIT 0, 10});
+    my $get_positions = $dbh->prepare(qq{SELECT DISTINCT position FROM results ORDER BY position ASC});
+    $get_positions->execute();
+    my $positionsref = $get_positions->fetchall_arrayref;
+    my @columns;
+
+    foreach my $position (@$positionsref) {
+        $position = $position->[0];
+        $get_top_10->execute($position);
+        my $rows = $get_top_10->fetchall_arrayref;
+        push( @{ $columns[$position] }, "node $position" );
+        my $counter = 0;
+        foreach my $row (@$rows) {
+            my ( $result, $posit, $o11, $c1, $g2 ) = @$row;
+            push( @{ $columns[$position] }, $result );
+        }
+        push( @{ $columns[$position] }, ( "", "", "", "", "", "", "", "", "", "" ) );
+    }
+    $vars->{"row_numbers"} = [0];
+    foreach my $i ( 1 .. 10 ) {
+        last if ( join( "", map( $_->[$i], @columns ) ) eq "" );
+        push( @{ $vars->{"row_numbers"} }, $i );
+    }
+    $vars->{"column_numbers"} = [ 0 .. $#columns ];
+    $vars->{"overview_table"} = \@columns;
+    return $vars;
+}
+
 
 1;
