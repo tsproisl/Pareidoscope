@@ -32,11 +32,12 @@ common_functions::log( "N (Perl) = " . sum(values %subgraphs), 1, $maxloglevel )
 my $dbh         = DBI->connect("dbi:SQLite:$outdir/$dbname") or croak("Cannot connect: $DBI::errstr");
 $dbh->do(qq{PRAGMA encoding = 'UTF-8'});
 $dbh->do(qq{DROP TABLE IF EXISTS depseqs});
-$dbh->do(qq{CREATE TABLE depseqs (type TEXT NOT NULL, depseq INTEGER NOT NULL, UNIQUE (type))});
-my $insert_depseq = $dbh->prepare(qq{INSERT INTO depseqs (type, depseq) VALUES (?, ?)});
+$dbh->do(qq{CREATE TABLE depseqs (type TEXT NOT NULL, lowertype TEXT NOT NULL, depseq INTEGER NOT NULL, UNIQUE (type))});
+$dbh->do(qq{CREATE INDEX lowertypedepsidx ON depseqs (lowertype)});
+my $insert_depseq = $dbh->prepare(qq{INSERT INTO depseqs (type, lowertype, depseq) VALUES (?, ?, ?)});
 $dbh->do(qq{BEGIN TRANSACTION});
 while (my ($type, $depseq) = each %subgraphs) {
-    $insert_depseq->execute($type, $depseq);
+    $insert_depseq->execute($type, lc $type, $depseq);
 }
 $dbh->do(qq{COMMIT});
 $dbh->disconnect();

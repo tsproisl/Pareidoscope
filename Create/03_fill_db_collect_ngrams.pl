@@ -68,9 +68,10 @@ $dbh->do(qq{DROP TABLE IF EXISTS types});
 $dbh->do(qq{DROP TABLE IF EXISTS gramis});
 $dbh->do(qq{DROP INDEX IF EXISTS lemididx});
 $dbh->do(qq{CREATE TABLE lemmata (lemid INTEGER PRIMARY KEY, lemma VARCHAR(255) NOT NULL, wc VARCHAR(10) NOT NULL, freq INTEGER NOT NULL, UNIQUE (lemma, wc))});
-$dbh->do(qq{CREATE TABLE types (typid INTEGER PRIMARY KEY, lemid INTEGER NOT NULL, type VARCHAR(255) NOT NULL, gramid INTEGER NOT NULL, freq INTEGER NOT NULL, posseq INTEGER, chunkseq INTEGER, FOREIGN KEY (lemid) REFERENCES lemmata (lemid), FOREIGN KEY (gramid) REFERENCES gramis (gramid), UNIQUE (type, gramid, lemid))});
+$dbh->do(qq{CREATE TABLE types (typid INTEGER PRIMARY KEY, lemid INTEGER NOT NULL, type VARCHAR(255) NOT NULL, lowertype VARCHAR(255) NOT NULL, gramid INTEGER NOT NULL, freq INTEGER NOT NULL, posseq INTEGER, chunkseq INTEGER, FOREIGN KEY (lemid) REFERENCES lemmata (lemid), FOREIGN KEY (gramid) REFERENCES gramis (gramid), UNIQUE (type, gramid, lemid))});
 $dbh->do(qq{CREATE TABLE gramis (gramid INTEGER PRIMARY KEY, grami VARCHAR(25) NOT NULL, UNIQUE (grami))});
 $dbh->do(qq{CREATE INDEX lemididx ON types (lemid)});
+$dbh->do(qq{CREATE INDEX lowertypeidx ON types (lowertype)});
 open( NG, ">:encoding(utf8)", "$outdir/ngrams.out" ) or die("Cannot open $outdir/ngrams.out: $!");
 &create_indexes;
 $dbh->disconnect();
@@ -88,8 +89,8 @@ sub create_indexes {
     my $fetchgramid   = $dbh->prepare(qq{SELECT gramid FROM gramis WHERE grami=?});
     my $insertlemma   = $dbh->prepare(qq{INSERT INTO lemmata (lemma, wc, freq) VALUES (?, ?, ?)});
     my $fetchlemid    = $dbh->prepare(qq{SELECT lemid FROM lemmata WHERE lemma=? AND wc=? AND freq=?});
-    my $inserttype    = $dbh->prepare(qq{INSERT INTO types (type, gramid, lemid, freq, posseq, chunkseq) VALUES (?, ?, ?, ?, ?, ?)});
-    my $fetchtypid    = $dbh->prepare(qq{SELECT typid FROM types WHERE type=? AND gramid=? AND lemid=? AND freq=? AND posseq=? AND chunkseq=?});
+    my $inserttype    = $dbh->prepare(qq{INSERT INTO types (type, lowertype, gramid, lemid, freq, posseq, chunkseq) VALUES (?, ?, ?, ?, ?, ?, ?)});
+    my $fetchtypid    = $dbh->prepare(qq{SELECT typid FROM types WHERE type=? AND lowertype=? AND gramid=? AND lemid=? AND freq=? AND posseq=? AND chunkseq=?});
     my $updatelemma   = $dbh->prepare(qq{UPDATE lemmata SET freq=? WHERE lemid=?});
 
     #my $updatetype = $dbh->prepare(qq{UPDATE types SET freq=? WHERE typid=?});
@@ -147,7 +148,7 @@ sub create_indexes {
                 $types{$type}->{$grami}->{$lemid}->[1]++;
             }
             else {
-                $typid = &insertandreturnid( $inserttype, $fetchtypid, [ $type, $grami, $lemid, 1, 0, 0 ] );
+                $typid = &insertandreturnid( $inserttype, $fetchtypid, [ $type, lc $type, $grami, $lemid, 1, 0, 0 ] );
                 $types{$type}->{$grami}->{$lemid} = [ $typid, 1, 0 ];
             }
             push( @tokens,  $type );
