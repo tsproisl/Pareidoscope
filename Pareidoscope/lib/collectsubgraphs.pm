@@ -29,7 +29,7 @@ sub get_subgraphs {
     my $subgraph_types_threshold = 750000;
     my $s_handle                 = $data->get_attribute("s");
     my $s_id_handle              = $data->get_attribute("s_id");
-    my $s_ignoredep_handle       = $data->get_attribute("s_ignoredep");
+    my $s_ignore_handle       = $data->get_attribute("s_ignore");
     my $indep_handle             = $data->get_attribute("indep");
     my $outdep_handle            = $data->get_attribute("outdep");
     my $root_handle              = $data->get_attribute("root");
@@ -97,8 +97,8 @@ sub get_subgraphs {
             my ( $match, $matchend ) = split( /\t/, $m );
             my $match_length = ( $matchend - $match ) + 1;
             croak("Match length: $match_length != 1") if ( $match_length != 1 );
-            my $ignoredep = $s_ignoredep_handle->cpos2str($match);
-            next SENTENCE if ( substr( $ignoredep, 0, 3 ) eq 'yes' );
+            my $ignore = $s_ignore_handle->cpos2str($match);
+            next SENTENCE if ( substr( $ignore, 0, 3 ) eq 'yes' );
             my ( $start, $end ) = $s_handle->cpos2struc2cpos($match);
             my @indeps  = $indep_handle->cpos2str( $start .. $end );
             my @outdeps = $outdep_handle->cpos2str( $start .. $end );
