@@ -6,7 +6,7 @@ use open qw(:std :utf8);
 
 use XML::LibXML;
 
-#use chunklink_2_2_2000_for_conll_tsproisl;
+use chunklink_2_2_2000_for_conll_tsproisl;
 
 use Data::Dumper;
 
@@ -32,17 +32,14 @@ OUTER: while ( my $line = <IN> ) {
             my @dependencies;
             while ( my $sline = <IN> ) {
                 if ( $sline eq "</sentence>\n" ) {
-                    my $chunker_lines;
-                    {
 
-                        #local @ARGV = (join(" ", @pstree));
-                        #$chunker_lines = do 'chunklink_2_2_2000_for_conll_tsproisl.pm';
-                        my $args = quotemeta( join( " ", @pstree ) );
-                        $chunker_lines = `perl chunklink_2_2_2000_for_conll_tsproisl.pm $args`;
-                    }
-                    my @chunker_output = split( /\n/, $chunker_lines );
-
-                    #my @chunker_output = @wordstagslemmata;
+                    # my $chunker_lines;
+                    # {
+                    #     #my $args = quotemeta( join( " ", @pstree ) );
+                    #     #$chunker_lines = `perl chunklink_2_2_2000_for_conll_tsproisl.pm $args`;
+                    # }
+                    # my @chunker_output = split( /\n/, $chunker_lines );
+                    my @chunker_output = split( /\n/, chunk( join( " ", @pstree ) ) );
                     die("Strange phrase structure tree") if ( scalar(@chunker_output) != scalar(@wordstagslemmata) );
                     my $len = @chunker_output;
                     $line =~ s/>\n/ len="$len">\n/;
@@ -55,7 +52,7 @@ OUTER: while ( my $line = <IN> ) {
                     #print Dumper(\@chunker_output);
                     my $sentence = &add_heads( $line . join( "", @wordstagslemmata ) . "</s>\n" );
                     $sentence = &add_dependencies( $sentence, [@dependencies] );
-                    print OUT $sentence;
+                    print OUT $sentence . "\n";
                     $counter++;
 
                     #last OUTER if ( $counter >= 50 );
@@ -167,7 +164,14 @@ sub add_dependencies {
     my $deps     = shift;
     my $result;
     my $dom = XML::LibXML->load_xml( string => $sentence );
+    local $XML::LibXML::skipXMLDeclaration = 1;
     foreach my $s ( $dom->getElementsByTagName("s") ) {
+
+        # rename attribute
+        my $original_id = $s->getAttribute('original_sentence_id');
+        $s->removeAttribute('original_sentence_id');
+        $s->setAttribute( 'original_id', $original_id );
+
         my @sent;
         my $root = 0;
 

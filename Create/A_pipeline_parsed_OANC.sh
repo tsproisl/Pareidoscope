@@ -1,7 +1,8 @@
 #!/bin/bash
 
 outdir="/localhome/Databases/temp/cwb/oanc"
-corpus="/localhome/Corpora/OANC/oanc_parsed_1_6_9.xml.out"
+rawcorpus="/localhome/Corpora/OANC/oanc_parsed_1_6_9.xml.out"
+corpus="/localhome/Corpora/OANC/oanc_parsed_1_6_9.xml.out.depignore"
 corpusoutdir="/localhome/Databases/CWB/oanc"
 corpusname="OANC"
 registryfile="oanc"
@@ -12,7 +13,8 @@ max_n=5
 
 export PERL5LIB="/home/linguistik/tsproisl/local/lib/perl5:/home/linguistik/tsproisl/local/lib/perl5/site_perl:$PERL5LIB"
 
-#./01_cwb-encode_treebank.sh $corpus $corpusoutdir $registryfile $corpusname $outdir && \
+./00_add_ignoredep_attribute.pl $rawcorpus && \
+./01_cwb-encode_treebank.sh $corpus $corpusoutdir $registryfile $corpusname $outdir && \
 ./03_fill_db_collect_ngrams.pl $outdir $corpusname $dbname $registryfile $tagset && \
 ./04_count_ngrams.sh $outdir "ngrams" && \
 ./06_collect_chunks_fill_db.pl $outdir $corpusname $dbname $registryfile && \
