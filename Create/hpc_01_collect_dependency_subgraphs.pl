@@ -28,7 +28,7 @@ open( OUT, ">:encoding(utf8)", $outfile ) or die("Cannot open $outfile: $!");
 &read_corpus( $outfile, $dependencies, $max_n );
 close(OUT) or die("Cannot close $outfile: $!");
 
-Storable::nstore(\%structures, $outfile . '.dump');
+Storable::nstore( \%structures, $outfile . '.dump' );
 
 sub read_corpus {
     my ( $outfile, $dependencies, $max_n ) = @_;
@@ -39,17 +39,18 @@ OUTER: while ( my $match = <TAB> ) {
         #last if ( $. == 5000 );
         #my $match = shift(@tablines);
         chomp($match);
-        my ( $indeps, $outdeps, $roots, $cposs, $s_id, $word_forms ) = split( /\t/, $match );
+        my ( $indeps, $outdeps, $roots, $cposs, $s_id, $s_ignore, $word_forms ) = split( /\t/, $match );
 
         #next unless ( $s_id eq "4eca801b0572f4e02700021d" );
+        next OUTER if ( substr( $s_ignore, 0, 3 ) eq 'yes' );
         my @indeps     = split( / /, $indeps );
         my @outdeps    = split( / /, $outdeps );
         my @roots      = split( / /, $roots );
         my @cposs      = split( / /, $cposs );
         my @word_forms = split( / /, $word_forms );
-	my %cpos_to_word_form = zip @cposs, @word_forms;
-        my $raw_graph  = Graph::Directed->new;
-        my $graph      = Graph::Directed->new;
+        my %cpos_to_word_form = zip @cposs, @word_forms;
+        my $raw_graph         = Graph::Directed->new;
+        my $graph             = Graph::Directed->new;
         my $root;
         my ( %raw_relations, %relations, %reverse_relations );
         my ( %raw_to_graph, %graph_to_raw );
@@ -77,7 +78,7 @@ OUTER: while ( my $match = <TAB> ) {
 
                 # m/^(?<relation>[^(]+)\(0(?:&apos;)*,(?<offset>-?\d+)(?:&apos;)*/;
                 # m/^([^(]+)\(0(?:&apos;)*,(-?\d+)(?:&apos;)*/;
-		m/^([^(]+)\(0(?:')*,(-?\d+)(?:')*/;
+                m/^([^(]+)\(0(?:')*,(-?\d+)(?:')*/;
 
                 #my $offset = $+{"offset"};
                 my $offset = $2;
@@ -316,8 +317,8 @@ sub emit {
     foreach my $vertex ( $subgraph->vertices() ) {
         my ( @incoming, @outgoing );
 
-	# count occurrences in structure
-	$structures{$cpos_to_word_form_ref->{$graph_to_raw_ref->{$vertex}}}++;
+        # count occurrences in structure
+        $structures{ $cpos_to_word_form_ref->{ $graph_to_raw_ref->{$vertex} } }++;
 
         # incoming edges
         foreach my $local_vertex ( keys %{ $incoming_edge{$vertex} } ) {

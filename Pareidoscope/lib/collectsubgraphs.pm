@@ -29,6 +29,7 @@ sub get_subgraphs {
     my $subgraph_types_threshold = 750000;
     my $s_handle                 = $data->get_attribute("s");
     my $s_id_handle              = $data->get_attribute("s_id");
+    my $s_ignoredep_handle       = $data->get_attribute("s_ignoredep");
     my $indep_handle             = $data->get_attribute("indep");
     my $outdep_handle            = $data->get_attribute("outdep");
     my $root_handle              = $data->get_attribute("root");
@@ -96,6 +97,8 @@ sub get_subgraphs {
             my ( $match, $matchend ) = split( /\t/, $m );
             my $match_length = ( $matchend - $match ) + 1;
             croak("Match length: $match_length != 1") if ( $match_length != 1 );
+            my $ignoredep = $s_ignoredep_handle->cpos2str($match);
+            next SENTENCE if ( substr( $ignoredep, 0, 3 ) eq 'yes' );
             my ( $start, $end ) = $s_handle->cpos2struc2cpos($match);
             my @indeps  = $indep_handle->cpos2str( $start .. $end );
             my @outdeps = $outdep_handle->cpos2str( $start .. $end );
@@ -118,6 +121,7 @@ sub get_subgraphs {
                 next SENTENCE if ( scalar( () = split /[|]/xms, $indeps[$i], $UNLIMITED_NUMBER_OF_FIELDS ) + scalar @out > $data->{"active"}->{"subgraph_edges"} );
                 my $cpos = $start + $i;
                 foreach my $dep (@out) {
+
                     #$dep =~ m/^(?<relation>[^(]+)[(]0(?:&apos;)*,(?<offset>-?\d+)(?:&apos;)*/xms;
                     $dep =~ m/^(?<relation>[^(]+)[(]0(?:')*,(?<offset>-?\d+)(?:')*/xms;
                     my $target = $cpos + $LAST_PAREN_MATCH{"offset"};
@@ -202,7 +206,7 @@ sub lexical_subgraph_query {
     my $unlex_json_graph = JSON::encode_json($unlex_matrix);
 
     # check cache database
-    my ($qids, $qid);
+    my ( $qids, $qid );
     my $class = "lexdep-" . ( param('ignore_case') ? "ci" : "cs" );
     $check_cache->execute( $data->{"active"}->{"corpus"}, $class, $json_graph, param("threshold") );
     $qids = $check_cache->fetchall_arrayref;
@@ -262,7 +266,7 @@ sub lexical_subgraph_query {
             }
         }
         $dbh->do(qq{COMMIT});
-	$dbh->disconnect();
+        $dbh->disconnect();
     }
 
     %$vars = ( %$vars, %{ _lexdep_overview_table( $data, $qid ) } );
@@ -588,7 +592,7 @@ sub _cwb_treebank_query {
             my $tmp = JSON::decode_json($out_json);
             foreach my $tokens_ref ( @{ $out->{'tokens'} } ) {
                 $tmp->{'tokens'} = param('ignore_case') ? [ map { lc $_ } @{$tokens_ref} ] : $tokens_ref;
-		$tmp->{'tokenset'}++;
+                $tmp->{'tokenset'}++;
                 my $tmp_json = JSON::encode_json($tmp);
                 $insert_result->execute( $qid, $tmp_json );
                 $n++;
@@ -638,7 +642,8 @@ sub _lexdep_tables {
             my ( $result, $posit, $o11, $c1, $g2 ) = @$row;
             $g2 = sprintf( "%.5f", $g2 );
             my ( $freqlink, $ngfreqlink, $lexnlink, $strucnlink );
-            $slotrow->{"word"}        = $result;
+            $slotrow->{"word"} = $result;
+
             #$slotrow->{"cofreq_href"} = create_freq_link_lex( $data, $o11, $ngramref, $position, $result );
             #$slotrow->{"ngfreq_href"} = create_ngfreq_link_lex( $data, $c1, $ngramref, $position, $result ) unless ($general);
             #$slotrow->{"lex_href"}    = create_n_link_lex( $data, $ngramref, $position, $result );
@@ -687,6 +692,5 @@ sub _lexdep_overview_table {
     $vars->{"overview_table"} = \@columns;
     return $vars;
 }
-
 
 1;
