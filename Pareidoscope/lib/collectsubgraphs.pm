@@ -118,7 +118,8 @@ sub get_subgraphs {
                 next SENTENCE if ( scalar( () = split /[|]/xms, $indeps[$i], $UNLIMITED_NUMBER_OF_FIELDS ) + scalar @out > $data->{"active"}->{"subgraph_edges"} );
                 my $cpos = $start + $i;
                 foreach my $dep (@out) {
-                    $dep =~ m/^(?<relation>[^(]+)[(]0(?:&apos;)*,(?<offset>-?\d+)(?:&apos;)*/xms;
+                    #$dep =~ m/^(?<relation>[^(]+)[(]0(?:&apos;)*,(?<offset>-?\d+)(?:&apos;)*/xms;
+                    $dep =~ m/^(?<relation>[^(]+)[(]0(?:')*,(?<offset>-?\d+)(?:')*/xms;
                     my $target = $cpos + $LAST_PAREN_MATCH{"offset"};
                     next if ( $cpos == $target );
                     $relation{$cpos}->{$target}         = $LAST_PAREN_MATCH{"relation"};

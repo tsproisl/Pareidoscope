@@ -51,7 +51,8 @@ sub fill_database {
             $indeps =~ s/^\|//;
             $indeps =~ s/\|$//;
             foreach my $indep ( split( /\|/, $indeps ) ) {
-                if ( $indep =~ m/^(?<relation>[^(]+)\((?<offset>-?\d+)(?:&apos;)*,0(?:&apos;)*/ ) {
+                # if ( $indep =~ m/^(?<relation>[^(]+)\((?<offset>-?\d+)(?:&apos;)*,0(?:&apos;)*/ ) {
+		if ( $indep =~ m/^(?<relation>[^(]+)\((?<offset>-?\d+)(?:')*,0(?:')*/ ) {
                     $relations{ $+{"relation"} }++;
                 }
                 else {

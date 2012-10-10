@@ -180,7 +180,9 @@ sub add_dependencies {
         my @outdeps;
         foreach my $depline (@$deps) {
             next if ( $depline =~ /^\s*$/ );
-            die("Does not match: $depline\n") unless ( $depline =~ m/^([^()]+)\((.+?)-(\d+)((?:&apos;)*), (.+?)-(\d+)((?:&apos;)*)\)$/ );
+	    $depline =~ s/&apos;/'/xmsg;
+            #die("Does not match: $depline\n") unless ( $depline =~ m/^([^()]+)\((.+?)-(\d+)((?:&apos;)*), (.+?)-(\d+)((?:&apos;)*)\)$/ );
+            die("Does not match: $depline\n") unless ( $depline =~ m/^([^()]+)\((.+?)-(\d+)((?:')*), (.+?)-(\d+)((?:')*)\)$/ );
             my ( $rel, $reg, $regidx, $regcopy, $dep, $depidx, $depcopy ) = ( $1, $2, $3, $4, $5, $6, $7 );
             if ( $regidx != $depidx or $regcopy ne $depcopy ) {
                 if ( $rel eq "root" ) {

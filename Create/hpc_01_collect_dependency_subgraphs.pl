@@ -75,8 +75,9 @@ OUTER: while ( my $match = <TAB> ) {
             }
             foreach ( split( /\|/, $outdep ) ) {
 
-                #m/^(?<relation>[^(]+)\(0(?:&apos;)*,(?<offset>-?\d+)(?:&apos;)*/;
-                m/^([^(]+)\(0(?:&apos;)*,(-?\d+)(?:&apos;)*/;
+                # m/^(?<relation>[^(]+)\(0(?:&apos;)*,(?<offset>-?\d+)(?:&apos;)*/;
+                # m/^([^(]+)\(0(?:&apos;)*,(-?\d+)(?:&apos;)*/;
+		m/^([^(]+)\(0(?:')*,(-?\d+)(?:')*/;
 
                 #my $offset = $+{"offset"};
                 my $offset = $2;
