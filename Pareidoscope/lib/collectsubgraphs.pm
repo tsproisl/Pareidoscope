@@ -613,7 +613,7 @@ sub concordance {
 
     # unpack graph
     my ( $json_graph, $query_length ) = _get_json_graph($data);
-    params->{"id"} = _cwb_treebank_query( $data, $mode );
+    params->{"id"} = _cwb_treebank_query( $data, $mode, $json_graph, $query_length );
     params->{"start"} = 0 unless ( param("start") );
     my $vars = {};
     %$vars = ( %$vars, %{ kwic::display_dep($data) } );

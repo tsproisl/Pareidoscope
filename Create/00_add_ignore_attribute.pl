@@ -28,7 +28,7 @@ use Set::Object;
 sub add_ignore {
     my ($corpus_file) = @_;
     open my $cfh, '<', $corpus_file or croak "Cannot open $corpus_file: $OS_ERROR";
-    open my $out, '>', "${corpus_file}.ignore_test" or croak "Cannot open ${corpus_file}.ignore: $OS_ERROR";
+    open my $out, '>', "${corpus_file}.ignore" or croak "Cannot open ${corpus_file}.ignore: $OS_ERROR";
     local $INPUT_RECORD_SEPARATOR = "</s>\n";
 OUTER:
     while ( my $sentence = <$cfh> ) {

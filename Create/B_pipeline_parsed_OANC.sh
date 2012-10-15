@@ -2,6 +2,7 @@
 
 outdir="/localhome/Databases/temp/cwb/oanc"
 subgraphdir="/localhome/Databases/temp/cwb/oanc/subgraphs"
+rawcorpus="/localhome/Corpora/OANC/oanc_parsed_1_6_9.xml.out"
 corpus="/localhome/Corpora/OANC/oanc_parsed_1_6_9.xml.out"
 corpusoutdir="/localhome/Databases/CWB/oanc"
 corpusname="OANC"

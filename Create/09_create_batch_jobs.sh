@@ -62,7 +62,7 @@ cd \$HOME/Pareidoscope/dependencies_batch
 cp $relations_basename $infiles \$TMPDIR
 cd \$TMPDIR
 
-export PERL5LIB="/home/hpc/slli/slli02/local/lib/perl5/site_perl/5.8.8/x86_64-linux-thread-multi:\$PERL5LIB"
+export PERL5LIB="/home/hpc/slli/slli02/local/lib/perl5/site_perl/5.10.0:/home/hpc/slli/slli02/local/lib/perl5/site_perl/5.10.0/x86_64-linux-thread-multi:\$PERL5LIB"
 
 for (( i=0 ; i < \${#files[@]} ; i++ ))
 do
@@ -84,14 +84,15 @@ do
     do
 	keys="\$keys -k\$j,\$j"
     done
-    percentage=\$(( 50 / $max_n ))
+    #percentage=\$(( 50 / $max_n ))
+    percentage=50
     # this is a tabulator:
     #grep -h "	\$i\$" subgraphs_${jobnr}_*.txt > \$WOODYHOME/subgraphs_${jobnr}_\$i.txt &
-    grep -h "	\$i\$" subgraphs_${jobnr}_*.txt | sort -S \${percentage}% -T \$TMPDIR -n \$keys | gzip > \$WOODYHOME/subgraphs_${jobnr}_\$i.txt.gz &
-
+    #grep -h "	\$i\$" subgraphs_${jobnr}_*.txt | sort -S \${percentage}% -T \$TMPDIR -n \$keys | gzip > \$WOODYHOME/subgraphs_${jobnr}_\$i.txt.gz &
+    grep -h "	\$i\$" subgraphs_${jobnr}_*.txt | sort -S \${percentage}% --parallel=4 -T \$TMPDIR -n \$keys | gzip > \$WOODYHOME/subgraphs_${jobnr}_\$i.txt.gz
 done
 
-wait
+#wait
 
 rm $infiles subgraphs_${jobnr}_*.txt
 EOF
