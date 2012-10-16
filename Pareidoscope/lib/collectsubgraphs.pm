@@ -8,7 +8,7 @@ use Graph::Directed;
 use Set::Object;
 use DBI;
 use Time::HiRes;
-use List::MoreUtils qw(first_index);
+use List::MoreUtils qw(first_index any);
 use Carp;    # carp croak
 use IO::Socket;
 use JSON qw();
@@ -29,7 +29,7 @@ sub get_subgraphs {
     my $subgraph_types_threshold = 750000;
     my $s_handle                 = $data->get_attribute("s");
     my $s_id_handle              = $data->get_attribute("s_id");
-    my $s_ignore_handle       = $data->get_attribute("s_ignore");
+    my $s_ignore_handle          = $data->get_attribute("s_ignore");
     my $indep_handle             = $data->get_attribute("indep");
     my $outdep_handle            = $data->get_attribute("outdep");
     my $root_handle              = $data->get_attribute("root");
@@ -46,16 +46,6 @@ sub get_subgraphs {
     my $localdata = localdata_client->init( $data->{"active"}->{"localdata"}, @{ $data->{"active"}->{"machines"} } );
     my ( $query, $unlex_query, $title, $anchor, $query_length, $ngram_ref ) = executequeries::build_query($data);
 
-    # # TODO
-    # # "word"/"lemma" und Wortform/Lemma aus $query extrahieren
-    # my %node_restriction;
-    # if ($query =~ m/^[[](?<type>word|lemma)='(?<type_value>[^']+)' .*? (?:(?<gram>pos|wc)='(?<gram_value>[^']+)')?/xms) {
-    # 	$node_restriction{$LAST_PAREN_MATCH{'type'}} = $LAST_PAREN_MATCH{'type_value'};
-    # 	$node_restriction{$LAST_PAREN_MATCH{'gram'}} = $LAST_PAREN_MATCH{'gram_value'} if (defined $LAST_PAREN_MATCH{'gram'});
-    # }
-    # else {
-    #    croak "Unexpected query: '$query'";
-    # }
     $return_vars->{"query_anchor"}       = $anchor;
     $return_vars->{"query_title"}        = $title;
     $return_vars->{"threshold"}          = param("threshold");
@@ -131,14 +121,6 @@ sub get_subgraphs {
                     $graph->add_edge( $cpos, $target );
                 }
             }
-
-            # Skip unconnected graphs (necessary because of a bug in the current version of the Stanford Dependencies converter)
-            next SENTENCE if ( ( $graph->vertices() > 1 ) && ( !$graph->is_weakly_connected() ) );
-
-            # check if all vertices are reachable from the root
-            my $graph_successors = Set::Object->new( $root, $graph->all_successors($root) );
-            my $graph_vertices = Set::Object->new( $graph->vertices() );
-            next SENTENCE if ( $graph_successors->not_equal($graph_vertices) );
 
             my $subgraph = Graph::Directed->new();
             $subgraph->add_vertex($match);
@@ -235,6 +217,7 @@ sub lexical_subgraph_query {
                 }
             }
         }
+        return $vars if ( any { !defined } ( $vars->{'analyze_matches'}, $vars->{'matches'} ) );
         return $vars if ( $vars->{'analyze_matches'} * $vars->{'matches'} == 0 );
         my $localn = $json_graph eq $unlex_json_graph ? $data->{"active"}->{'subgraphs'} : $vars->{'analyze_matches'};
         $insert_query->execute( $data->{"active"}->{"corpus"}, $class, $json_graph, param("threshold"), $query_length, $vars->{'matches'}, $localn );
@@ -345,11 +328,11 @@ sub _create_table {
         $query_copy =~ s/\s+/ /xmsg;
         my %node_restriction;
         while ( $query_copy =~ m/(?<key>\S+)='(?<value>[^']+)'/xmsg ) {
-            $node_restriction{ $LAST_PAREN_MATCH{'key'} } = $LAST_PAREN_MATCH{'value'};
+            $node_restriction{ $LAST_PAREN_MATCH{'key'} . $position } = $LAST_PAREN_MATCH{'value'};
         }
-        $row->{"struc_href"}  = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'graph' => $result, 'position' => $position, 'ignore_case' => params->{'ignore_case'}, %node_restriction };
-        $row->{"lex_href"}    = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'graph' => $result, 'position' => $position, 'ignore_case' => params->{'ignore_case'}, %node_restriction };
-        $row->{"cofreq_href"} = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'graph' => $result, 'position' => $position, 'ignore_case' => params->{'ignore_case'}, %node_restriction };
+        $row->{"struc_href"}  = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'graph' => $result, 'ignore_case' => params->{'ignore_case'}, %node_restriction };
+        $row->{"lex_href"}    = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'graph' => $result, 'ignore_case' => params->{'ignore_case'}, %node_restriction };
+        $row->{"cofreq_href"} = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'graph' => $result, 'ignore_case' => params->{'ignore_case'}, %node_restriction };
         $row->{"ngfreq_href"} = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'graph' => $result, 'ignore_case' => params->{'ignore_case'} };
         $counter++;
         $row->{"number"} = $counter;
@@ -533,9 +516,11 @@ sub _get_json_graph {
     my @linear_matrix   = map { defined $_ ? { 'relation' => $_ } : {} } map { $data->{'number_to_relation'}->[$_] or undef } unpack( "(S*)>", pack( "H*", param('graph') ) );
     my $number_of_nodes = sqrt $#linear_matrix + 1;
     my @matrix          = map { [ @linear_matrix[ $_ * $number_of_nodes .. $_ * $number_of_nodes + $number_of_nodes - 1 ] ] } ( 0 .. $number_of_nodes - 1 );
-    foreach my $param (qw(word lemma pos wc)) {
-        if ( param($param) ) {
-            $matrix[ param('position') ]->[ param('position') ]->{$param} = param($param);
+    foreach my $position ( 0 .. $data->{"active"}->{"subgraph_size"} - 1 ) {
+        foreach my $param (qw(word lemma pos wc)) {
+            if ( param( $param . $position ) ) {
+                $matrix[$position]->[$position]->{$param} = param( $param . $position );
+            }
         }
     }
     my $json_graph = JSON::encode_json( \@matrix );
@@ -580,7 +565,7 @@ sub _cwb_treebank_query {
 
         print $socket "corpus " . $data->{"active"}->{"corpus"} . "\n";
         print $socket "mode $mode\n";
-        print $socket "case-sensitivity " . ( param('ignore_case') ? "yes" : "no" ) . "\n";
+        print $socket "case-sensitivity " . ( param('ignore_case') ? "no" : "yes" ) . "\n";
         print $socket $json_graph, "\n";
 
         $dbh->do(qq{BEGIN TRANSACTION});
@@ -629,6 +614,7 @@ sub _lexdep_tables {
     $get_positions->execute();
     my $positionsref = $get_positions->fetchall_arrayref;
     my $slots;
+    my $max_index = $data->{"active"}->{"subgraph_size"} - 1;
 
     foreach my $position (@$positionsref) {
         my $slot;
@@ -641,12 +627,17 @@ sub _lexdep_tables {
             my $slotrow;
             my ( $result, $posit, $o11, $c1, $g2 ) = @$row;
             $g2 = sprintf( "%.5f", $g2 );
+            my $param_copy = Storable::dclone(params);
+	    my $param_copy_unlex = {map {$_ => $param_copy->{$_}} grep {!/(word|lemma|pos|wc)[0-$max_index]/} keys %{$param_copy}};
+            $param_copy->{ 'word' . $position } = $result;
+            $param_copy_unlex->{ 'word' . $position } = $result;
             my ( $freqlink, $ngfreqlink, $lexnlink, $strucnlink );
-            $slotrow->{"word"} = $result;
+            $slotrow->{"word"}        = $result;
+            $slotrow->{"cofreq_href"} = $param_copy;
 
-            #$slotrow->{"cofreq_href"} = create_freq_link_lex( $data, $o11, $ngramref, $position, $result );
-            #$slotrow->{"ngfreq_href"} = create_ngfreq_link_lex( $data, $c1, $ngramref, $position, $result ) unless ($general);
-            #$slotrow->{"lex_href"}    = create_n_link_lex( $data, $ngramref, $position, $result );
+            $slotrow->{"ngfreq_href"} = $param_copy_unlex;
+            $slotrow->{"lex_href"} = $param_copy;
+
             #$slotrow->{"struc_href"}  = create_n_link_lex( $data, $ngramref, $position, $result );
             $counter++;
             $slotrow->{"number"} = $counter;

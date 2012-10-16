@@ -184,11 +184,8 @@ sub escapeHTML {
 
 sub display_dep {
     my ($data) = @_;
-    my %state;
-    $state{"corpus"}      = param("corpus");
-    $state{"id"}          = param("id");
+    my %state = %{Storable::dclone(params)};
     $state{"s"}           = "Link";
-    $state{'return_type'} = param('return_type');
     my $qid = param('id');
     my ( $size, $end );
     my $vars;
