@@ -173,7 +173,8 @@ sub get_subgraphs {
 }
 
 sub lexical_subgraph_query {
-    my ( $data, $mode ) = @_;
+    my ($data) = @_;
+    my $mode = 'collo-word';
 
     my $vars;
     my $check_cache      = database->prepare(qq{SELECT qid, r1, n FROM queries WHERE corpus=? AND class=? AND query=? AND threshold=?});
@@ -255,145 +256,24 @@ sub lexical_subgraph_query {
     %$vars = ( %$vars, %{ _lexdep_overview_table( $data, $qid ) } );
     $vars->{"slots"} = _lexdep_tables( $data, $qid, ( $json_graph eq $unlex_json_graph ) );
     return $vars;
-
-    # gibt es Lexikalisierung?
-    # unlexikalisierte Struktur abfragen
-    # lexikalisierte Struktur abfragen
-    # Kookkurrenzen aggregieren
-    # Assoziationsmaß berechnen
-    # Im Cache ablegen
-    # Visualisierung: wie die Beziehung zwischen einer Spalte und einem bestimmten Knoten deutlich machen? Farben?
 }
 
-sub _create_table {
-    my ( $data, $query, $qid ) = @_;
-    my $vars;
-    my %specifics = (
-        "map"   => "number_to_relation",
-        "class" => "strucd"
-    );
-    my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$qid" ) or croak("Cannot connect: $DBI::errstr");
-    $dbh->do("PRAGMA encoding = 'UTF-8'");
-    $dbh->do("PRAGMA cache_size = 50000");
-    my $filter_length = q{};
-    my $filter_pos    = q{};
-    my $get_top_40    = $dbh->prepare( qq{SELECT result, position, mlen, o11, c1, am FROM results WHERE qid=? $filter_length $filter_pos ORDER BY am DESC, o11 DESC LIMIT } . param("start") . qq{, 40} );
-    $get_top_40->execute($qid);
-    my $rows = $get_top_40->fetchall_arrayref;
+sub concordance {
+    my ($data) = @_;
+    my $mode = 'sentence';
 
-    ###$vars->{"hidden_states"} = $config->keep_states_listref_of_hashrefs( $cgi, {}, qw(m c rt dt start t tt p w i ht h ct) );
-    # id fch flen frel ftag fwc fpos q rt
-    foreach my $param ( keys %{ params() } ) {
-        next if ( param($param) eq q{} );
-        if ( List::MoreUtils::any { $_ eq $param } qw(fch flen frel ftag fwc fpos) ) {
-            $vars->{$param} = param($param);
-        }
-        else {
-            $vars->{"hidden_states"}->{$param} = param($param);
-        }
-    }
-    $vars->{"hidden_states"}->{"start"} = 0;
-
-    ### NOTWENDIG?
-    $vars->{"pos_tags"} = $data->{"number_to_tag"};
-    $vars->{"word_classes"} = [ "", sort keys %{ config->{"tagsets"}->{ $data->{"active"}->{"tagset"} } } ];
-    my $counter = param("start");
-
-    foreach my $row (@$rows) {
-        my ( $result, $position, $mlen, $o11, $c1, $g2 ) = @$row;
-        $row             = {};
-        $g2              = sprintf( "%.5f", $g2 );
-        $row->{"g"}      = $g2;
-        $row->{"cofreq"} = $o11;
-        $row->{"ngfreq"} = $c1;
-        my ( $strucnlink, $lexnlink, $freqlink, $ngfreqlink, $g2span );
-        my ( @result, @ngram, @display_ngram, $display_ngram, );
-        $result =~ s/[<>]//g;
-        @ngram = map( $data->{ $specifics{"map"} }->[$_], map( hex($_), unpack( "(a4)*", $result ) ) );
-        @display_ngram = @ngram;
-
-        #$display_ngram = join ' ', grep {defined} @display_ngram;
-        $display_ngram = "graph=$result&position=$position";
-
-        #$display_ngram[$position] = "<em>$display_ngram[$position]";
-        #$display_ngram[ $position + $mlen - 1 ] .= "</em>";
-        #$display_ngram = join( " ", @display_ngram );
-        $row->{"display_ngram"} = $display_ngram;
-
-        # CREATE LEX AND STRUC LINKS
-        my $query_copy = $query;
-        $query_copy =~ s/^\[//xms;
-        $query_copy =~ s/\] within s$//xms;
-        $query_copy =~ s/%c//xmsg;
-        $query_copy =~ s/\s+/ /xmsg;
-        my %node_restriction;
-        while ( $query_copy =~ m/(?<key>\S+)='(?<value>[^']+)'/xmsg ) {
-            $node_restriction{ $LAST_PAREN_MATCH{'key'} . $position } = $LAST_PAREN_MATCH{'value'};
-        }
-        $row->{"struc_href"}  = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'graph' => $result, 'ignore_case' => params->{'ignore_case'}, %node_restriction };
-        $row->{"lex_href"}    = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'graph' => $result, 'ignore_case' => params->{'ignore_case'}, %node_restriction };
-        $row->{"cofreq_href"} = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'graph' => $result, 'ignore_case' => params->{'ignore_case'}, %node_restriction };
-        $row->{"ngfreq_href"} = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'graph' => $result, 'ignore_case' => params->{'ignore_case'} };
-        $counter++;
-        $row->{"number"} = $counter;
-    }
-    $vars->{"rows"} = $rows;
+    # unpack graph
+    my ( $json_graph, $query_length ) = _get_json_graph($data);
+    params->{"id"} = _cwb_treebank_query( $data, $mode, $json_graph, $query_length );
+    params->{"start"} = 0 unless ( param("start") );
+    my $vars = {};
+    %$vars = ( %$vars, %{ kwic::display_dep($data) } );
     return $vars;
 }
 
-sub _enumerate_connected_subgraphs_recursive {
-    my ( $data, $match, $graph, $subgraph, $prohibited_edges, $relation_ref, $reverse_relation_ref, $depth, $result_ref, $relation_id_ref ) = @_;
-
-    # determine all edges to neighbouring nodes that are not
-    # prohibited
-    my $out_edges          = Set::Object->new();
-    my $in_edges           = Set::Object->new();
-    my $neighbours         = Set::Object->new();
-    my $neighbouring_edges = Set::Object->new();
-    foreach my $node ( $subgraph->vertices ) {
-
-        # outgoing edges
-        foreach my $target ( keys %{ $relation_ref->{$node} } ) {
-            next if ( $prohibited_edges->contains("$node-$target") );
-            $out_edges->insert( [ $node, $target ] );
-            $neighbours->insert($target);
-            $neighbouring_edges->insert("$node-$target");
-        }
-
-        # incoming edges
-        foreach my $origin ( keys %{ $reverse_relation_ref->{$node} } ) {
-            next if ( $prohibited_edges->contains("$origin-$node") );
-            $in_edges->insert( [ $origin, $node ] );
-            $neighbours->insert($origin);
-            $neighbouring_edges->insert("$origin-$node");
-        }
-    }
-
-    my $first_powerset = _cross_set( _powerset_node_based( $out_edges, 0, $data->{"active"}->{"subgraph_size"} - $subgraph->vertices, 1 ), _powerset_node_based( $in_edges, 0, $data->{"active"}->{"subgraph_size"} - $subgraph->vertices, 0 ), $data->{"active"}->{"subgraph_size"} - $subgraph->vertices );
-
-    foreach my $set ( $first_powerset->elements() ) {
-        next if ( $set->size() == 0 );
-        my $new_nodes = Set::Object::intersection( $neighbours, Set::Object->new( map { @{$_} } $set->elements() ) );
-
-        # all combinations of edges between the newly added nodes
-        my $edges        = Set::Object->new();
-        my $string_edges = Set::Object->new();
-        foreach my $new_node ( $new_nodes->elements() ) {
-            $edges->insert( grep { $new_nodes->contains( $_->[1] ) } $graph->edges_from($new_node) );
-        }
-        $string_edges->insert( map { $_->[0] . q{-} . $_->[1] } $edges->elements() );
-
-        my $second_powerset = _powerset_edges( $edges, 0, $edges->size() );
-        foreach my $new_set ( $second_powerset->elements() ) {
-            my $local_subgraph = $subgraph->copy_graph;
-            $local_subgraph->add_edges( $set->elements(), $new_set->elements() );
-            _emit( $match, $local_subgraph, $relation_ref, $result_ref, $relation_id_ref );
-            if ( $local_subgraph->vertices < $data->{"active"}->{"subgraph_size"} && $depth < $data->{"active"}->{"subgraph_depth"} ) {
-                _enumerate_connected_subgraphs_recursive( $data, $match, $graph, $local_subgraph, Set::Object::union( $prohibited_edges, $neighbouring_edges, $string_edges ), $relation_ref, $reverse_relation_ref, $depth + 1, $result_ref, $relation_id_ref );
-            }
-        }
-    }
-    return;
+sub structural_ngram_query {
+    my ($date) = @_;
+    ...
 }
 
 sub _cross_set {
@@ -593,18 +473,6 @@ sub _cwb_treebank_query {
     return $qid;
 }
 
-sub concordance {
-    my ( $data, $mode ) = @_;
-
-    # unpack graph
-    my ( $json_graph, $query_length ) = _get_json_graph($data);
-    params->{"id"} = _cwb_treebank_query( $data, $mode, $json_graph, $query_length );
-    params->{"start"} = 0 unless ( param("start") );
-    my $vars = {};
-    %$vars = ( %$vars, %{ kwic::display_dep($data) } );
-    return $vars;
-}
-
 sub _lexdep_tables {
     my ( $data, $qid, $general ) = @_;
     my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$qid" ) or croak("Cannot connect: $DBI::errstr");
@@ -628,15 +496,15 @@ sub _lexdep_tables {
             my ( $result, $posit, $o11, $c1, $g2 ) = @$row;
             $g2 = sprintf( "%.5f", $g2 );
             my $param_copy = Storable::dclone(params);
-	    my $param_copy_unlex = {map {$_ => $param_copy->{$_}} grep {!/(word|lemma|pos|wc)[0-$max_index]/} keys %{$param_copy}};
-            $param_copy->{ 'word' . $position } = $result;
+            my $param_copy_unlex = { map { $_ => $param_copy->{$_} } grep { !/(word|lemma|pos|wc)[0-$max_index]/ } keys %{$param_copy} };
+            $param_copy->{ 'word' . $position }       = $result;
             $param_copy_unlex->{ 'word' . $position } = $result;
             my ( $freqlink, $ngfreqlink, $lexnlink, $strucnlink );
             $slotrow->{"word"}        = $result;
             $slotrow->{"cofreq_href"} = $param_copy;
 
             $slotrow->{"ngfreq_href"} = $param_copy_unlex;
-            $slotrow->{"lex_href"} = $param_copy;
+            $slotrow->{"lex_href"}    = $param_copy;
 
             #$slotrow->{"struc_href"}  = create_n_link_lex( $data, $ngramref, $position, $result );
             $counter++;
@@ -682,6 +550,137 @@ sub _lexdep_overview_table {
     $vars->{"column_numbers"} = [ 0 .. $#columns ];
     $vars->{"overview_table"} = \@columns;
     return $vars;
+}
+
+sub _create_table {
+    my ( $data, $query, $qid ) = @_;
+    my $vars;
+    my %specifics = (
+        "map"   => "number_to_relation",
+        "class" => "strucd"
+    );
+    my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$qid" ) or croak("Cannot connect: $DBI::errstr");
+    $dbh->do("PRAGMA encoding = 'UTF-8'");
+    $dbh->do("PRAGMA cache_size = 50000");
+    my $filter_length = q{};
+    my $filter_pos    = q{};
+    my $get_top_40    = $dbh->prepare( qq{SELECT result, position, mlen, o11, c1, am FROM results WHERE qid=? $filter_length $filter_pos ORDER BY am DESC, o11 DESC LIMIT } . param("start") . qq{, 40} );
+    $get_top_40->execute($qid);
+    my $rows = $get_top_40->fetchall_arrayref;
+
+    ###$vars->{"hidden_states"} = $config->keep_states_listref_of_hashrefs( $cgi, {}, qw(m c rt dt start t tt p w i ht h ct) );
+    # id fch flen frel ftag fwc fpos q rt
+    foreach my $param ( keys %{ params() } ) {
+        next if ( param($param) eq q{} );
+        if ( List::MoreUtils::any { $_ eq $param } qw(fch flen frel ftag fwc fpos) ) {
+            $vars->{$param} = param($param);
+        }
+        else {
+            $vars->{"hidden_states"}->{$param} = param($param);
+        }
+    }
+    $vars->{"hidden_states"}->{"start"} = 0;
+
+    ### NOTWENDIG?
+    $vars->{"pos_tags"} = $data->{"number_to_tag"};
+    $vars->{"word_classes"} = [ "", sort keys %{ config->{"tagsets"}->{ $data->{"active"}->{"tagset"} } } ];
+    my $counter = param("start");
+
+    foreach my $row (@$rows) {
+        my ( $result, $position, $mlen, $o11, $c1, $g2 ) = @$row;
+        $row             = {};
+        $g2              = sprintf( "%.5f", $g2 );
+        $row->{"g"}      = $g2;
+        $row->{"cofreq"} = $o11;
+        $row->{"ngfreq"} = $c1;
+        my ( $strucnlink, $lexnlink, $freqlink, $ngfreqlink, $g2span );
+        my ( @result, @ngram, @display_ngram, $display_ngram, );
+        $result =~ s/[<>]//g;
+        @ngram = map( $data->{ $specifics{"map"} }->[$_], map( hex($_), unpack( "(a4)*", $result ) ) );
+        @display_ngram = @ngram;
+
+        #$display_ngram = join ' ', grep {defined} @display_ngram;
+        $display_ngram = "graph=$result&position=$position";
+
+        #$display_ngram[$position] = "<em>$display_ngram[$position]";
+        #$display_ngram[ $position + $mlen - 1 ] .= "</em>";
+        #$display_ngram = join( " ", @display_ngram );
+        $row->{"display_ngram"} = $display_ngram;
+
+        # CREATE LEX AND STRUC LINKS
+        my $query_copy = $query;
+        $query_copy =~ s/^\[//xms;
+        $query_copy =~ s/\] within s$//xms;
+        $query_copy =~ s/%c//xmsg;
+        $query_copy =~ s/\s+/ /xmsg;
+        my %node_restriction;
+        while ( $query_copy =~ m/(?<key>\S+)='(?<value>[^']+)'/xmsg ) {
+            $node_restriction{ $LAST_PAREN_MATCH{'key'} . $position } = $LAST_PAREN_MATCH{'value'};
+        }
+        $row->{"struc_href"}  = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'graph' => $result, 'ignore_case' => params->{'ignore_case'}, %node_restriction };
+        $row->{"lex_href"}    = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'graph' => $result, 'ignore_case' => params->{'ignore_case'}, %node_restriction };
+        $row->{"cofreq_href"} = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'graph' => $result, 'ignore_case' => params->{'ignore_case'}, %node_restriction };
+        $row->{"ngfreq_href"} = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'graph' => $result, 'ignore_case' => params->{'ignore_case'} };
+        $counter++;
+        $row->{"number"} = $counter;
+    }
+    $vars->{"rows"} = $rows;
+    return $vars;
+}
+
+sub _enumerate_connected_subgraphs_recursive {
+    my ( $data, $match, $graph, $subgraph, $prohibited_edges, $relation_ref, $reverse_relation_ref, $depth, $result_ref, $relation_id_ref ) = @_;
+
+    # determine all edges to neighbouring nodes that are not
+    # prohibited
+    my $out_edges          = Set::Object->new();
+    my $in_edges           = Set::Object->new();
+    my $neighbours         = Set::Object->new();
+    my $neighbouring_edges = Set::Object->new();
+    foreach my $node ( $subgraph->vertices ) {
+
+        # outgoing edges
+        foreach my $target ( keys %{ $relation_ref->{$node} } ) {
+            next if ( $prohibited_edges->contains("$node-$target") );
+            $out_edges->insert( [ $node, $target ] );
+            $neighbours->insert($target);
+            $neighbouring_edges->insert("$node-$target");
+        }
+
+        # incoming edges
+        foreach my $origin ( keys %{ $reverse_relation_ref->{$node} } ) {
+            next if ( $prohibited_edges->contains("$origin-$node") );
+            $in_edges->insert( [ $origin, $node ] );
+            $neighbours->insert($origin);
+            $neighbouring_edges->insert("$origin-$node");
+        }
+    }
+
+    my $first_powerset = _cross_set( _powerset_node_based( $out_edges, 0, $data->{"active"}->{"subgraph_size"} - $subgraph->vertices, 1 ), _powerset_node_based( $in_edges, 0, $data->{"active"}->{"subgraph_size"} - $subgraph->vertices, 0 ), $data->{"active"}->{"subgraph_size"} - $subgraph->vertices );
+
+    foreach my $set ( $first_powerset->elements() ) {
+        next if ( $set->size() == 0 );
+        my $new_nodes = Set::Object::intersection( $neighbours, Set::Object->new( map { @{$_} } $set->elements() ) );
+
+        # all combinations of edges between the newly added nodes
+        my $edges        = Set::Object->new();
+        my $string_edges = Set::Object->new();
+        foreach my $new_node ( $new_nodes->elements() ) {
+            $edges->insert( grep { $new_nodes->contains( $_->[1] ) } $graph->edges_from($new_node) );
+        }
+        $string_edges->insert( map { $_->[0] . q{-} . $_->[1] } $edges->elements() );
+
+        my $second_powerset = _powerset_edges( $edges, 0, $edges->size() );
+        foreach my $new_set ( $second_powerset->elements() ) {
+            my $local_subgraph = $subgraph->copy_graph;
+            $local_subgraph->add_edges( $set->elements(), $new_set->elements() );
+            _emit( $match, $local_subgraph, $relation_ref, $result_ref, $relation_id_ref );
+            if ( $local_subgraph->vertices < $data->{"active"}->{"subgraph_size"} && $depth < $data->{"active"}->{"subgraph_depth"} ) {
+                _enumerate_connected_subgraphs_recursive( $data, $match, $graph, $local_subgraph, Set::Object::union( $prohibited_edges, $neighbouring_edges, $string_edges ), $relation_ref, $reverse_relation_ref, $depth + 1, $result_ref, $relation_id_ref );
+            }
+        }
+    }
+    return;
 }
 
 1;

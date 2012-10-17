@@ -19,7 +19,7 @@ hook 'before' => sub {
     params->{'corpus'} = config->{'corpora'}->[0]->{'corpus'} unless ( defined( param('corpus') ) );
     params->{'start'} = 0 unless ( defined( param('start') ) );
     $data->init_corpus( param('corpus') );
-    params->{'ignore_case'} = (defined(param('ignore_case')) and param('ignore_case') eq '1') ? 1 : 0;
+    params->{'ignore_case'} = ( defined( param('ignore_case') ) and param('ignore_case') eq '1' ) ? 1 : 0;
 };
 
 hook 'before_template' => sub {
@@ -150,22 +150,22 @@ any [ 'get', 'post' ] => '/results/complex_query' => sub {
 
 get '/results/concordance' => sub {
     my %vars;
-    $vars{'current'} = uri_for('/results/concordance');
+    $vars{'current'}     = uri_for('/results/concordance');
     $vars{'return_type'} = param('return_type');
     if ( param("return_type") eq "pos" || param("return_type") eq "chunk" ) {
-	%vars = ( %vars, %{ executequeries::cqp_query($data) } );
+        %vars = ( %vars, %{ executequeries::cqp_query($data) } );
     }
     elsif ( param("return_type") eq "dep" ) {
-	%vars = ( %vars, %{ collectsubgraphs::concordance($data, "sentence") } );
+        %vars = ( %vars, %{ collectsubgraphs::concordance($data) } );
     }
     template( 'kwic', \%vars );
 };
 
 get '/results/display_context' => sub {
     my %vars;
-    $vars{'current'} = uri_for('/results/display_context');
+    $vars{'current'}     = uri_for('/results/display_context');
     $vars{'return_type'} = param('return_type');
-    $vars{'p'}      = kwic::display_context($data);
+    $vars{'p'}           = kwic::display_context($data);
     template( 'context_display', \%vars );
 };
 
@@ -176,7 +176,7 @@ get '/results/lexical_ngram_query' => sub {
         %vars = ( %vars, %{ executequeries::lexn_query($data) } );
     }
     elsif ( param("return_type") eq "dep" ) {
-        %vars = ( %vars, %{ collectsubgraphs::lexical_subgraph_query($data, 'collo-word') } );
+        %vars = ( %vars, %{ collectsubgraphs::lexical_subgraph_query($data) } );
     }
     template( 'lexical_query_results', \%vars );
 };
@@ -184,7 +184,12 @@ get '/results/lexical_ngram_query' => sub {
 any [ 'get', 'post' ] => '/results/structural_ngram_query' => sub {
     my %vars;
     $vars{'current'} = uri_for('/results/structural_ngram_query');
-    %vars = ( %vars, %{ executequeries::strucn_query($data) } );
+    if ( param("return_type") eq "pos" || param("return_type") eq "chunk" ) {
+        %vars = ( %vars, %{ executequeries::strucn_query($data) } );
+    }
+    elsif ( param("return_type") eq "dep" ) {
+        %vars = ( %vars, %{ collectsubgraphs::structural_subgraph_query($data) } );
+    }
     template( 'complex_query_results', \%vars );
 };
 
