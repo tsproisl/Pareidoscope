@@ -107,7 +107,7 @@ sub single_item_query {
         return
               param('return_type') eq 'pos'   ? _strucn( $data, $freq )
             : param('return_type') eq 'chunk' ? _strucn( $data, $freq )
-            : param('return_type') eq 'dep' ? collectsubgraphs::get_subgraphs( $data, $freq )
+            : param('return_type') eq 'dep' ? collectsubgraphs::get_subgraphs( $data, $freq, 'sequence' )
             :                                 undef;
     };
     $return_vars->{"call_strucn"} = $call_strucn;

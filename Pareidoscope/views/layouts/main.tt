@@ -141,12 +141,18 @@
 	  </h3>
 	  <ul class="sidemenu">
 	    <li>
+	      <a target="_blank" href="http://www.treebank.info"><strong>
+		Treebank.info
+	      </strong></a>
+	      <br />
+	      a simple interface to complex structures
+	    </li>
+	    <li>
 	      <a target="_blank" href="http://www.linguistik.uni-erlangen.de"><strong>
 		CLUE
 	      </strong></a>
 	      <br />
-	      Professorship for Computational Linguistics at the
-	      University of Erlangen-Nuremberg
+	      Professorship for Corpus Linguistics at the University of Erlangen-Nuremberg
 	    </li>
 	    <li>
 	      <a target="_blank" href="http://www.lexi.uni-erlangen.de"><strong>

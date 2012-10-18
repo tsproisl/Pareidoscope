@@ -188,7 +188,7 @@ any [ 'get', 'post' ] => '/results/structural_ngram_query' => sub {
         %vars = ( %vars, %{ executequeries::strucn_query($data) } );
     }
     elsif ( param("return_type") eq "dep" ) {
-        %vars = ( %vars, %{ collectsubgraphs::structural_subgraph_query($data) } );
+        %vars = ( %vars, %{ collectsubgraphs::get_subgraphs($data, undef, 'graph') } );
     }
     template( 'complex_query_results', \%vars );
 };
