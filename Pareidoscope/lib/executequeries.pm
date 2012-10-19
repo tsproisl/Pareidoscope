@@ -729,7 +729,8 @@ sub _strucn {
 # CREATE NEW DB
 #---------------
 sub create_new_db {
-    my ($qid) = @_;
+    my ($qid, $type) = @_;
+    my $data_type = defined $type && $type eq 'graph' ? 'TEXT' : 'INTEGER';
     my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$qid" ) or croak( "Cannot connect to " . config->{"user_data"} . "/$qid: $DBI::errstr" );
     $dbh->do("PRAGMA encoding = 'UTF-8'");
     $dbh->do("PRAGMA cache_size = 50000");
@@ -738,7 +739,7 @@ sub create_new_db {
 			 rid INTEGER PRIMARY KEY,
 			 qid INTEGER NOT NULL,
 			 result TEXT NOT NULL,
-			 position INTEGER NOT NULL,
+			 position $data_type NOT NULL,
                          mlen INTEGER NOT NULL,
 			 o11 INTEGER NOT NULL,
 			 c1 INTEGER NOT NULL,

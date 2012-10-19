@@ -21,6 +21,8 @@ use executequeries;
 use localdata_client;
 use statistics;
 
+use Data::Dumper;
+
 sub get_subgraphs {
     my ( $data, $freq, $query_type ) = @_;
     my $return_vars;
@@ -43,9 +45,12 @@ sub get_subgraphs {
         $return_vars->{"frequency"}          = $freq;
         $return_vars->{"frequency_too_high"} = $freq >= $frequency_threshold;
         $return_vars->{"frequency_too_low"}  = $freq < param("threshold");
+        return $return_vars if ( $freq == 0 );
+        return $return_vars if ( $return_vars->{"frequency_too_high"} );
+        return $return_vars if ( $return_vars->{"frequency_too_low"} );
     }
     elsif ( $query_type eq 'graph' ) {
-        my ( $query, $query_length ) = _get_json_graph($data);
+        ( $query, $query_length ) = _get_json_graph($data);
         $title  = $query;
         $anchor = $title;
         $anchor =~ s/\s/_/xmsg;
@@ -55,9 +60,6 @@ sub get_subgraphs {
     $return_vars->{"query_title"}  = $title;
     $return_vars->{"threshold"}    = param("threshold");
     $return_vars->{"return_type"}  = param("return_type");
-    return $return_vars if ( $freq == 0 );
-    return $return_vars if ( $return_vars->{"frequency_too_high"} );
-    return $return_vars if ( $return_vars->{"frequency_too_low"} );
 
     # check cache database
     $check_cache->execute( $data->{"active"}->{"corpus"}, $specifics{"class"}, $query, param("threshold") );
@@ -93,21 +95,30 @@ sub get_subgraphs {
             my $mode = 'corpus-position';
             my $id = _cwb_treebank_query( $data, $mode, $query, $query_length );
             $t1 = [ Time::HiRes::gettimeofday() ];
-            my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . $id ) or croak "Cannot connect: $DBI::errstr";
+            my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . '/' . $id ) or croak "Cannot connect: $DBI::errstr";
             $dbh->do("PRAGMA encoding = 'UTF-8'");
             my $get_results = $dbh->prepare(qq{SELECT result FROM results WHERE qid=?});
             $get_results->execute($id);
             my $results_ref = $get_results->fetchall_arrayref;
 
+            my $freq = @{$results_ref};
+            $return_vars->{"frequency"}          = $freq;
+            $return_vars->{"frequency_too_high"} = $freq >= $frequency_threshold;
+            $return_vars->{"frequency_too_low"}  = $freq < param("threshold");
+            return $return_vars if ( $freq == 0 );
+            return $return_vars if ( $return_vars->{"frequency_too_high"} );
+            return $return_vars if ( $return_vars->{"frequency_too_low"} );
+
             foreach my $r ( @{$results_ref} ) {
                 my $r_string = $r->[0];
                 my $r_ref    = JSON::decode_json($r_string);
-                push @matches, [ $r_ref->{'s_start'}, $r_ref->{'s_end'}, [ @{ $r_ref->{'tokens'} } ] ];
+                push @matches, [ $r_ref->{'s_start'}, $r_ref->{'s_end'}, [ map { $_ + $r_ref->{'s_start'} } @{ $r_ref->{'tokens'} } ] ];
             }
             $t2 = [ Time::HiRes::gettimeofday() ];
             ( $result_ref, $queue_ref, $r1 ) = _analyze_sentences( $data, \@matches, $query, $query_length );
         }
 
+	debug "R1 = $r1";
         $return_vars->{"ngram_tokens"} = $r1;
         return $return_vars if ( $r1 == 0 );
         $return_vars->{"ngram_types"}          = scalar @{$queue_ref};
@@ -121,7 +132,7 @@ sub get_subgraphs {
         croak('qid is undef!') if ( !defined $qid );
         my $t3 = [ Time::HiRes::gettimeofday() ];
 
-        my $dbh = executequeries::create_new_db($qid);
+        my $dbh = executequeries::create_new_db( $qid, $query_type );
         $dbh->disconnect();
         $localdata->add_freq_and_am( $queue_ref, $r1, $data->{"active"}->{"subgraphs"}, $qid );
         my $t4 = [ Time::HiRes::gettimeofday() ];
@@ -139,6 +150,12 @@ sub get_subgraphs {
     }
     $return_vars->{"previous_href"}->{"start"} = param("start") - 40;
     $return_vars->{"next_href"}->{"start"}     = param("start") + 40;
+    if ($query_type eq 'graph') {
+	my $variables = Storable::dclone($return_vars);
+	$return_vars = {};
+	$return_vars->{'variables'} = $variables;
+	$return_vars->{'query'} = $query;
+    }
     return $return_vars;
 }
 
@@ -260,7 +277,7 @@ sub _analyze_sentences {
     foreach my $i ( 0 .. $query_length - 1 ) {
         foreach my $j ( 0 .. $query_length - 1 ) {
             next if ( $i == $j );
-            push @edges, [ $nodes[$i], $nodes[$j] ] if ( defined $query_ref->[$i]->[$j] );
+            push @edges, [ $nodes[$i], $nodes[$j] ] if ( defined $query_ref->[$i]->[$j]->{'relation'} );
         }
     }
 
@@ -430,7 +447,7 @@ sub _emit {
     for ( my $i = 0; $i <= $#sorted_nodes; $i++ ) {
         my $node_1 = $sorted_nodes[$i];
         my @cpos = indexes { $_ == $node_1 } @{$cpos_ref};
-        croak if ( @cpos > 1 );
+        croak 'More than one index – how can that be?' if ( @cpos > 1 );
         $node_index[ $cpos[0] ] = $i if ( @cpos == 1 );
         for ( my $j = 0; $j <= $#sorted_nodes; $j++ ) {
             my $node_2 = $sorted_nodes[$j];
@@ -681,7 +698,7 @@ sub _create_table {
             foreach my $position ( 0 .. $data->{"active"}->{"subgraph_size"} - 1 ) {
                 foreach my $param (qw(word lemma pos wc)) {
                     if ( param( $param . $position ) ) {
-                        $node_restriction{$param . $positions[$position]} = param( $param . $position );
+                        $node_restriction{ $param . $positions[$position] } = param( $param . $position );
                     }
                 }
             }
