@@ -5,7 +5,6 @@ use open qw(:utf8 :std);
 use utf8;
 
 use Data::Dumper;
-#use List::MoreUtils qw(any);
 use List::MoreUtils;
 use GraphViz;
 
@@ -14,12 +13,11 @@ sub visualize_graph {
 
     content_type 'image/png';
 
-    my $graph    = param('graph');
-    my $position = param('position');
-    my $label    = param('label');
-    my $bgcolor  = 'transparent';
-    #if ( any { ( !defined $_ ) || ( $_ eq q{} ) } ( $graph, $position, $label ) ) {
-    if ( List::MoreUtils::any { ( !defined $_ ) || ( $_ eq q{} ) } ( $graph, $position, $label ) ) {
+    my $graph   = param('graph');
+    my $bgcolor = 'transparent';
+
+    #if ( List::MoreUtils::any { ( !defined $_ ) || ( $_ eq q{} ) } ( $graph, $position, $label ) ) {
+    if ( !defined $graph ) {
         my $gv = GraphViz->new(
             node => {
                 shape    => 'plaintext',
@@ -58,8 +56,8 @@ sub visualize_graph {
 
     # add nodes
     foreach my $i ( 0 .. $#matrix ) {
-        if ( $i == $position ) {
-            $gv->add_node( $i, label => $label, shape => 'ellipse' );
+        if ( param( 'label' . $i ) ) {
+            $gv->add_node( $i, label => param( 'label' . $i ), shape => 'ellipse' );
         }
         else {
             $gv->add_node( $i, label => q{}, shape => 'ellipse', height => 0.1, width => 0.1 );

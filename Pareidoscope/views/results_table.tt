@@ -126,7 +126,7 @@
   [% FOREACH row IN rows %]
   <tr [% IF rowa == 1%]class="row-a"[% rowa = 0 %][% ELSE %]class="row-b"[% rowa = 1 %][% END %]>
     <td style="text-align:right;" class="first">[% row.number %]</td>
-    <td>[% IF return_type == 'dep' %]<img src="[% graphviz_url %]?[% row.display_ngram %]&label=[% query_title %]"/>[% ELSE %][% row.display_ngram %][% END %]</td>
+    <td>[% IF return_type == 'dep' %]<img src="[% graphviz_url %]?[% row.display_ngram %]"/>[% ELSE %][% row.display_ngram %][% END %]</td>
     <td style="text-align:right;"><a href="[% concordance_url %][% FOREACH arg IN row.cofreq_href %][% IF loop.first %]?[% ELSE %]&[% END %][% arg.key %]=[% arg.value %][% END %]">[% row.cofreq %]</a>
     </td>
     <td style="text-align:right;"><a href="[% concordance_url %][% FOREACH arg IN row.ngfreq_href %][% IF loop.first %]?[% ELSE %]&[% END %][% arg.key %]=[% arg.value %][% END %]">[% row.ngfreq %]</a>

@@ -580,7 +580,7 @@ sub _lexdep_tables {
             $slotrow->{"ngfreq_href"} = $param_copy_unlex;
             $slotrow->{"lex_href"}    = $param_copy;
 
-            #$slotrow->{"struc_href"}  = create_n_link_lex( $data, $ngramref, $position, $result );
+            $slotrow->{"struc_href"}  = $param_copy;
             $counter++;
             $slotrow->{"number"} = $counter;
             $slotrow->{"cofreq"} = $o11;
@@ -672,15 +672,9 @@ sub _create_table {
         $result =~ s/[<>]//g;
         @ngram = map( $data->{ $specifics{"map"} }->[$_], map( hex($_), unpack( "(a4)*", $result ) ) );
         @display_ngram = @ngram;
-
-        #$display_ngram = join ' ', grep {defined} @display_ngram;
-        $display_ngram = "graph=$result&position=$position";
-
-        #$display_ngram[$position] = "<em>$display_ngram[$position]";
-        #$display_ngram[ $position + $mlen - 1 ] .= "</em>";
-        #$display_ngram = join( " ", @display_ngram );
-        $row->{"display_ngram"} = $display_ngram;
-
+        $display_ngram = "graph=$result";
+	my %display_label;
+	
         # CREATE LEX AND STRUC LINKS
         my %node_restriction;
         if ( $query_type eq 'sequence' ) {
@@ -691,6 +685,7 @@ sub _create_table {
             $query_copy =~ s/\s+/ /xmsg;
             while ( $query_copy =~ m/(?<key>\S+)='(?<value>[^']+)'/xmsg ) {
                 $node_restriction{ $LAST_PAREN_MATCH{'key'} . $position } = $LAST_PAREN_MATCH{'value'};
+		push @{$display_label{$position}}, $LAST_PAREN_MATCH{'value'};
             }
         }
         elsif ( $query_type eq 'graph' ) {
@@ -699,10 +694,13 @@ sub _create_table {
                 foreach my $param (qw(word lemma pos wc)) {
                     if ( param( $param . $position ) ) {
                         $node_restriction{ $param . $positions[$position] } = param( $param . $position );
+			push @{$display_label{$positions[$position]}}, param( $param . $position );
                     }
                 }
             }
         }
+	$display_ngram .= join q{}, map {'&label' . $_ . '=' . join '/', @{$display_label{$_}}} keys %display_label;
+        $row->{"display_ngram"} = $display_ngram;
         $row->{"struc_href"}  = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'graph' => $result, 'ignore_case' => params->{'ignore_case'}, %node_restriction };
         $row->{"lex_href"}    = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'graph' => $result, 'ignore_case' => params->{'ignore_case'}, %node_restriction };
         $row->{"cofreq_href"} = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'graph' => $result, 'ignore_case' => params->{'ignore_case'}, %node_restriction };
