@@ -21,6 +21,8 @@
     ftag = variables.ftag
     fwc = variables.fwc
     fpos = variables.fpos
+    fdep = variables.fdep
+    dep_rels = variables.dep_rels
 %]
 
 <a name="[% query_anchor %]"></a>
@@ -62,6 +64,28 @@
     [% FOREACH hidden_state IN hidden_states %]
     <input type="hidden" name="[% hidden_state.key %]" value="[% hidden_state.value %]" />
     [% END %]
+    [% IF return_type == 'dep' %]
+    dependency graph with n
+    <select name="frel" >
+      <option [% IF (! frel.defined) or frel == 1 %]selected="selected"[% END %] value="1">≥</option>
+      <option [% IF frel == 2 %]selected="selected"[% END %] value="2">≤</option>
+      <option [% IF frel == 3 %]selected="selected"[% END %] value="3">=</option>
+    </select>
+    <select name="flen" >
+      <option [% IF (! flen.defined) or flen == 1 %]selected="selected"[% END %] value="1">1</option>
+      <option [% IF flen == 2 %]selected="selected"[% END %] value="2">2</option>
+      <option [% IF flen == 3 %]selected="selected"[% END %] value="3">3</option>
+      <option [% IF flen == 4 %]selected="selected"[% END %] value="4">4</option>
+      <option [% IF flen == 5 %]selected="selected"[% END %] value="5">5</option>
+    </select>
+    nodes and a
+    <select name="fdep" >
+      [% FOREACH dep_rel IN dep_rels %]
+      <option [% IF fdep == dep_rel %]selected="selected"[% END %] value="[% dep_rel %]">[% dep_rel %]</option>
+      [% END %]
+    </select>
+    relation
+    [% ELSE %]
     n-gram with n
     <select name="frel" >
       <option [% IF (! frel.defined) or frel == 1 %]selected="selected"[% END %] value="1">≥</option>
@@ -98,6 +122,7 @@
       <option value="3">left or right</option>
     </select>
     of the node
+    [% END %]
   </p>
   <input type="submit" name="s" value="Submit" style="margin-left: 11px; margin-bottom: 15px;" class="button" />
 </form>

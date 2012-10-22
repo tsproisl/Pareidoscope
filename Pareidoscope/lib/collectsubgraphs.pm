@@ -118,7 +118,7 @@ sub get_subgraphs {
             ( $result_ref, $queue_ref, $r1 ) = _analyze_sentences( $data, \@matches, $query, $query_length );
         }
 
-	debug "R1 = $r1";
+        debug "R1 = $r1";
         $return_vars->{"ngram_tokens"} = $r1;
         return $return_vars if ( $r1 == 0 );
         $return_vars->{"ngram_types"}          = scalar @{$queue_ref};
@@ -150,11 +150,11 @@ sub get_subgraphs {
     }
     $return_vars->{"previous_href"}->{"start"} = param("start") - 40;
     $return_vars->{"next_href"}->{"start"}     = param("start") + 40;
-    if ($query_type eq 'graph') {
-	my $variables = Storable::dclone($return_vars);
-	$return_vars = {};
-	$return_vars->{'variables'} = $variables;
-	$return_vars->{'query'} = $query;
+    if ( $query_type eq 'graph' ) {
+        my $variables = Storable::dclone($return_vars);
+        $return_vars                = {};
+        $return_vars->{'variables'} = $variables;
+        $return_vars->{'query'}     = $query;
     }
     return $return_vars;
 }
@@ -580,7 +580,7 @@ sub _lexdep_tables {
             $slotrow->{"ngfreq_href"} = $param_copy_unlex;
             $slotrow->{"lex_href"}    = $param_copy;
 
-            $slotrow->{"struc_href"}  = $param_copy;
+            $slotrow->{"struc_href"} = $param_copy;
             $counter++;
             $slotrow->{"number"} = $counter;
             $slotrow->{"cofreq"} = $o11;
@@ -633,12 +633,24 @@ sub _create_table {
         "map"   => "number_to_relation",
         "class" => "strucd"
     );
+    my %filter_relations = ( 1 => ">=", 2 => "<=", 3 => "=" );
+    my $get_relation_ids = $data->{"dbh"}->prepare(qq{SELECT relation, depid FROM dependencies});
+    $get_relation_ids->execute();
+    my %relation_id = map { @{$_} } @{ $get_relation_ids->fetchall_arrayref() };
+
     my $dbh = DBI->connect( "dbi:SQLite:" . config->{"user_data"} . "/$qid" ) or croak("Cannot connect: $DBI::errstr");
     $dbh->do("PRAGMA encoding = 'UTF-8'");
     $dbh->do("PRAGMA cache_size = 50000");
     my $filter_length = q{};
-    my $filter_pos    = q{};
-    my $get_top_40    = $dbh->prepare( qq{SELECT result, position, mlen, o11, c1, am FROM results WHERE qid=? $filter_length $filter_pos ORDER BY am DESC, o11 DESC LIMIT } . param("start") . qq{, 40} );
+    my $filter_rel    = q{};
+    $filter_length = 'AND length(result) ' . $filter_relations{ param("frel") } . ' ' . ( ( param("flen")**2 ) * 4 + 2 ) if ( defined( param("flen") ) and defined( param("frel") ) );
+    if ( defined param('fdep') && param('fdep') ne q{} ) {
+        debug 'fdep = ' . param('fdep');
+        $filter_rel = 'AND result REGEXP \'^([<>]?[0-9a-f]{4}[<>]?)*';
+        $filter_rel .= '([<>]?' . sprintf( '%04x', $relation_id{ param('fdep') } ) . '[<>]?)';
+        $filter_rel .= '([<>]?[0-9a-f]{4}[<>]?)*$' . '\'';
+    }
+    my $get_top_40 = $dbh->prepare( qq{SELECT result, position, mlen, o11, c1, am FROM results WHERE qid=? $filter_length $filter_rel ORDER BY am DESC, o11 DESC LIMIT } . param("start") . qq{, 40} );
     $get_top_40->execute($qid);
     my $rows = $get_top_40->fetchall_arrayref;
 
@@ -646,7 +658,7 @@ sub _create_table {
     # id fch flen frel ftag fwc fpos q rt
     foreach my $param ( keys %{ params() } ) {
         next if ( param($param) eq q{} );
-        if ( List::MoreUtils::any { $_ eq $param } qw(fch flen frel ftag fwc fpos) ) {
+        if ( List::MoreUtils::any { $_ eq $param } qw(flen frel fdep) ) {
             $vars->{$param} = param($param);
         }
         else {
@@ -670,11 +682,11 @@ sub _create_table {
         my ( $strucnlink, $lexnlink, $freqlink, $ngfreqlink, $g2span );
         my ( @result, @ngram, @display_ngram, $display_ngram, );
         $result =~ s/[<>]//g;
-        @ngram = map( $data->{ $specifics{"map"} }->[$_], map( hex($_), unpack( "(a4)*", $result ) ) );
+        @ngram         = map( $data->{ $specifics{"map"} }->[$_], map( hex($_), unpack( "(a4)*", $result ) ) );
         @display_ngram = @ngram;
         $display_ngram = "graph=$result";
-	my %display_label;
-	
+        my %display_label;
+
         # CREATE LEX AND STRUC LINKS
         my %node_restriction;
         if ( $query_type eq 'sequence' ) {
@@ -685,7 +697,7 @@ sub _create_table {
             $query_copy =~ s/\s+/ /xmsg;
             while ( $query_copy =~ m/(?<key>\S+)='(?<value>[^']+)'/xmsg ) {
                 $node_restriction{ $LAST_PAREN_MATCH{'key'} . $position } = $LAST_PAREN_MATCH{'value'};
-		push @{$display_label{$position}}, $LAST_PAREN_MATCH{'value'};
+                push @{ $display_label{$position} }, $LAST_PAREN_MATCH{'value'};
             }
         }
         elsif ( $query_type eq 'graph' ) {
@@ -694,17 +706,31 @@ sub _create_table {
                 foreach my $param (qw(word lemma pos wc)) {
                     if ( param( $param . $position ) ) {
                         $node_restriction{ $param . $positions[$position] } = param( $param . $position );
-			push @{$display_label{$positions[$position]}}, param( $param . $position );
+                        push @{ $display_label{ $positions[$position] } }, param( $param . $position );
                     }
                 }
             }
         }
-	$display_ngram .= join q{}, map {'&label' . $_ . '=' . join '/', @{$display_label{$_}}} keys %display_label;
+
+        foreach my $param ( keys %{ params() } ) {
+            next if ( param($param) eq q{} );
+            if ( List::MoreUtils::any { $_ eq $param } qw(flen frel fdep) ) {
+                $vars->{$param} = param($param);
+            }
+
+            # else {
+            #     $vars->{"hidden_states"}->{$param} = param($param);
+            # }
+        }
+        $vars->{"hidden_states"}->{"start"} = 0;
+        $vars->{"dep_rels"} = [ q{}, sort keys %relation_id ];
+
+        $display_ngram .= join q{}, map { '&label' . $_ . '=' . join '/', @{ $display_label{$_} } } keys %display_label;
         $row->{"display_ngram"} = $display_ngram;
-        $row->{"struc_href"}  = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'graph' => $result, 'ignore_case' => params->{'ignore_case'}, %node_restriction };
-        $row->{"lex_href"}    = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'graph' => $result, 'ignore_case' => params->{'ignore_case'}, %node_restriction };
-        $row->{"cofreq_href"} = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'graph' => $result, 'ignore_case' => params->{'ignore_case'}, %node_restriction };
-        $row->{"ngfreq_href"} = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'graph' => $result, 'ignore_case' => params->{'ignore_case'} };
+        $row->{"struc_href"}    = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'graph' => $result, 'ignore_case' => params->{'ignore_case'}, %node_restriction };
+        $row->{"lex_href"}      = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'graph' => $result, 'ignore_case' => params->{'ignore_case'}, %node_restriction };
+        $row->{"cofreq_href"}   = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'graph' => $result, 'ignore_case' => params->{'ignore_case'}, %node_restriction };
+        $row->{"ngfreq_href"}   = { 'return_type' => param('return_type'), 'threshold' => param('threshold'), 's' => 'Link', corpus => param('corpus'), 'graph' => $result, 'ignore_case' => params->{'ignore_case'} };
         $counter++;
         $row->{"number"} = $counter;
     }
