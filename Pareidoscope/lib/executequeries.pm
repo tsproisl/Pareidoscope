@@ -614,6 +614,7 @@ sub _strucn {
             "class" => "strucc"
         );
     }
+    $return_vars->{"ngram_tokens"}          = 0;
     $return_vars->{"threshold"}          = param("threshold");
     $return_vars->{"return_type"}        = $specifics{"name"};
     $return_vars->{"frequency"}          = $freq;
