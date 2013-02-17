@@ -14,9 +14,9 @@ use Carp;    # carp croak
 
 # use Data::Dumper;            # Dumper
 # use List::Util;              # first max maxstr min minstr reduce shuffle sum
-use List::MoreUtils qw(first_index);         # "the stuff missing in List::Util"
-use Log::Log4perl qw(:easy); # TRACE DEBUG INFO WARN ERROR FATAL ALWAYS
-Log::Log4perl->easy_init( $DEBUG );
+use List::MoreUtils qw(first_index);    # "the stuff missing in List::Util"
+use Log::Log4perl qw(:easy);            # TRACE DEBUG INFO WARN ERROR FATAL ALWAYS
+Log::Log4perl->easy_init($DEBUG);
 
 use Readonly;
 Readonly my $UNLIMITED_NUMBER_OF_FIELDS       => -1;
@@ -27,16 +27,16 @@ use Set::Object;
 
 sub add_ignore {
     my ($corpus_file) = @_;
-    open my $cfh, '<', $corpus_file or croak "Cannot open $corpus_file: $OS_ERROR";
+    open my $cfh, '<', $corpus_file            or croak "Cannot open $corpus_file: $OS_ERROR";
     open my $out, '>', "${corpus_file}.ignore" or croak "Cannot open ${corpus_file}.ignore: $OS_ERROR";
     local $INPUT_RECORD_SEPARATOR = "</s>\n";
 OUTER:
     while ( my $sentence = <$cfh> ) {
         my @sentence = split /\n/xms, $sentence;
-	$sentence[$#sentence] .= "\n";
-	my $s_index = first_index {/^<s[ ][^>]+>$/xms} @sentence;
+        $sentence[$#sentence] .= "\n";
+        my $s_index = first_index {/^<s[ ][^>]+>$/xms} @sentence;
         my @tokens = grep { $_ !~ /^<[^>]+>$/xms } @sentence;
-	my ( @word_forms, @indeps, @outdeps, @roots );
+        my ( @word_forms, @indeps, @outdeps, @roots );
         my $root;
         foreach my $token (@tokens) {
             my ( $word, $pos, $lemma, $wc, $indep, $outdep, $root ) = split /\t/xms, $token;
@@ -46,6 +46,7 @@ OUTER:
             push @roots,      $root;
         }
         my $graph = Graph::Directed->new;
+        my @edges;
 
         for ( my $i = 0; $i <= $#word_forms; $i++ ) {
             $root = $i if ( $roots[$i] eq "root" );
@@ -58,30 +59,42 @@ OUTER:
 
             # Skip sentences with nodes that have more than ten edges
             if ( scalar( () = split( /\|/, $indep, $UNLIMITED_NUMBER_OF_FIELDS ) ) + scalar( () = split( /\|/, $outdep, -1 ) ) > $MAXIMUM_NUMBER_OF_SUBGRAPH_EDGES ) {
-		$sentence[$s_index] =~ s/\s*>$/ ignore="yes-edges">/xms;
-		print $out join "\n", @sentence;
+                $sentence[$s_index] =~ s/\s*>$/ ignore="yes-edge_limit">/xms;
+                print $out join "\n", @sentence;
                 next OUTER;
             }
             foreach my $dep ( split( /[|]/xms, $outdep ) ) {
+
                 #$dep =~ m/^(?<relation>[^(]+)[(]0(?:&apos;)*,(?<offset>-?\d+)(?:&apos;)*/xms;
-		$dep =~ m/^(?<relation>[^(]+)[(]0(?:')*,(?<offset>-?\d+)(?:')*/xms;
+                $dep =~ m/^(?<relation>[^(]+)[(]0(?:')*,(?<offset>-?\d+)(?:')*/xms;
                 my $target = $i + $LAST_PAREN_MATCH{"offset"};
                 next if ( $i == $target );
-                $graph->add_edge( $i, $target );
+		# Skip sentences with parallel edges, i.e. sentences
+		# having two edges with different labels between the
+		# same two vertices
+                if ( $graph->has_edge( $i, $target ) and $edges[$i]->[$target] eq $LAST_PAREN_MATCH{"relation"} ) {
+                    $sentence[$s_index] =~ s/\s*>$/ ignore="yes-parallel_edge">/xms;
+                    print $out join "\n", @sentence;
+                    next OUTER;
+                }
+                else {
+                    $graph->add_edge( $i, $target );
+                    $edges[$i]->[$target] = $LAST_PAREN_MATCH{"relation"};
+                }
             }
         }
 
         # Skip rootless sentences
         if ( !defined $root ) {
-	    $sentence[$s_index] =~ s/\s*>$/ ignore="yes-rootless">/xms;
-	    print $out join "\n", @sentence;
+            $sentence[$s_index] =~ s/\s*>$/ ignore="yes-rootless">/xms;
+            print $out join "\n", @sentence;
             next OUTER;
         }
 
         # Skip unconnected graphs (necessary because of a bug in the current version of the Stanford Dependencies converter)
         if ( ( $graph->vertices() > 1 ) && ( !$graph->is_weakly_connected() ) ) {
-	    $sentence[$s_index] =~ s/\s*>$/ ignore="yes-unconnected">/xms;
-	    print $out join "\n", @sentence;
+            $sentence[$s_index] =~ s/\s*>$/ ignore="yes-unconnected">/xms;
+            print $out join "\n", @sentence;
             next OUTER;
         }
 
@@ -89,12 +102,12 @@ OUTER:
         my $graph_successors = Set::Object->new( $root, $graph->all_successors($root) );
         my $graph_vertices = Set::Object->new( $graph->vertices() );
         if ( $graph_successors->not_equal($graph_vertices) ) {
-	    $sentence[$s_index] =~ s/\s*>$/ ignore="yes-unreachable">/xms;
-	    print $out join "\n", @sentence;
+            $sentence[$s_index] =~ s/\s*>$/ ignore="yes-unreachable_node">/xms;
+            print $out join "\n", @sentence;
             next OUTER;
         }
-	$sentence[$s_index] =~ s/\s*>$/ ignore="no">/xms;
-	print $out join "\n", @sentence;
+        $sentence[$s_index] =~ s/\s*>$/ ignore="no">/xms;
+        print $out join "\n", @sentence;
     }
     close $cfh or croak "Cannot close $corpus_file: $OS_ERROR";
     close $out or croak "Cannot close ${corpus_file}.ignore: $OS_ERROR";
