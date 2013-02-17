@@ -14,8 +14,8 @@ use Carp;    # carp croak
 
 # use Data::Dumper;            # Dumper
 # use List::Util;              # first max maxstr min minstr reduce shuffle sum
-use List::MoreUtils qw(first_index);    # "the stuff missing in List::Util"
-use Log::Log4perl qw(:easy);            # TRACE DEBUG INFO WARN ERROR FATAL ALWAYS
+use List::MoreUtils qw(first_index indexes);    # "the stuff missing in List::Util"
+use Log::Log4perl qw(:easy);                    # TRACE DEBUG INFO WARN ERROR FATAL ALWAYS
 Log::Log4perl->easy_init($DEBUG);
 
 use Readonly;
@@ -45,11 +45,28 @@ OUTER:
             push @outdeps,    $outdep;
             push @roots,      $root;
         }
+
+        @root_indexes = indexes { $_ eq "root" } @roots;
+
+        # Skip rootless sentences
+        if ( @root_indexes == 0 ) {
+            $sentence[$s_index] =~ s/\s*>$/ ignore="yes-rootless">/xms;
+            print $out join "\n", @sentence;
+            next OUTER;
+        }
+
+        # Skip sentences with more than one root
+        if ( @root_indexes > 1 ) {
+            $sentence[$s_index] =~ s/\s*>$/ ignore="yes-too_many_roots">/xms;
+            print $out join "\n", @sentence;
+            next OUTER;
+        }
+
+        $root = $root_indexes[0];
         my $graph = Graph::Directed->new;
         my @edges;
 
         for ( my $i = 0; $i <= $#word_forms; $i++ ) {
-            $root = $i if ( $roots[$i] eq "root" );
             my $indep  = $indeps[$i];
             my $outdep = $outdeps[$i];
             $indep  =~ s/^\|//;
@@ -69,9 +86,10 @@ OUTER:
                 $dep =~ m/^(?<relation>[^(]+)[(]0(?:')*,(?<offset>-?\d+)(?:')*/xms;
                 my $target = $i + $LAST_PAREN_MATCH{"offset"};
                 next if ( $i == $target );
-		# Skip sentences with parallel edges, i.e. sentences
-		# having two edges with different labels between the
-		# same two vertices
+
+                # Skip sentences with parallel edges, i.e. sentences
+                # having two edges with different labels between the
+                # same two vertices
                 if ( $graph->has_edge( $i, $target ) and $edges[$i]->[$target] eq $LAST_PAREN_MATCH{"relation"} ) {
                     $sentence[$s_index] =~ s/\s*>$/ ignore="yes-parallel_edge">/xms;
                     print $out join "\n", @sentence;
@@ -82,13 +100,6 @@ OUTER:
                     $edges[$i]->[$target] = $LAST_PAREN_MATCH{"relation"};
                 }
             }
-        }
-
-        # Skip rootless sentences
-        if ( !defined $root ) {
-            $sentence[$s_index] =~ s/\s*>$/ ignore="yes-rootless">/xms;
-            print $out join "\n", @sentence;
-            next OUTER;
         }
 
         # Skip unconnected graphs (necessary because of a bug in the current version of the Stanford Dependencies converter)
