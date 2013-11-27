@@ -2,10 +2,14 @@
 # -*- coding: utf-8 -*-
 
 import argparse
+import json
 import os
 import sqlite3
 
+from networkx.readwrite import json_graph
+
 from pareidoscope.utils import cwb
+from pareidoscope.utils import nx_graph
 
 
 def create_db(filename):
@@ -14,6 +18,7 @@ def create_db(filename):
     Arguments:
     - `filename`:
     """
+    # SELECT sentid, position FROM tokens INNER JOIN types USING (typeid) INNER JOIN sentences USING (sentid) INNER JOIN indeps USING (typeid) INNER JOIN outdeps USING (typeid) WHERE …
     conn = sqlite3.connect(filename)
     c = conn.cursor()
     ## tables for finding vertice candidates
@@ -26,15 +31,15 @@ def create_db(filename):
     c.execute("CREATE INDEX types_indeg_idx ON types (indeg)")
     c.execute("CREATE INDEX types_outdeg_idx ON types (outdeg)")
     # indeps
-    c.execute("CREATE TABLE indeps (typeid INTEGER, indep TEXT, FOREIGN KEY (typeid) REFERENCES types, UNIQUE (typeid, dep))")
-    c.execute("CREATE INDEX indeps_idx ON indeps (dep)")
+    c.execute("CREATE TABLE indeps (typeid INTEGER, indep TEXT, FOREIGN KEY (typeid) REFERENCES types, UNIQUE (typeid, indep))")
+    c.execute("CREATE INDEX indeps_idx ON indeps (indep)")
     # outdeps
-    c.execute("CREATE TABLE outdeps (typeid INTEGER, outdep TEXT, FOREIGN KEY (typeid) REFERENCES types, UNIQUE (typeid, dep))")
-    c.execute("CREATE INDEX outdeps_idx ON outdeps (dep)")
+    c.execute("CREATE TABLE outdeps (typeid INTEGER, outdep TEXT, FOREIGN KEY (typeid) REFERENCES types, UNIQUE (typeid, outdep))")
+    c.execute("CREATE INDEX outdeps_idx ON outdeps (outdep)")
     # sentences
     c.execute("CREATE TABLE sentences (sentid INTEGER PRIMARY KEY, graph TEXT)")
     # tokens
-    c.execute("CREATE TABLE tokens (tokenid INTEGER PRIMARY KEY AUTOINCREMENT, typeid INTEGER, sentid INTEGER, position INTEGER, FOREIGN KEY (typeid) REFERENCES types, FOREIGN KEY (sentid) REFRENCES sentences, UNIQUE (typeid, sentid, position))")
+    c.execute("CREATE TABLE tokens (tokenid INTEGER PRIMARY KEY AUTOINCREMENT, typeid INTEGER, sentid INTEGER, position INTEGER, FOREIGN KEY (typeid) REFERENCES types, FOREIGN KEY (sentid) REFERENCES sentences, UNIQUE (typeid, sentid, position))")
     ## tables for abstract subgraphs
     # size 2
     c.execute("CREATE TABLE subgraphs2 (graphid INTEGER PRIMARY KEY AUTOINCREMENT, graph TEXT, sentid INTEGER, v1 INTEGER, v2 INTEGER)")
@@ -50,7 +55,21 @@ def create_db(filename):
     c.execute("CREATE INDEX subgraphs5_idx ON subgraphs5 (graph)")
     return conn, c
 
-# SELECT sentid, position FROM tokens INNER JOIN types USING (typeid) INNER JOIN sentences USING (sentid) INNER JOIN indeps USING (typeid) INNER JOIN outdeps USING (typeid) WHERE …
+
+def insert_types(conn, c, sentences):
+    """Insert type-level data
+    
+    Arguments:
+    - `conn`:
+    - `c`:
+    - `sentences`:
+    """
+    # after insert: id = c.lastrowid
+    for s in sentences:
+        gs = nx_graph.create_nx_digraph_from_cwb(s)
+        serialized = json.dumps(json_graph.node_link_data(gs))
+        # serialized = json.dumps(json_graph.adjacency_data(gs))
+        print serialized
 
 
 
@@ -61,4 +80,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     # raise exeception if args.db already exists
-    sents = cwb.sentences_iter(args.corpus)
+    conn, c = create_db(args.db)
+    sents = cwb.sentences_iter(args.CORPUS)
+    insert_types(None, None, sents)
