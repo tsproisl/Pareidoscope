@@ -1,0 +1,64 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+import argparse
+import os
+import sqlite3
+
+from pareidoscope.utils import cwb
+
+
+def create_db(filename):
+    """Create an empty database
+    
+    Arguments:
+    - `filename`:
+    """
+    conn = sqlite3.connect(filename)
+    c = conn.cursor()
+    ## tables for finding vertice candidates
+    # types
+    c.execute("CREATE TABLE types (typeid INTEGER PRIMARY KEY AUTOINCREMENT, word TEXT, pos TEXT, lemma TEXT, wc TEXT, indeg INTEGER, outdeg INTEGER)")
+    c.execute("CREATE INDEX types_word_idx ON types (word)")
+    c.execute("CREATE INDEX types_pos_idx ON types (pos)")
+    c.execute("CREATE INDEX types_lemma_idx ON types (lemma)")
+    c.execute("CREATE INDEX types_wc_idx ON types (wc)")
+    c.execute("CREATE INDEX types_indeg_idx ON types (indeg)")
+    c.execute("CREATE INDEX types_outdeg_idx ON types (outdeg)")
+    # indeps
+    c.execute("CREATE TABLE indeps (typeid INTEGER, indep TEXT, FOREIGN KEY (typeid) REFERENCES types, UNIQUE (typeid, dep))")
+    c.execute("CREATE INDEX indeps_idx ON indeps (dep)")
+    # outdeps
+    c.execute("CREATE TABLE outdeps (typeid INTEGER, outdep TEXT, FOREIGN KEY (typeid) REFERENCES types, UNIQUE (typeid, dep))")
+    c.execute("CREATE INDEX outdeps_idx ON outdeps (dep)")
+    # sentences
+    c.execute("CREATE TABLE sentences (sentid INTEGER PRIMARY KEY, graph TEXT)")
+    # tokens
+    c.execute("CREATE TABLE tokens (tokenid INTEGER PRIMARY KEY AUTOINCREMENT, typeid INTEGER, sentid INTEGER, position INTEGER, FOREIGN KEY (typeid) REFERENCES types, FOREIGN KEY (sentid) REFRENCES sentences, UNIQUE (typeid, sentid, position))")
+    ## tables for abstract subgraphs
+    # size 2
+    c.execute("CREATE TABLE subgraphs2 (graphid INTEGER PRIMARY KEY AUTOINCREMENT, graph TEXT, sentid INTEGER, v1 INTEGER, v2 INTEGER)")
+    c.execute("CREATE INDEX subgraphs2_idx ON subgraphs2 (graph)")
+    # size 3
+    c.execute("CREATE TABLE subgraphs3 (graphid INTEGER PRIMARY KEY AUTOINCREMENT, graph TEXT, sentid INTEGER, v1 INTEGER, v2 INTEGER, v3 INTEGER)")
+    c.execute("CREATE INDEX subgraphs3_idx ON subgraphs3 (graph)")
+    # size 4
+    c.execute("CREATE TABLE subgraphs4 (graphid INTEGER PRIMARY KEY AUTOINCREMENT, graph TEXT, sentid INTEGER, v1 INTEGER, v2 INTEGER, v3 INTEGER, v4 INTEGER)")
+    c.execute("CREATE INDEX subgraphs4_idx ON subgraphs4 (graph)")
+    # size 5
+    c.execute("CREATE TABLE subgraphs5 (graphid INTEGER PRIMARY KEY AUTOINCREMENT, graph TEXT, sentid INTEGER, v1 INTEGER, v2 INTEGER, v3 INTEGER, v4 INTEGER, v5 INTEGER)")
+    c.execute("CREATE INDEX subgraphs5_idx ON subgraphs5 (graph)")
+    return conn, c
+
+# SELECT sentid, position FROM tokens INNER JOIN types USING (typeid) INNER JOIN sentences USING (sentid) INNER JOIN indeps USING (typeid) INNER JOIN outdeps USING (typeid) WHERE …
+
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Convert a corpus in CWB format to an SQLite database')
+    parser.add_argument("--db", type=os.path.abspath, required=True, help="SQLite3 database")
+    parser.add_argument("CORPUS", type=argparse.FileType("r"), help="Corpus in CWB format")
+    args = parser.parse_args()
+    
+    # raise exeception if args.db already exists
+    sents = cwb.sentences_iter(args.corpus)
