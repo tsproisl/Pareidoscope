@@ -1,0 +1,59 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+import argparse
+import collections
+import itertools
+import json
+import operator
+import os
+import sys
+
+from pareidoscope.utils import nx_graph
+from pareidoscope.utils import random_trees
+from pareidoscope.utils import cwb
+
+
+def get_distributions(corpus, voc, rel):
+    """Get frequency distributions for vocabulary and relations.
+    
+    Arguments:
+    - `corpus`:
+    - `voc`:
+    - `rel`:
+    """
+    vertice_dist, edge_dist = [], []
+    sents = list(cwb.sentences_iter(corpus))
+    tokens = collections.Counter(itertools.chain.from_iterable([[t[0] for t in s] for s in sents]))
+    r = [[t[4][1:t[4].find("(")] for t in s] for s in sents]
+    relations = collections.Counter(itertools.chain.from_iterable(r))
+    del relations[""]
+    for v, f in sorted(tokens.iteritems(), key=operator.itemgetter(1))[:int(voc*len(tokens))]:
+        vertice_dist.extend([v] * f)
+    for e, f in sorted(relations.iteritems(), key=operator.itemgetter(1))[:int(rel*len(relations))]:
+        edge_dist.extend([e] * f)
+    return vertice_dist, edge_dist
+
+
+
+if __name__ == "__main__":
+    description = "Create random queries based on a corpus in CWB format."
+    epilog = """Examples:
+  Create 100 queries with 2 to 5 vertices:
+    ..."""
+    parser = argparse.ArgumentParser(description=description, epilog=epilog, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("-v", "--vocabulary", help="Ratio of vocabulary (most frequent) to use; default: 0.2", type=float, default=0.2, metavar="R")
+    parser.add_argument("-r", "--relations", help="Ratio of relations (most frequent) to use; default: 0.5", type=float, default=0.5, metavar="R")
+    parser.add_argument("--min-length", help="Minimum sentence length; default: 2", type=int, default=2, metavar="N")
+    parser.add_argument("--max-length", help="Maximum sentence length; default: 5", type=int, default=5, metavar="N")
+    parser.add_argument("--underspec", help="Probability for a vertice or edge to be underspecified, i.e. to be labeled '.+'; default: 0.0", type=float, default=0.0, metavar="R")
+    parser.add_argument("-c", "--corpus", type=argparse.FileType("r"), required=True, help="Corpus in CWB format")
+    parser.add_argument("QUERIES", help="Number of queries to be generated", type=int)
+    args = parser.parse_args()
+    
+    vertice_dist, edge_dist = get_distributions(args.corpus, args.vocabulary, args.relations)
+    for i in range(args.QUERIES):
+        length = random_trees.get_length("uniform", 0, 0, args.min_length, args.max_length)
+        tree = random_trees.get_random_tree(length, vertice_dist, edge_dist, "zipf", 10, True, args.underspec)
+        a, b, r1, c1, n = random_trees.split_tree(tree)
+        print "\t".join([json.dumps(nx_graph.export_to_adjacency_matrix(x)) for x in [tree, a, b, r1, c1, n]])

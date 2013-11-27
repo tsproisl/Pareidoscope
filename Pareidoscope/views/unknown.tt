@@ -1,6 +1,0 @@
-<p>
-  [% error %]
-</p>
-<pre>
-  [% dump %]
-</pre>

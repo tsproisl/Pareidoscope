@@ -1,0 +1,172 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+import argparse
+import itertools
+import json
+import math
+import multiprocessing
+import multiprocessing.managers
+import subprocess
+import sys
+import time
+import Queue
+
+import pareidoscope.query
+from pareidoscope.utils import cwb
+
+
+def read_queries(queries_file):
+    """Read all queries.
+    
+    Arguments:
+    - `queries_file`:
+    """
+    queries = [line.decode("utf-8").rstrip("\n").split("\t") for line in queries_file]
+    queries = [[nx_graph.create_nx_digraph(json.loads(q)) for q in l] for l in queries]
+    return queries
+
+
+def grouper(iterable, n, fillvalue=None):
+    "Collect data into fixed-length chunks or blocks"
+    # grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx
+    args = [iter(iterable)] * n
+    return itertools.izip_longest(fillvalue=fillvalue, *args)
+
+
+def run_server(queries_file, corpus, port, authkey):
+    # Start a shared manager server and access its queues
+    manager = make_server_manager(port, authkey)
+    shared_job_q = manager.get_job_q()
+    shared_result_q = manager.get_result_q()
+
+    queries = read_queries(queries_file)
+    results = [{} for q in queries]
+    sents = cwb.sentences_iter(corpus)
+    sent_chunks =  grouper(sents, 10)
+    s_q = itertools.izip(sent_chunks, itertools.repeat(queries))
+    num_chunks = 0
+    for chunk in s_q:
+        shared_job_q.put(chunk)
+        num_chunks += 1
+        if num_chunks >= 500:
+            break
+
+    # Wait until all results are ready in shared_result_q
+    num_results = 0
+    resultdict = {}
+    while num_results < num_chunks:
+        result_chunks = shared_result_q.get()
+        for result in result_chunks:
+            pareidoscope.query.merge_result(result, results)
+        num_results += 1
+        try:
+            c = s_q.next()
+            num_chunks += 1
+            shared_job_q.put(c)
+        except StopIteration:
+            pass
+
+    # Sleep a bit before shutting down the server - to give clients time to
+    # realize the job queue is empty and exit in an orderly way.
+    time.sleep(5)
+    manager.shutdown()
+    return results
+
+
+def make_server_manager(port, authkey):
+    """ Create a manager for the server, listening on the given port.
+        Return a manager object with get_job_q and get_result_q
+        methods.
+
+        http://eli.thegreenplace.net/2012/01/24/distributed-computing-in-python-with-multiprocessing/
+    """
+    job_q = multiprocessing.Queue()
+    result_q = multiprocessing.Queue()
+    # job_q = Queue.Queue()
+    # result_q = Queue.Queue()
+
+    # This is based on the examples in the official docs of multiprocessing.
+    # get_{job|result}_q return synchronized proxies for the actual Queue
+    # objects.
+    class JobQueueManager(multiprocessing.managers.SyncManager):
+        pass
+
+    JobQueueManager.register('get_job_q', callable=lambda: job_q)
+    JobQueueManager.register('get_result_q', callable=lambda: result_q)
+
+    manager = JobQueueManager(address=('', port), authkey=authkey)
+    manager.start()
+    # print 'Server started at port %s' % port
+    return manager
+
+
+def write_results(prefix, results):
+    """Write results to files
+    
+    Arguments:
+    - `prefix`:
+    - `results`:
+    """
+    with open("%s.dat" % prefix, "w") as fh:
+        json.dump(results, fh)
+    for suffix in results[0].keys():
+        with open("%s_%s.mi" % (prefix, suffix), "w") as fh:
+            fh.write("MI\n")
+            for i, q in enumerate(results):
+                s = q[suffix]
+                e11 = 0
+                if s["o11"] == 0:
+                    continue
+                if suffix in ["iso_ct", "sub_ct"]:
+                    if any([s[x] == 0 for x in ["r1", "c1", "n"]]):
+                        e11 = 0
+                    else:
+                        e11 = (s["r1"] * s["c1"]) / float(s["n"])
+                elif suffix == "sub_bnl":
+                    if any([s[x] == 0 for x in s.keys()]):
+                        e11 = 0
+                    else:
+                        # po11 = sum([math.log(x) for x in [s["a"]/float(s["n"]), s["b"]/float(s["n"]), s["r1"]/float(s["a"]), s["c1"]/float(s["b"]), s["o11"]/float(s["r1+c1"])]])
+                        po11 = sum([math.log(x) for x in [s["a"]/float(s["n"]), s["b"]/float(s["n"]), s["r1"]/float(s["a"]), s["c1"]/float(s["b"])]])
+                        e11 = (math.e ** po11) * s["n"]
+                elif suffix == "sub_bns":
+                    if any([s[x] == 0 for x in s.keys()]):
+                        e11 = 0
+                    else:
+                        # po11 = sum([math.log(x) for x in [s["a"]/float(s["n"]), s["b"]/float(s["n"]), s["o11"]/float(s["a+b"])]])
+                        po11 = sum([math.log(x) for x in [s["a"]/float(s["n"]), s["b"]/float(s["n"])]])
+                        e11 = (math.e ** po11) * s["n"]
+                elif suffix == "sent_bnl":
+                    if any([s[x] == 0 for x in s.keys()]):
+                        e11 = 0
+                    else:
+                        # po11 = sum([math.log(x) for x in [s["a"]/float(s["size"]), s["n"]/float(s["size"]), s["b"]/float(s["size"]), s["r1"]/float(s["a+n"]), s["c1"]/float(s["b+n"]), s["o11"]/float(s["r1+c1"])]])
+                        po11 = sum([math.log(x) for x in [s["a"]/float(s["size"]), s["n"]/float(s["size"]), s["b"]/float(s["size"]), s["r1"]/float(s["a+n"]), s["c1"]/float(s["b+n"])]])
+                        e11 = (math.e ** po11) * s["size"]
+                elif suffix == "sent_bns":
+                    if any([s[x] == 0 for x in s.keys()]):
+                        e11 = 0
+                    else:
+                        # po11 = sum([math.log(x) for x in [s["a"]/float(s["size"]), s["n"]/float(s["size"]), s["b"]/float(s["size"]), s["o11"]/float(s["a+b+n"])]])
+                        po11 = sum([math.log(x) for x in [s["a"]/float(s["size"]), s["n"]/float(s["size"]), s["b"]/float(s["size"])]])
+                        e11 = (math.e ** po11) * s["size"]
+                mi = math.log(s["o11"]/float(e11), 2)
+                fh.write("%d\t%f\n" % (i+1, mi))
+        subprocess.call([script_directory+"/analyze_batch_queries.R", "%s/%s_%s.mi" % (script_directory, prefix, suffix), suffix])
+
+
+
+if __name__ == "__main__":
+    if sys.version_info < (2, 7):
+        raise Exception("Need at least Python 2.7!")
+    parser = argparse.ArgumentParser(description='Run a batch of queries against a corpus (server)')
+    parser.add_argument("-c", "--corpus", type=argparse.FileType("r"), required=True, help="Corpus in CWB format")
+    parser.add_argument("-o", "--output", type=str, required=True, help="Output prefix")
+    parser.add_argument("-p", "--port", type=int, help="Port", default=5662)
+    parser.add_argument("-a", "--auth", type=str, help="Authkey", default="Ood4phee")
+    parser.add_argument("QUERIES", type=argparse.FileType("r"), help="Queries for O11, A, B, R1, C1 and N")
+    args = parser.parse_args()
+    
+    results = run_server(args.QUERIES, args.corpus, args.port, args.auth)
+    write_results(args.output, results)

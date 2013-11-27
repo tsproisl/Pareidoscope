@@ -1,0 +1,105 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+import argparse
+import itertools
+import json
+import math
+import multiprocessing
+import os
+import subprocess
+import sys
+
+import pareidoscope.query
+from pareidoscope.utils import cwb
+from pareidoscope.utils import nx_graph
+
+
+def read_queries(queries_file):
+    """Read all queries.
+    
+    Arguments:
+    - `queries_file`:
+    """
+    queries = [line.decode("utf-8").rstrip("\n").split("\t") for line in queries_file]
+    queries = [[nx_graph.create_nx_digraph(json.loads(q)) for q in l] for l in queries]
+    return queries
+
+
+def write_results(prefix, results):
+    """Write results to files
+    
+    Arguments:
+    - `prefix`:
+    - `results`:
+    """
+    with open("%s.dat" % prefix, "w") as fh:
+        json.dump(results, fh)
+    for suffix in results[0].keys():
+        with open("%s_%s.mi" % (prefix, suffix), "w") as fh:
+            fh.write("MI\n")
+            for i, q in enumerate(results):
+                s = q[suffix]
+                e11 = 0
+                if s["o11"] == 0:
+                    continue
+                if suffix in ["iso_ct", "sub_ct"]:
+                    if any([s[x] == 0 for x in ["r1", "c1", "n"]]):
+                        e11 = 0
+                    else:
+                        e11 = (s["r1"] * s["c1"]) / float(s["n"])
+                elif suffix == "sub_bnl":
+                    if any([s[x] == 0 for x in s.keys()]):
+                        e11 = 0
+                    else:
+                        # po11 = sum([math.log(x) for x in [s["a"]/float(s["n"]), s["b"]/float(s["n"]), s["r1"]/float(s["a"]), s["c1"]/float(s["b"]), s["o11"]/float(s["r1+c1"])]])
+                        po11 = sum([math.log(x) for x in [s["a"]/float(s["n"]), s["b"]/float(s["n"]), s["r1"]/float(s["a"]), s["c1"]/float(s["b"])]])
+                        e11 = (math.e ** po11) * s["n"]
+                elif suffix == "sub_bns":
+                    if any([s[x] == 0 for x in s.keys()]):
+                        e11 = 0
+                    else:
+                        # po11 = sum([math.log(x) for x in [s["a"]/float(s["n"]), s["b"]/float(s["n"]), s["o11"]/float(s["a+b"])]])
+                        po11 = sum([math.log(x) for x in [s["a"]/float(s["n"]), s["b"]/float(s["n"])]])
+                        e11 = (math.e ** po11) * s["n"]
+                elif suffix == "sent_bnl":
+                    if any([s[x] == 0 for x in s.keys()]):
+                        e11 = 0
+                    else:
+                        # po11 = sum([math.log(x) for x in [s["a"]/float(s["size"]), s["n"]/float(s["size"]), s["b"]/float(s["size"]), s["r1"]/float(s["a+n"]), s["c1"]/float(s["b+n"]), s["o11"]/float(s["r1+c1"])]])
+                        po11 = sum([math.log(x) for x in [s["a"]/float(s["size"]), s["n"]/float(s["size"]), s["b"]/float(s["size"]), s["r1"]/float(s["a+n"]), s["c1"]/float(s["b+n"])]])
+                        e11 = (math.e ** po11) * s["size"]
+                elif suffix == "sent_bns":
+                    if any([s[x] == 0 for x in s.keys()]):
+                        e11 = 0
+                    else:
+                        # po11 = sum([math.log(x) for x in [s["a"]/float(s["size"]), s["n"]/float(s["size"]), s["b"]/float(s["size"]), s["o11"]/float(s["a+b+n"])]])
+                        po11 = sum([math.log(x) for x in [s["a"]/float(s["size"]), s["n"]/float(s["size"]), s["b"]/float(s["size"])]])
+                        e11 = (math.e ** po11) * s["size"]
+                mi = math.log(s["o11"]/float(e11), 2)
+                fh.write("%d\t%f\n" % (i+1, mi))
+        script_directory = os.path.abspath(os.path.dirname(sys.argv[0]))
+        working_directory = os.path.abspath(os.getcwd())
+        subprocess.call([script_directory+"/analyze_batch_queries.R", "%s/%s_%s.mi" % (working_directory, prefix, suffix), suffix])
+
+
+
+if __name__ == "__main__":
+    if sys.version_info < (2, 7):
+        raise Exception("Need at least Python 2.7!")
+    os.nice(10)
+    parser = argparse.ArgumentParser(description='Run a batch of queries against a corpus')
+    parser.add_argument("-c", "--corpus", type=argparse.FileType("r"), required=True, help="Corpus in CWB format")
+    parser.add_argument("-o", "--output", type=str, required=True, help="Output prefix")
+    parser.add_argument("QUERIES", type=argparse.FileType("r"), help="Queries for O11, A, B, R1, C1 and N")
+    args = parser.parse_args()
+    
+    queries = read_queries(args.QUERIES)
+    results = [{} for q in queries]
+    pool = multiprocessing.Pool(processes = multiprocessing.cpu_count())
+    sents = cwb.sentences_iter(args.corpus)
+    r = pool.imap(pareidoscope.query.run_queries, itertools.izip(sents, itertools.repeat(queries)), 10)
+    # r = map(pareidoscope.query.run_queries, itertools.izip(sents, itertools.repeat(queries)))
+    for result in r:
+        pareidoscope.query.merge_result(result, results)
+    write_results(args.output, results)
