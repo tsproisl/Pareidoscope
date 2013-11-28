@@ -129,7 +129,7 @@ def enumerate_connected_subgraphs(graph, graph_to_raw, nr_of_vertices, nr_of_edg
     - `min_n`:
     - `max_n`:
     """
-    for vertice in sorted(graph.nodes(), reverse = True):
+    for vertice in sorted(graph.nodes(), reverse=True):
         max_subgraph_size = len([v for v in graph.nodes() if v >= vertice])
         if nr_of_vertices > max_subgraph_size:
             continue
@@ -218,6 +218,110 @@ def enumerate_connected_subgraphs_recursive(graph, subgraph, prohibited_edges, n
                     yield return_corpus_order(local_subgraph, graph_to_raw)
                 elif nr_of_subgraph_vertices < nr_of_vertices:
                     for result in enumerate_connected_subgraphs_recursive(graph, local_subgraph, prohibited_edges.union(in_edges, out_edges, new_edges), nr_of_vertices, nr_of_edges, graph_to_raw):
+                        yield result
+
+
+def enumerate_csg_minmax(graph, graph_to_raw, min_vertices=2, max_vertices=5):
+    """Based on
+    https://mpi-inf.mpg.de/departments/d5/teaching/ss09/queryoptimization/lecture8.pdf:
+    
+    EnumerateCsg(G)
+    for all i ∈ [n − 1, ... , 0] descending {
+        emit {v_i};
+        EnumerateCsgRec(G , {v_i}, B_i );
+    }
+    
+    EnumerateCsgRec(G, S, X)
+    N = N(S) \ X;
+    for all S' ⊆ N, S' = ∅, enumerate subsets first {
+        emit (S ∪ S');
+    }
+    for all S' ⊆ N, S' = ∅, enumerate subsets first {
+        EnumerateCsgRec(G, (S ∪ S'), (X ∪ N));
+    }
+    
+    Arguments:
+    - `graph`:
+    - `graph_to_raw`:
+    - `min_vertices`:
+    - `max_vertices`:
+    """
+    for vertice in sorted(graph.nodes(), reverse=True):
+        subgraph = networkx.DiGraph()
+        subgraph.add_node(vertice, graph.node[vertice])
+        nr_of_subgraph_vertices = subgraph.number_of_nodes()
+        if min_vertices <= nr_of_subgraph_vertices <= max_vertices:
+            yield return_corpus_order(subgraph, graph_to_raw)
+        prohibited_edges = set([])
+        for v in [u for u in graph.nodes() if u < vertice]:
+            prohibited_edges.update(set(graph.out_edges(nbunch = [v])))
+            prohibited_edges.update(set(graph.in_edges(nbunch = [v])))
+        for result in enumerate_csg_minmax_recursive(graph, subgraph, prohibited_edges, graph_to_raw, min_vertices, max_vertices):
+            yield result
+
+
+def enumerate_csg_minmax_recursive(graph, subgraph, prohibited_edges, graph_to_raw, min_vertices, max_vertices):
+    """See enumerate_connected_subgraphs()
+    
+    Arguments:
+    - `graph`:
+    - `subgraph`:
+    - `prohibited_edges`:
+    - `graph_to_raw`:
+    - `min_vertices`:
+    - `max_vertices`:
+    """
+    out_edges, in_edges, neighbours = set([]), set([]), set([])
+    neighbour_edges = {}
+    subgraph_size = subgraph.number_of_nodes()
+    subgraph_edges = subgraph.number_of_edges()
+    for vertice in subgraph.nodes():
+        for e in graph.out_edges(nbunch = [vertice]):
+            if e in prohibited_edges:
+                continue
+            out_edges.add(e)
+            neighbours.add(e[1])
+            if e[1] not in neighbour_edges:
+                neighbour_edges[e[1]] = []
+            neighbour_edges[e[1]].append(e)
+        for e in graph.in_edges(nbunch = [vertice]):
+            if e in prohibited_edges:
+                continue
+            in_edges.add(e)
+            neighbours.add(e[0])
+            if e[0] not in neighbour_edges:
+                neighbour_edges[e[0]] = []
+            neighbour_edges[e[0]].append(e)
+    # all combinations of vertices
+    for combination in powerset(neighbours, 1):
+        # all combinations of edges
+        edges = tuple([powerset(neighbour_edges[vertice], 1) for vertice in combination])
+        for edge_combi in list(itertools.product(*edges)):
+            ec = []
+            for edges in edge_combi:
+                ec.extend(edges)
+            # new vertices
+            new_vertices = set([e[0] if e[0] in neighbours else e[1] for e in ec])
+            # edges between new vertices
+            new_edges = set([])
+            for new_vertice in new_vertices:
+                new_edges.update([e for e in graph.out_edges(nbunch = [new_vertice]) if e[1] in new_vertices])
+            for new_edge_combi in powerset(new_edges, 0):
+                nec = list(new_edge_combi)
+                local_subgraph = networkx.DiGraph(subgraph)
+                # add edges
+                for s, t in ec + nec:
+                    local_subgraph.add_edge(s, t, graph.edge[s][t])
+                    local_subgraph.node[s] = graph.node[s]
+                    local_subgraph.node[t] = graph.node[t]
+                nr_of_subgraph_vertices = local_subgraph.number_of_nodes()
+                nr_of_subgraph_edges = local_subgraph.number_of_edges()
+                if nr_of_subgraph_edges != subgraph_edges + len(ec + nec):
+                    raise Exception("WAAAAH")
+                if min_vertices <= nr_of_subgraph_vertices <= max_vertices:
+                    yield return_corpus_order(local_subgraph, graph_to_raw)
+                if nr_of_subgraph_vertices < max_vertices:
+                    for result in enumerate_csg_minmax_recursive(graph, local_subgraph, prohibited_edges.union(in_edges, out_edges, new_edges), graph_to_raw, min_vertices, max_vertices):
                         yield result
 
 

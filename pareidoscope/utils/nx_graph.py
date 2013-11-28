@@ -211,7 +211,7 @@ def _get_unique_order(nx_graph, sorted_vertices, vtuples):
             raise Exception("Group should not be empty!")
         else:
             # We need more criteria for sorting
-            vtuples_dfs = {v: tuple(_dfs(v) + [v]) for v in group}
+            vtuples_dfs = {v: tuple(_dfs(nx_graph, v, vtuples) + [v]) for v in group}
             keyfunc_dfs = lambda v: vtuples_dfs[v]
             order.extend(sorted(group, key=keyfunc_dfs))
     return order
@@ -228,3 +228,22 @@ def canonical_order(nx_graph):
     keyfunc = lambda v: vtuples[v]
     sorted_vertices = sorted(vertices, key=keyfunc)
     return _get_unique_order(nx_graph, sorted_vertices, vtuples)
+
+
+def canonize(nx_graph, order=False):
+    """Return canonized copy of nx_graph
+    
+    Arguments:
+    - `nx_graph`:
+    """
+    co = canonical_order(nx_graph)
+    mapping = {v: i for i, v in enumerate(co)}
+    canonized = networkx.DiGraph()
+    for v, l in nx_graph.nodes(data=True):
+        canonized.add_node(mapping[v], l)
+    for s, t, l in nx_graph.edges(data=True):
+        canonized.add_edge(mapping[s], mapping[t], l)
+    if order:
+        return canonized, co
+    else:
+        return canonized

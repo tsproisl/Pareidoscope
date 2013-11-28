@@ -12,6 +12,7 @@ setup(
     scripts=[
         'bin/pareidoscope_batch_query',
         'bin/pareidoscope_create_queries_from_corpus',
+        'bin/pareidoscope_cwb_to_db',
         'bin/pareidoscope_distributed_batch_query_client',
         'bin/pareidoscope_distributed_batch_query_server',
         'pareidoscope_random_trees',

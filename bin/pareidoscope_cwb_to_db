@@ -2,12 +2,18 @@
 # -*- coding: utf-8 -*-
 
 import argparse
+import collections
+import itertools
 import json
+import multiprocessing
 import os
 import sqlite3
+import tempfile
 
+import networkx
 from networkx.readwrite import json_graph
 
+from pareidoscope import subgraph_enumeration
 from pareidoscope.utils import cwb
 from pareidoscope.utils import nx_graph
 
@@ -23,11 +29,12 @@ def create_db(filename):
     c = conn.cursor()
     ## tables for finding vertice candidates
     # types
-    c.execute("CREATE TABLE types (typeid INTEGER PRIMARY KEY AUTOINCREMENT, word TEXT, pos TEXT, lemma TEXT, wc TEXT, indeg INTEGER, outdeg INTEGER)")
+    c.execute("CREATE TABLE types (typeid INTEGER PRIMARY KEY AUTOINCREMENT, word TEXT, pos TEXT, lemma TEXT, wc TEXT, root INTEGER, indeg INTEGER, outdeg INTEGER)")
     c.execute("CREATE INDEX types_word_idx ON types (word)")
     c.execute("CREATE INDEX types_pos_idx ON types (pos)")
     c.execute("CREATE INDEX types_lemma_idx ON types (lemma)")
     c.execute("CREATE INDEX types_wc_idx ON types (wc)")
+    c.execute("CREATE INDEX types_root_idx ON types (root)")
     c.execute("CREATE INDEX types_indeg_idx ON types (indeg)")
     c.execute("CREATE INDEX types_outdeg_idx ON types (outdeg)")
     # indeps
@@ -37,39 +44,159 @@ def create_db(filename):
     c.execute("CREATE TABLE outdeps (typeid INTEGER, outdep TEXT, FOREIGN KEY (typeid) REFERENCES types, UNIQUE (typeid, outdep))")
     c.execute("CREATE INDEX outdeps_idx ON outdeps (outdep)")
     # sentences
-    c.execute("CREATE TABLE sentences (sentid INTEGER PRIMARY KEY, graph TEXT)")
+    c.execute("CREATE TABLE sentences (sentid INTEGER PRIMARY KEY AUTOINCREMENT, graph TEXT)")
     # tokens
-    c.execute("CREATE TABLE tokens (tokenid INTEGER PRIMARY KEY AUTOINCREMENT, typeid INTEGER, sentid INTEGER, position INTEGER, FOREIGN KEY (typeid) REFERENCES types, FOREIGN KEY (sentid) REFERENCES sentences, UNIQUE (typeid, sentid, position))")
+    c.execute("CREATE TABLE tokens (typeid INTEGER, sentid INTEGER, position INTEGER, FOREIGN KEY (typeid) REFERENCES types, FOREIGN KEY (sentid) REFERENCES sentences, UNIQUE (typeid, sentid, position))")
     ## tables for abstract subgraphs
+    c.execute("CREATE TABLE subgraphs (subgraphid INTEGER PRIMARY KEY AUTOINCREMENT, subgraph TEXT UNIQUE, isomorphisms INTEGER)")
     # size 2
-    c.execute("CREATE TABLE subgraphs2 (graphid INTEGER PRIMARY KEY AUTOINCREMENT, graph TEXT, sentid INTEGER, v1 INTEGER, v2 INTEGER)")
-    c.execute("CREATE INDEX subgraphs2_idx ON subgraphs2 (graph)")
+    c.execute("CREATE TABLE subgraphs2 (subgraphid INTEGER, sentid INTEGER, v1 INTEGER, v2 INTEGER, FOREIGN KEY (subgraphid) REFERENCES subgraphs)")
+    c.execute("CREATE INDEX subgraphs2_idx ON subgraphs2 (subgraphid)")
     # size 3
-    c.execute("CREATE TABLE subgraphs3 (graphid INTEGER PRIMARY KEY AUTOINCREMENT, graph TEXT, sentid INTEGER, v1 INTEGER, v2 INTEGER, v3 INTEGER)")
-    c.execute("CREATE INDEX subgraphs3_idx ON subgraphs3 (graph)")
+    c.execute("CREATE TABLE subgraphs3 (subgraphid INTEGER, sentid INTEGER, v1 INTEGER, v2 INTEGER, v3 INTEGER, FOREIGN KEY (subgraphid) REFERENCES subgraphs)")
+    c.execute("CREATE INDEX subgraphs3_idx ON subgraphs3 (subgraphid)")
     # size 4
-    c.execute("CREATE TABLE subgraphs4 (graphid INTEGER PRIMARY KEY AUTOINCREMENT, graph TEXT, sentid INTEGER, v1 INTEGER, v2 INTEGER, v3 INTEGER, v4 INTEGER)")
-    c.execute("CREATE INDEX subgraphs4_idx ON subgraphs4 (graph)")
+    c.execute("CREATE TABLE subgraphs4 (subgraphid INTEGER, sentid INTEGER, v1 INTEGER, v2 INTEGER, v3 INTEGER, v4 INTEGER, FOREIGN KEY (subgraphid) REFERENCES subgraphs)")
+    c.execute("CREATE INDEX subgraphs4_idx ON subgraphs4 (subgraphid)")
     # size 5
-    c.execute("CREATE TABLE subgraphs5 (graphid INTEGER PRIMARY KEY AUTOINCREMENT, graph TEXT, sentid INTEGER, v1 INTEGER, v2 INTEGER, v3 INTEGER, v4 INTEGER, v5 INTEGER)")
-    c.execute("CREATE INDEX subgraphs5_idx ON subgraphs5 (graph)")
+    c.execute("CREATE TABLE subgraphs5 (subgraphid INTEGER, sentid INTEGER, v1 INTEGER, v2 INTEGER, v3 INTEGER, v4 INTEGER, v5 INTEGER, FOREIGN KEY (subgraphid) REFERENCES subgraphs)")
+    c.execute("CREATE INDEX subgraphs5_idx ON subgraphs5 (subgraphid)")
     return conn, c
 
 
-def insert_types(conn, c, sentences):
-    """Insert type-level data
+def tupleize(sentence):
+    """Return a list of tuples representing the tokens
+    
+    Arguments:
+    - `sentence`:
+    """
+    result = {}
+    result["tokens"] = {}
+    gs = nx_graph.create_nx_digraph_from_cwb(sentence)
+    result["graph"] = json.dumps(json_graph.node_link_data(gs))
+    for v in gs.nodes():
+        word = gs.node[v]["word"]
+        pos = gs.node[v]["pos"]
+        lemma = gs.node[v]["lemma"]
+        wc = gs.node[v]["wc"]
+        root = gs.node[v].get("root", "") != ""
+        root = 1 if root else 0
+        indegree = gs.in_degree(v)
+        outdegree = gs.out_degree(v)
+        indeps = set([gs.edge[s][t]["relation"] for s, t in gs.in_edges(v)])
+        indeps = tuple(sorted(list(indeps)))
+        outdeps = set([gs.edge[s][t]["relation"] for s, t in gs.out_edges(v)])
+        outdeps = tuple(sorted(list(outdeps)))
+        t = (word, pos, lemma, wc, root, indegree, outdegree, indeps, outdeps)
+        result["tokens"][v] = t
+    # yield?
+    return result
+
+
+def preprocess_results(conn, c, result, results):
+    """Collect results
+    
+    Arguments:
+    - `result`:
+    - `results`:
+    """
+    c.execute("INSERT INTO sentences (graph) VALUES (?)", (result["graph"],))
+    sentid = c.lastrowid
+    for position, t in result["tokens"].iteritems():
+        if t not in results:
+            results[t] = []
+        results[t].append([sentid, position])
+
+
+def insert_tokens(conn, c, results):
+    """Insert token-level data into database
     
     Arguments:
     - `conn`:
     - `c`:
-    - `sentences`:
+    - `results`:
     """
-    # after insert: id = c.lastrowid
-    for s in sentences:
-        gs = nx_graph.create_nx_digraph_from_cwb(s)
-        serialized = json.dumps(json_graph.node_link_data(gs))
-        # serialized = json.dumps(json_graph.adjacency_data(gs))
-        print serialized
+    for t in results:
+        c.execute("INSERT INTO types (word, pos, lemma, wc, root, indeg, outdeg) VALUES (?,?,?,?,?,?,?)", t[0:7])
+        typeid = c.lastrowid
+        indeps = t[7]
+        for indep in indeps:
+            c.execute("INSERT INTO indeps VALUES (?,?)", (typeid, indep))
+        outdeps = t[8]
+        for outdep in outdeps:
+            c.execute("INSERT INTO outdeps VALUES (?,?)", (typeid, outdep))
+        #c.executemany("", results[t])
+        tokens = itertools.izip(itertools.repeat([typeid]), results[t])
+        tokens = (tuple(itertools.chain.from_iterable(token)) for token in tokens)
+        c.executemany("INSERT INTO tokens VALUES (?,?,?)", tokens)
+    conn.commit()
+
+
+def extract_subgraphs(args):
+    """Extract subgraphs from sentence
+    
+    Arguments:
+    - `sentid`:
+    - `graph`:
+    """
+    sentid, graph = args
+    result = []
+    gs = json_graph.node_link_graph(json.loads(graph))
+    bfo_graph, bfo_to_raw = subgraph_enumeration.get_bfo(gs)
+    for subgraph in subgraph_enumeration.enumerate_csg_minmax(bfo_graph, bfo_to_raw):
+        for v in subgraph.nodes():
+            subgraph.node[v] = {}
+        for s, t in subgraph.edges():
+            subgraph.edge[s][t] = {}
+        subgraph, order = nx_graph.canonize(subgraph, order=True)
+        t = tuple(networkx.generate_adjlist(subgraph))
+        result.append([t, sentid, order])
+    # yield?
+    return result
+
+
+def insert_subgraphs(conn, c, result, subgraphs):
+    """Insert subgraphs into database
+    
+    Arguments:
+    - `conn`:
+    - `c`:
+    - `result`:
+    - `subgraphs`:
+    """
+    for r in result:
+        sg, sentid, positions = r
+        if sg not in subgraphs:
+            c.execute("INSERT INTO subgraphs (subgraph) VALUES (?)", (json.dumps(list(sg)),))
+            subgraphid = c.lastrowid
+            subgraphs[sg] = subgraphid
+        subgraphid = subgraphs[sg]
+        subgraphs["isomorphisms"][subgraphid] = subgraphs["isomorphisms"].get(subgraphid, 0) + 1
+        length = len(sg)
+        if length > 5 or length < 2:
+            raise Exception("Subgraph of length %d: %s" % (length, subgraph))
+        query = "INSERT INTO subgraphs%d (subgraphid, sentid, %s) VALUES (?,?,%s)" % (length, ", ".join("v%d" % i for i in range(1, length + 1)), ",".join(["?"] * length))
+        params = [subgraphid, sentid]
+        params.extend(positions)
+        c.execute(query, tuple(params))
+
+
+def db_sentences_iter(db):
+    """Iterate over sentences in database
+    
+    Arguments:
+    - `c`:
+    """
+    conn = sqlite3.connect(db)
+    c = conn.cursor()
+    tmp = tempfile.TemporaryFile(mode="w+")
+    for s in c.execute("SELECT * FROM sentences"):
+        tmp.write(json.dumps(list(s)) + "\n")
+    conn.close()
+    tmp.seek(0)
+    for line in tmp:
+        yield tuple(json.loads(line.rstrip()))
+    tmp.close()
 
 
 
@@ -80,6 +207,24 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     # raise exeception if args.db already exists
+    if os.path.exists(args.db):
+        raise Exception("Database file already exists")
     conn, c = create_db(args.db)
     sents = cwb.sentences_iter(args.CORPUS)
-    insert_types(None, None, sents)
+    pool = multiprocessing.Pool(processes = multiprocessing.cpu_count())
+    r = pool.imap(tupleize, sents, 10)
+    #r = map(tupleize, sents)
+    results = {}
+    for result in r:
+        preprocess_results(conn, c, result, results)
+    insert_tokens(conn, c, results)
+    sentences = db_sentences_iter(args.db)
+    r = pool.imap(extract_subgraphs, sentences, 10)
+    #r = map(extract_subgraphs, sentences)
+    subgraphs = {"isomorphisms": {}}
+    for result in r:
+        insert_subgraphs(conn, c, result, subgraphs)
+    isomorphisms = ((isos, sgid) for sgid, isos in subgraphs["isomorphisms"].iteritems())
+    c.executemany("UPDATE subgraphs SET isomorphisms=? WHERE subgraphid=?", isomorphisms)
+    conn.commit()
+    conn.close()
