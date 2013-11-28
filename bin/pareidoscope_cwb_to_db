@@ -89,7 +89,6 @@ def tupleize(sentence):
         outdeps = tuple(sorted(list(outdeps)))
         t = (word, pos, lemma, wc, root, indegree, outdegree, indeps, outdeps)
         result["tokens"][v] = t
-    # yield?
     return result
 
 
@@ -151,7 +150,6 @@ def extract_subgraphs(args):
         subgraph, order = nx_graph.canonize(subgraph, order=True)
         t = tuple(networkx.generate_adjlist(subgraph))
         result.append([t, sentid, order])
-    # yield?
     return result
 
 
@@ -182,7 +180,11 @@ def insert_subgraphs(conn, c, result, subgraphs):
 
 
 def db_sentences_iter(db):
-    """Iterate over sentences in database
+    """Iterate over sentences in database.
+    
+    The sqlite3 library does not like being used by multiple processes
+    via the same connection. That's why we have to use a temp file as
+    workaround.
     
     Arguments:
     - `c`:
@@ -202,6 +204,8 @@ def db_sentences_iter(db):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Convert a corpus in CWB format to an SQLite database')
+    # parser.add_argument("--min-subgraph", type=int, help="Minimum subgraph size for indexing (default: 2 vertices)", default=2, metavar="N")
+    # parser.add_argument("--max-subgraph", type=int, help="Maximum subgraph size for indexing (default: 5 vertices)", default=5, metavar="N")
     parser.add_argument("--db", type=os.path.abspath, required=True, help="SQLite3 database")
     parser.add_argument("CORPUS", type=argparse.FileType("r"), help="Corpus in CWB format")
     args = parser.parse_args()
@@ -219,7 +223,7 @@ if __name__ == "__main__":
         preprocess_results(conn, c, result, results)
     insert_tokens(conn, c, results)
     sentences = db_sentences_iter(args.db)
-    r = pool.imap(extract_subgraphs, sentences, 10)
+    r = pool.imap_unordered(extract_subgraphs, sentences, 10)
     #r = map(extract_subgraphs, sentences)
     subgraphs = {"isomorphisms": {}}
     for result in r:
