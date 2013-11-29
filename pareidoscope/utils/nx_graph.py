@@ -23,7 +23,7 @@ def create_nx_digraph(adj_matrix):
     return dg
 
 
-def create_nx_digraph_from_cwb(cwb):
+def create_nx_digraph_from_cwb(cwb, origid=None):
     """Return a networkx.DiGraph object of the CWB representation.
     
     Arguments:
@@ -31,6 +31,8 @@ def create_nx_digraph_from_cwb(cwb):
     """
     relpattern = re.compile(r"^(?P<relation>[^(]+)[(](?P<offset>-?\d+)(?:'*),0(?:'*)[)]$")
     dg = networkx.DiGraph()
+    if origid != None:
+        dg.graph["origid"] = origid
     attributes = lambda l: {"word": l[0], "pos": l[1], "lemma": l[2], "wc": l[3]}
     dg.add_nodes_from([(l, attributes(cwb[l])) for l in range(len(cwb))])
     for l in range(len(cwb)):
@@ -163,15 +165,19 @@ def _get_vertice_tuple(nx_graph, vertice):
     - `nx_graph`:
     - `vertice`:
     """
+    other_vertices = set(nx_graph.nodes())
+    other_vertices.remove(vertice)
+    root = all((networkx.has_path(nx_graph, vertice, x) for x in other_vertices))
+    antiroot = all((networkx.has_path(nx_graph, x, vertice) for x in other_vertices))
     label = tuple(sorted(nx_graph.node[vertice].items()))
     indegree = nx_graph.in_degree(vertice)
     outdegree = nx_graph.out_degree(vertice)
     inedgelabels = tuple(sorted([tuple(sorted(nx_graph.edge[s][t].items())) for s, t in nx_graph.in_edges(vertice)]))
     outedgelabels = tuple(sorted([tuple(sorted(nx_graph.edge[s][t].items())) for s, t in nx_graph.out_edges(vertice)]))
-    return (label, indegree, outdegree, inedgelabels, outedgelabels)
+    return (root, antiroot, label, indegree, outdegree, inedgelabels, outedgelabels)
 
 
-def _dfs(nx_graph, vertice, vtuples):
+def _dfs(nx_graph, vertice, vtuples, return_ids=False):
     """Return vertice tuples in order of depth-first search starting from
     vertice
     
@@ -187,7 +193,10 @@ def _dfs(nx_graph, vertice, vtuples):
     while len(agenda) > 0:
         v = agenda.pop(0)
         seen.add(v)
-        order.append(vtuples[v])
+        if return_ids:
+            order.append(v)
+        else:
+            order.append(vtuples[v])
         successors = sorted([x for x in nx_graph.successors(v) if x not in seen], key=keyfunc)
         agenda = _get_unique_order(nx_graph, successors, vtuples) + agenda
     return order
@@ -225,6 +234,12 @@ def canonical_order(nx_graph):
     """
     vertices = nx_graph.nodes()
     vtuples = {v: _get_vertice_tuple(nx_graph, v) for v in vertices}
+    roots = [v for v in vtuples if vtuples[v][0]]
+    antiroots = [v for v in vtuples if vtuples[v][0]]
+    if len(roots) == 1:
+        return _dfs(nx_graph, roots[0], vtuples, return_ids=True)
+    if len(antiroots) == 1:
+        return reversed(_dfs(nx_graph.reverse(), antiroots[0], vtuples, return_ids=True))
     keyfunc = lambda v: vtuples[v]
     sorted_vertices = sorted(vertices, key=keyfunc)
     return _get_unique_order(nx_graph, sorted_vertices, vtuples)

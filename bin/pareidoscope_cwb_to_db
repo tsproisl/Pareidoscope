@@ -44,7 +44,7 @@ def create_db(filename):
     c.execute("CREATE TABLE outdeps (typeid INTEGER, outdep TEXT, FOREIGN KEY (typeid) REFERENCES types, UNIQUE (typeid, outdep))")
     c.execute("CREATE INDEX outdeps_idx ON outdeps (outdep)")
     # sentences
-    c.execute("CREATE TABLE sentences (sentid INTEGER PRIMARY KEY AUTOINCREMENT, graph TEXT)")
+    c.execute("CREATE TABLE sentences (sentid INTEGER PRIMARY KEY AUTOINCREMENT, origid TEXT, graph TEXT)")
     # tokens
     c.execute("CREATE TABLE tokens (typeid INTEGER, sentid INTEGER, position INTEGER, FOREIGN KEY (typeid) REFERENCES types, FOREIGN KEY (sentid) REFERENCES sentences, UNIQUE (typeid, sentid, position))")
     ## tables for abstract subgraphs
@@ -64,16 +64,18 @@ def create_db(filename):
     return conn, c
 
 
-def tupleize(sentence):
+def tupleize(stuple):
     """Return a list of tuples representing the tokens
     
     Arguments:
     - `sentence`:
     """
+    sentence, origid = stuple
     result = {}
     result["tokens"] = {}
-    gs = nx_graph.create_nx_digraph_from_cwb(sentence)
+    gs = nx_graph.create_nx_digraph_from_cwb(sentence, origid)
     result["graph"] = json.dumps(json_graph.node_link_data(gs))
+    result["origid"] = origid
     for v in gs.nodes():
         word = gs.node[v]["word"]
         pos = gs.node[v]["pos"]
@@ -99,7 +101,7 @@ def preprocess_results(conn, c, result, results):
     - `result`:
     - `results`:
     """
-    c.execute("INSERT INTO sentences (graph) VALUES (?)", (result["graph"],))
+    c.execute("INSERT INTO sentences (origid, graph) VALUES (?, ?)", (result["origid"], result["graph"],))
     sentid = c.lastrowid
     for position, t in result["tokens"].iteritems():
         if t not in results:
@@ -164,11 +166,20 @@ def insert_subgraphs(conn, c, result, subgraphs):
     """
     for r in result:
         sg, sentid, positions = r
-        if sg not in subgraphs:
-            c.execute("INSERT INTO subgraphs (subgraph) VALUES (?)", (json.dumps(list(sg)),))
-            subgraphid = c.lastrowid
-            subgraphs[sg] = subgraphid
-        subgraphid = subgraphs[sg]
+        if sg not in subgraphs["tuples"]:
+            graph = networkx.parse_adjlist(sg, nodetype=int, create_using=networkx.DiGraph())
+            # check if sg is isomorphic to any known subgraph
+            isomorphic = [k for k, val in subgraphs["tuples"].iteritems() if networkx.is_isomorphic(val["graph"], graph)]
+            subgraphs["tuples"][sg] = {}
+            subgraphs["tuples"][sg]["graph"] = graph
+            if len(isomorphic) == 0:
+                c.execute("INSERT INTO subgraphs (subgraph) VALUES (?)", (json.dumps(list(sg)),))
+                subgraphs["tuples"][sg]["id"] = c.lastrowid
+            else:
+                if len(isomorphic) > 1:
+                    raise Exception("There are already more than one isomorphic subgraphs in the database!")
+                subgraphs["tuples"][sg]["id"] = subgraphs["tuples"][isomorphic[0]]["id"]
+        subgraphid = subgraphs["tuples"][sg]["id"]
         subgraphs["isomorphisms"][subgraphid] = subgraphs["isomorphisms"].get(subgraphid, 0) + 1
         length = len(sg)
         if length > 5 or length < 2:
@@ -179,26 +190,20 @@ def insert_subgraphs(conn, c, result, subgraphs):
         c.execute(query, tuple(params))
 
 
-def db_sentences_iter(db):
-    """Iterate over sentences in database.
-    
-    The sqlite3 library does not like being used by multiple processes
-    via the same connection. That's why we have to use a temp file as
-    workaround.
-    
+def grouper_nofill(n, iterable):
+    """list(grouper_nofill(3, 'ABCDEFG')) --> [['A', 'B', 'C'], ['D', 'E',
+    'F'], ['G']]
+
     Arguments:
-    - `c`:
+    - `n`:
+    - `iterable`:
+
     """
-    conn = sqlite3.connect(db)
-    c = conn.cursor()
-    tmp = tempfile.TemporaryFile(mode="w+")
-    for s in c.execute("SELECT * FROM sentences"):
-        tmp.write(json.dumps(list(s)) + "\n")
-    conn.close()
-    tmp.seek(0)
-    for line in tmp:
-        yield tuple(json.loads(line.rstrip()))
-    tmp.close()
+    it = iter(iterable)
+    def take():
+        while True:
+            yield list(itertools.islice(it, n))
+    return iter(take().next, [])
 
 
 
@@ -209,25 +214,27 @@ if __name__ == "__main__":
     parser.add_argument("--db", type=os.path.abspath, required=True, help="SQLite3 database")
     parser.add_argument("CORPUS", type=argparse.FileType("r"), help="Corpus in CWB format")
     args = parser.parse_args()
-    
+
+    groupsize = 5 * 10 * multiprocessing.cpu_count()
     # raise exeception if args.db already exists
     if os.path.exists(args.db):
         raise Exception("Database file already exists")
     conn, c = create_db(args.db)
-    sents = cwb.sentences_iter(args.CORPUS)
     pool = multiprocessing.Pool(processes = multiprocessing.cpu_count())
-    r = pool.imap(tupleize, sents, 10)
-    #r = map(tupleize, sents)
+    sents = cwb.sentences_iter(args.CORPUS, return_id=True)
     results = {}
-    for result in r:
-        preprocess_results(conn, c, result, results)
+    for sentences in grouper_nofill(groupsize, sents):
+        r = pool.imap_unordered(tupleize, sentences, 10)
+        #r = map(tupleize, sentences)
+        for result in r:
+            preprocess_results(conn, c, result, results)
     insert_tokens(conn, c, results)
-    sentences = db_sentences_iter(args.db)
-    r = pool.imap_unordered(extract_subgraphs, sentences, 10)
-    #r = map(extract_subgraphs, sentences)
-    subgraphs = {"isomorphisms": {}}
-    for result in r:
-        insert_subgraphs(conn, c, result, subgraphs)
+    subgraphs = {"isomorphisms": {}, "tuples": {}}
+    for sentences in grouper_nofill(groupsize, c.execute("SELECT sentid, graph FROM sentences")):
+        r = pool.imap_unordered(extract_subgraphs, sentences, 10)
+        #r = map(extract_subgraphs, sentences)
+        for result in r:
+            insert_subgraphs(conn, c, result, subgraphs)
     isomorphisms = ((isos, sgid) for sgid, isos in subgraphs["isomorphisms"].iteritems())
     c.executemany("UPDATE subgraphs SET isomorphisms=? WHERE subgraphid=?", isomorphisms)
     conn.commit()
