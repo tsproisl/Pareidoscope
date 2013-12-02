@@ -70,8 +70,6 @@ def run_queries(input_queue, output_queue):
             job = input_queue.get(block=True, timeout=5)
             sentences, queries = job
             for sentence in sentences:
-                if sentence == None:
-                    continue
                 result = pareidoscope.query.run_query((sentence, queries))
                 results.append(result)
             output_queue.put(results)

@@ -29,7 +29,7 @@ def create_nx_digraph_from_cwb(cwb, origid=None):
     Arguments:
     - `cwb`:
     """
-    relpattern = re.compile(r"^(?P<relation>[^(]+)[(](?P<offset>-?\d+)(?:'*),0(?:'*)[)]$")
+    relpattern = re.compile(r"^(?P<relation>[^(]+)[(](?P<offset>-?\d+)(?:&apos;|')*,0(?:&apos;|')*[)]$")
     dg = networkx.DiGraph()
     if origid != None:
         dg.graph["origid"] = origid
@@ -47,6 +47,31 @@ def create_nx_digraph_from_cwb(cwb, origid=None):
                 offset = int(match.group("offset"))
                 dg.add_edge(i+offset, i, {"relation": relation})
     return dg
+
+
+def is_sensible_graph(nx_graph):
+    """Check if graph is a sensible syntactic representation of a
+    sentence, i.e. rooted, connected, …
+    
+    Arguments:
+    - `nx_graph`:
+
+    """
+    # is there a vertice explicitly labeled as "root"?
+    roots = [v for v, l in nx_graph.nodes(data=True) if "root" in l]
+    if len(roots) != 1:
+        return False
+    # is the graph connected?
+    if not networkx.is_weakly_connected(nx_graph):
+        return False
+    root = roots[0]
+    other_vertices = set(nx_graph.nodes())
+    other_vertices.remove(root)
+    # is the "root" vertice really a root, i.e. is there a path to
+    # every other vertice?
+    if not all([networkx.has_path(nx_graph, root, v) for v in other_vertices]):
+        return False
+    return True
 
 
 def get_vertice_candidates(query_graph, target_graph):

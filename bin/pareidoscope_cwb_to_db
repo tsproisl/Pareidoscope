@@ -5,6 +5,7 @@ import argparse
 import collections
 import itertools
 import json
+import logging
 import multiprocessing
 import os
 import sqlite3
@@ -15,7 +16,10 @@ from networkx.readwrite import json_graph
 
 from pareidoscope import subgraph_enumeration
 from pareidoscope.utils import cwb
+from pareidoscope.utils import helper
 from pareidoscope.utils import nx_graph
+
+logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=logging.INFO)
 
 
 def create_db(filename):
@@ -48,7 +52,7 @@ def create_db(filename):
     # tokens
     c.execute("CREATE TABLE tokens (typeid INTEGER, sentid INTEGER, position INTEGER, FOREIGN KEY (typeid) REFERENCES types, FOREIGN KEY (sentid) REFERENCES sentences, UNIQUE (typeid, sentid, position))")
     ## tables for abstract subgraphs
-    c.execute("CREATE TABLE subgraphs (subgraphid INTEGER PRIMARY KEY AUTOINCREMENT, subgraph TEXT UNIQUE, isomorphisms INTEGER)")
+    c.execute("CREATE TABLE subgraphs (subgraphid INTEGER PRIMARY KEY AUTOINCREMENT, subgraph TEXT UNIQUE, length INTEGER, isomorphisms INTEGER)")
     # size 2
     c.execute("CREATE TABLE subgraphs2 (subgraphid INTEGER, sentid INTEGER, v1 INTEGER, v2 INTEGER, FOREIGN KEY (subgraphid) REFERENCES subgraphs)")
     c.execute("CREATE INDEX subgraphs2_idx ON subgraphs2 (subgraphid)")
@@ -71,9 +75,10 @@ def tupleize(stuple):
     - `sentence`:
     """
     sentence, origid = stuple
+    gs = nx_graph.create_nx_digraph_from_cwb(sentence, origid)
+    sensible = nx_graph.is_sensible_graph(gs)
     result = {}
     result["tokens"] = {}
-    gs = nx_graph.create_nx_digraph_from_cwb(sentence, origid)
     result["graph"] = json.dumps(json_graph.node_link_data(gs))
     result["origid"] = origid
     for v in gs.nodes():
@@ -91,7 +96,7 @@ def tupleize(stuple):
         outdeps = tuple(sorted(list(outdeps)))
         t = (word, pos, lemma, wc, root, indegree, outdegree, indeps, outdeps)
         result["tokens"][v] = t
-    return result
+    return result, sensible
 
 
 def preprocess_results(conn, c, result, results):
@@ -173,7 +178,7 @@ def insert_subgraphs(conn, c, result, subgraphs):
             subgraphs["tuples"][sg] = {}
             subgraphs["tuples"][sg]["graph"] = graph
             if len(isomorphic) == 0:
-                c.execute("INSERT INTO subgraphs (subgraph) VALUES (?)", (json.dumps(list(sg)),))
+                c.execute("INSERT INTO subgraphs (subgraph, length) VALUES (?,?)", (json.dumps(list(sg)),len(sg)))
                 subgraphs["tuples"][sg]["id"] = c.lastrowid
             else:
                 if len(isomorphic) > 1:
@@ -188,22 +193,6 @@ def insert_subgraphs(conn, c, result, subgraphs):
         params = [subgraphid, sentid]
         params.extend(positions)
         c.execute(query, tuple(params))
-
-
-def grouper_nofill(n, iterable):
-    """list(grouper_nofill(3, 'ABCDEFG')) --> [['A', 'B', 'C'], ['D', 'E',
-    'F'], ['G']]
-
-    Arguments:
-    - `n`:
-    - `iterable`:
-
-    """
-    it = iter(iterable)
-    def take():
-        while True:
-            yield list(itertools.islice(it, n))
-    return iter(take().next, [])
 
 
 
@@ -223,19 +212,24 @@ if __name__ == "__main__":
     pool = multiprocessing.Pool(processes = multiprocessing.cpu_count())
     sents = cwb.sentences_iter(args.CORPUS, return_id=True)
     results = {}
-    for sentences in grouper_nofill(groupsize, sents):
+    logging.info("tupleize and preprocess")
+    for sentences in helper.grouper_nofill(groupsize, sents):
         r = pool.imap_unordered(tupleize, sentences, 10)
         #r = map(tupleize, sentences)
-        for result in r:
-            preprocess_results(conn, c, result, results)
+        for result, sensible in r:
+            if sensible:
+                preprocess_results(conn, c, result, results)
+    logging.info("insert tokens")
     insert_tokens(conn, c, results)
     subgraphs = {"isomorphisms": {}, "tuples": {}}
-    for sentences in grouper_nofill(groupsize, c.execute("SELECT sentid, graph FROM sentences")):
-        r = pool.imap_unordered(extract_subgraphs, sentences, 10)
-        #r = map(extract_subgraphs, sentences)
+    logging.info("exctract subgraphs")
+    for sentences in helper.grouper_nofill(groupsize, c.execute("SELECT sentid, graph FROM sentences")):
+        #r = pool.imap_unordered(extract_subgraphs, sentences, 10)
+        r = map(extract_subgraphs, sentences)
         for result in r:
             insert_subgraphs(conn, c, result, subgraphs)
     isomorphisms = ((isos, sgid) for sgid, isos in subgraphs["isomorphisms"].iteritems())
+    logging.info("insert isomorphism counts")
     c.executemany("UPDATE subgraphs SET isomorphisms=? WHERE subgraphid=?", isomorphisms)
     conn.commit()
     conn.close()
