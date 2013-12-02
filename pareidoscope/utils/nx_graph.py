@@ -46,6 +46,10 @@ def create_nx_digraph_from_cwb(cwb, origid=None):
                 relation = match.group("relation")
                 offset = int(match.group("offset"))
                 dg.add_edge(i+offset, i, {"relation": relation})
+    # remove unconnected vertices, e.g. punctuation in the SD model
+    for v, l in dg.nodes(data=True):
+        if "root" not in l and dg.degree(v) == 0:
+            dg.remove_node(v)
     return dg
 
 
@@ -217,6 +221,8 @@ def _dfs(nx_graph, vertice, vtuples, return_ids=False):
     keyfunc = lambda v: vtuples[v]
     while len(agenda) > 0:
         v = agenda.pop(0)
+        if v in seen:
+            continue
         seen.add(v)
         if return_ids:
             order.append(v)

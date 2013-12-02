@@ -171,20 +171,19 @@ def insert_subgraphs(conn, c, result, subgraphs):
     """
     for r in result:
         sg, sentid, positions = r
-        if sg not in subgraphs["tuples"]:
+        if sg not in subgraphs["id"]:
             graph = networkx.parse_adjlist(sg, nodetype=int, create_using=networkx.DiGraph())
             # check if sg is isomorphic to any known subgraph
-            isomorphic = [k for k, val in subgraphs["tuples"].iteritems() if networkx.is_isomorphic(val["graph"], graph)]
-            subgraphs["tuples"][sg] = {}
-            subgraphs["tuples"][sg]["graph"] = graph
+            isomorphic = [t for t, g in subgraphs["graph"].iteritems() if networkx.is_isomorphic(g, graph)]
             if len(isomorphic) == 0:
                 c.execute("INSERT INTO subgraphs (subgraph, length) VALUES (?,?)", (json.dumps(list(sg)),len(sg)))
-                subgraphs["tuples"][sg]["id"] = c.lastrowid
+                subgraphs["graph"][sg] = graph
+                subgraphs["id"][sg] = c.lastrowid
             else:
                 if len(isomorphic) > 1:
                     raise Exception("There are already more than one isomorphic subgraphs in the database!")
-                subgraphs["tuples"][sg]["id"] = subgraphs["tuples"][isomorphic[0]]["id"]
-        subgraphid = subgraphs["tuples"][sg]["id"]
+                subgraphs["id"][sg] = subgraphs["id"][isomorphic[0]]
+        subgraphid = subgraphs["id"][sg]
         subgraphs["isomorphisms"][subgraphid] = subgraphs["isomorphisms"].get(subgraphid, 0) + 1
         length = len(sg)
         if length > 5 or length < 2:
@@ -221,11 +220,11 @@ if __name__ == "__main__":
                 preprocess_results(conn, c, result, results)
     logging.info("insert tokens")
     insert_tokens(conn, c, results)
-    subgraphs = {"isomorphisms": {}, "tuples": {}}
+    subgraphs = {"isomorphisms": {}, "id": {}, "graph": {}}
     logging.info("exctract subgraphs")
     for sentences in helper.grouper_nofill(groupsize, c.execute("SELECT sentid, graph FROM sentences")):
-        #r = pool.imap_unordered(extract_subgraphs, sentences, 10)
-        r = map(extract_subgraphs, sentences)
+        r = pool.imap_unordered(extract_subgraphs, sentences, 10)
+        #r = map(extract_subgraphs, sentences)
         for result in r:
             insert_subgraphs(conn, c, result, subgraphs)
     isomorphisms = ((isos, sgid) for sgid, isos in subgraphs["isomorphisms"].iteritems())
