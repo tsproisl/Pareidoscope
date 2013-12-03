@@ -45,7 +45,8 @@ def create_nx_digraph_from_cwb(cwb, origid=None):
                 match = re.search(relpattern, rel)
                 relation = match.group("relation")
                 offset = int(match.group("offset"))
-                dg.add_edge(i+offset, i, {"relation": relation})
+                if offset != 0:
+                    dg.add_edge(i+offset, i, {"relation": relation})
     # remove unconnected vertices, e.g. punctuation in the SD model
     for v, l in dg.nodes(data=True):
         if "root" not in l and dg.degree(v) == 0:

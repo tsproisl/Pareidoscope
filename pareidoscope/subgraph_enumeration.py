@@ -204,7 +204,7 @@ def enumerate_connected_subgraphs_recursive(graph, subgraph, prohibited_edges, n
                 new_edges.update([e for e in graph.out_edges(nbunch = [new_vertice]) if e[1] in new_vertices])
             for new_edge_combi in powerset(new_edges, 0, nr_of_edges - (subgraph_edges + len(ec))):
                 nec = list(new_edge_combi)
-                local_subgraph = networkx.DiGraph(subgraph)
+                local_subgraph = subgraph.copy()
                 # add edges
                 for s, t in ec + nec:
                     local_subgraph.add_edge(s, t, graph.edge[s][t])
@@ -213,7 +213,7 @@ def enumerate_connected_subgraphs_recursive(graph, subgraph, prohibited_edges, n
                 nr_of_subgraph_vertices = local_subgraph.number_of_nodes()
                 nr_of_subgraph_edges = local_subgraph.number_of_edges()
                 if nr_of_subgraph_edges != subgraph_edges + len(ec + nec):
-                    raise "WAAAAH"
+                    raise Exception("WAAAAH")
                 if nr_of_subgraph_vertices == nr_of_vertices and nr_of_edges == nr_of_subgraph_edges:
                     yield return_corpus_order(local_subgraph, graph_to_raw)
                 elif nr_of_subgraph_vertices < nr_of_vertices:
@@ -254,8 +254,8 @@ def enumerate_csg_minmax(graph, graph_to_raw, min_vertices=2, max_vertices=5):
             yield return_corpus_order(subgraph, graph_to_raw)
         prohibited_edges = set([])
         for v in [u for u in graph.nodes() if u < vertice]:
-            prohibited_edges.update(set(graph.out_edges(nbunch = [v])))
-            prohibited_edges.update(set(graph.in_edges(nbunch = [v])))
+            prohibited_edges.update(set(graph.out_edges(nbunch=[v])))
+            prohibited_edges.update(set(graph.in_edges(nbunch=[v])))
         for result in enumerate_csg_minmax_recursive(graph, subgraph, prohibited_edges, graph_to_raw, min_vertices, max_vertices):
             yield result
 
@@ -305,10 +305,10 @@ def enumerate_csg_minmax_recursive(graph, subgraph, prohibited_edges, graph_to_r
             # edges between new vertices
             new_edges = set([])
             for new_vertice in new_vertices:
-                new_edges.update([e for e in graph.out_edges(nbunch = [new_vertice]) if e[1] in new_vertices])
+                new_edges.update([e for e in graph.out_edges(nbunch=[new_vertice]) if e[1] in new_vertices])
             for new_edge_combi in powerset(new_edges, 0):
                 nec = list(new_edge_combi)
-                local_subgraph = networkx.DiGraph(subgraph)
+                local_subgraph = subgraph.copy()
                 # add edges
                 for s, t in ec + nec:
                     local_subgraph.add_edge(s, t, graph.edge[s][t])
