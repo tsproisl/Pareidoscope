@@ -56,7 +56,7 @@ def create_nx_digraph_from_cwb(cwb, origid=None):
 
 def is_sensible_graph(nx_graph):
     """Check if graph is a sensible syntactic representation of a
-    sentence, i.e. rooted, connected, …
+    sentence, i.e. rooted, connected, sensible outdegrees, …
     
     Arguments:
     - `nx_graph`:
@@ -69,12 +69,15 @@ def is_sensible_graph(nx_graph):
     # is the graph connected?
     if not networkx.is_weakly_connected(nx_graph):
         return False
+    # is the "root" vertice really a root, i.e. is there a path to
+    # every other vertice?
     root = roots[0]
     other_vertices = set(nx_graph.nodes())
     other_vertices.remove(root)
-    # is the "root" vertice really a root, i.e. is there a path to
-    # every other vertice?
     if not all([networkx.has_path(nx_graph, root, v) for v in other_vertices]):
+        return False
+    # do the vertices have sensible outdegrees <= 10?
+    if any([nx_graph.out_degree(v) > 10 for v in nx_graph.nodes()]):
         return False
     return True
 
@@ -207,7 +210,7 @@ def _get_vertice_tuple(nx_graph, vertice):
     return (root, antiroot, label, indegree, outdegree, inedgelabels, outedgelabels)
 
 
-def _dfs(nx_graph, vertice, vtuples, return_ids=False):
+def _dfs(nx_graph, vertice, vtuples, return_ids=False, blacklist=[]):
     """Return vertice tuples in order of depth-first search starting from
     vertice
     
@@ -215,9 +218,11 @@ def _dfs(nx_graph, vertice, vtuples, return_ids=False):
     - `nx_graph`:
     - `vertice`:
     - `vtuples`:
+    - `return_ids`:
+    - `blacklist`:
     """
     order = []
-    seen = set()
+    seen = set(blacklist)
     agenda = [vertice]
     keyfunc = lambda v: vtuples[v]
     while len(agenda) > 0:
@@ -230,17 +235,18 @@ def _dfs(nx_graph, vertice, vtuples, return_ids=False):
         else:
             order.append(vtuples[v])
         successors = sorted([x for x in nx_graph.successors(v) if x not in seen], key=keyfunc)
-        agenda = _get_unique_order(nx_graph, successors, vtuples) + agenda
+        agenda = _get_unique_order(nx_graph, successors, vtuples, blacklist=list(seen)) + agenda
     return order
 
 
-def _get_unique_order(nx_graph, sorted_vertices, vtuples):
+def _get_unique_order(nx_graph, sorted_vertices, vtuples, blacklist=[]):
     """Resolve any groups within sorted_vertices
     
     Arguments:
     - `nx_graph`:
     - `sorted_vertices`:
     - `vtuples`:
+    - `blacklist`:
     """
     order = []
     keyfunc = lambda v: vtuples[v]
@@ -252,7 +258,7 @@ def _get_unique_order(nx_graph, sorted_vertices, vtuples):
             raise Exception("Group should not be empty!")
         else:
             # We need more criteria for sorting
-            vtuples_dfs = {v: tuple(_dfs(nx_graph, v, vtuples) + [v]) for v in group}
+            vtuples_dfs = {v: tuple(_dfs(nx_graph, v, vtuples, blacklist=blacklist) + [v]) for v in group}
             keyfunc_dfs = lambda v: vtuples_dfs[v]
             order.extend(sorted(group, key=keyfunc_dfs))
     return order
