@@ -4,16 +4,18 @@
 from pareidoscope.utils import nx_graph
 
 
-def get_subgraph_isomorphisms_nx(query_graph, target_graph):
+def get_subgraph_isomorphisms_nx(query_graph, target_graph, vertice_candidates=None):
     """Return a list of isomorphisms that map vertices and edges from
     query_graph to vertices and edges from target_graph.
     
     Arguments:
     - `query_graph`:
     - `target_graph`:
+    - `vertice_candidates`:
     """
     subgraph_isomorphisms = None
-    vertice_candidates = nx_graph.get_vertice_candidates(query_graph, target_graph)
+    if vertice_candidates == None:
+        vertice_candidates = nx_graph.get_vertice_candidates(query_graph, target_graph)
     if is_purely_structural(query_graph):
         subgraph_isomorphisms = match_structural(query_graph, target_graph, vertice_candidates, 0)
     else:

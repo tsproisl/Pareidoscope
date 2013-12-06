@@ -8,16 +8,18 @@ import networkx
 from pareidoscope.utils import nx_graph
 
 
-def get_subgraphs_nx(query_graph, target_graph):
+def get_subgraphs_nx(query_graph, target_graph, vertice_candidates=None):
     """Return a list of subgraphs of target_graph that are isomorphic
     to query_graph
     
     Arguments:
     - `query_graph`:
     - `target_graph`:
+    - `vertice_candidates`:
     """
     bfo_graph, bfo_to_raw = get_bfo(target_graph)
-    vertice_candidates = nx_graph.get_vertice_candidates(query_graph, bfo_graph)
+    if vertice_candidates == None:
+        vertice_candidates = nx_graph.get_vertice_candidates(query_graph, bfo_graph)
     vertice_candidates = reduce(lambda x, y: x.union(y), vertice_candidates)
     for subgraph in enumerate_connected_subgraphs(bfo_graph, bfo_to_raw, query_graph.number_of_nodes(), query_graph.number_of_edges(), vertice_candidates):
         vc = nx_graph.get_vertice_candidates(query_graph, subgraph)
