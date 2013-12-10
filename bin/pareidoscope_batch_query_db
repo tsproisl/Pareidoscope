@@ -7,11 +7,13 @@ import json
 import math
 import multiprocessing
 import os
+import sqlite3
 import subprocess
 import sys
 
 import pareidoscope.query
 from pareidoscope.utils import cwb
+from pareidoscope.utils import database
 from pareidoscope.utils import helper
 from pareidoscope.utils import nx_graph
 
@@ -90,21 +92,30 @@ if __name__ == "__main__":
         raise Exception("Need at least Python 2.7!")
     os.nice(10)
     parser = argparse.ArgumentParser(description='Run a batch of queries against a corpus')
-    parser.add_argument("--db", type=argparse.FileType("r"), required=True, help="Corpus database")
+    parser.add_argument("--db", type=os.path.abspath, required=True, help="Corpus database")
     parser.add_argument("-o", "--output", type=str, required=True, help="Output prefix")
     parser.add_argument("QUERIES", type=argparse.FileType("r"), help="Queries for O11, A, B, R1, C1 and N")
     args = parser.parse_args()
     
     groupsize = 5 * 10 * multiprocessing.cpu_count()
+    conn = sqlite3.connect(args.db)
+    c = conn.cursor()
+    conn.create_function("REGEXP", 2, database.regexp)
     queries = read_queries(args.QUERIES)
-    results = [{} for q in queries]
-    pool = multiprocessing.Pool(processes = multiprocessing.cpu_count())
+    # Strategien
+    # purely structural: iterate sentences or use structural index
+    # ansonsten: database.get_candidates()
+    for qline in queries:
+        go11, ga, gb, gr1, gc1, gn = qline
+        database.get_candidates(c, ga)
+    # results = [{} for q in queries]
+    # pool = multiprocessing.Pool(processes = multiprocessing.cpu_count())
     # distribute queries, not sentences
     # if query length is between two and five vertices, one SQL query should be enough -> check!
-    sents = cwb.sentences_iter(args.corpus)
-    for sentences in helper.grouper_nofill(groupsize, sents):
-        r = pool.imap(pareidoscope.query.run_queries, itertools.izip(sentences, itertools.repeat(queries)), 10)
-        # r = map(pareidoscope.query.run_queries, itertools.izip(sentences, itertools.repeat(queries)))
-        for result in r:
-            pareidoscope.query.merge_result(result, results)
-    write_results(args.output, results)
+    # sents = cwb.sentences_iter(args.corpus)
+    # for sentences in helper.grouper_nofill(groupsize, sents):
+    #     r = pool.imap(pareidoscope.query.run_queries, itertools.izip(sentences, itertools.repeat(queries)), 10)
+    #     # r = map(pareidoscope.query.run_queries, itertools.izip(sentences, itertools.repeat(queries)))
+    #     for result in r:
+    #         pareidoscope.query.merge_result(result, results)
+    # write_results(args.output, results)

@@ -20,7 +20,7 @@ def sentences_iter(corpus, return_id=False):
                 yield sentence, origid
             else:
                 yield sentence
-        elif line.startswith("<s id="):
+        elif line.startswith("<s "):
             m = re.search(pattern, line)
             if m:
                 origid = m.group(2)

@@ -28,9 +28,9 @@ def get_distributions(corpus, voc, rel):
     r = [[t[4][1:t[4].find("(")] for t in s] for s in sents]
     relations = collections.Counter(itertools.chain.from_iterable(r))
     del relations[""]
-    for v, f in sorted(tokens.iteritems(), key=operator.itemgetter(1))[:int(voc*len(tokens))]:
+    for v, f in sorted(tokens.iteritems(), key=operator.itemgetter(1), reverse=True)[:int(voc*len(tokens))]:
         vertice_dist.extend([v] * f)
-    for e, f in sorted(relations.iteritems(), key=operator.itemgetter(1))[:int(rel*len(relations))]:
+    for e, f in sorted(relations.iteritems(), key=operator.itemgetter(1), reverse=True)[:int(rel*len(relations))]:
         edge_dist.extend([e] * f)
     return vertice_dist, edge_dist
 

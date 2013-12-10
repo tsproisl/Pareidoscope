@@ -31,7 +31,7 @@ def create_nx_digraph_from_cwb(cwb, origid=None):
     """
     relpattern = re.compile(r"^(?P<relation>[^(]+)[(](?P<offset>-?\d+)(?:&apos;|')*,0(?:&apos;|')*[)]$")
     dg = networkx.DiGraph()
-    if origid != None:
+    if origid is not None:
         dg.graph["origid"] = origid
     attributes = lambda l: {"word": l[0], "pos": l[1], "lemma": l[2], "wc": l[3]}
     dg.add_nodes_from([(l, attributes(cwb[l])) for l in range(len(cwb))])
