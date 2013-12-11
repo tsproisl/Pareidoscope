@@ -5,6 +5,8 @@ import json
 import operator
 import re
 
+import networkx
+
 from pareidoscope.utils import nx_graph
 
 
@@ -162,5 +164,18 @@ def get_structure_candidates(c, graph):
     skel = nx_graph.skeletize(graph)
     mapping = {v: i for i, v in enumerate(sorted(skel.nodes()))}
     canonized, order = nx_graph.canonize(skel, order=True)
+    length = len(order)
     subgraph = json.dumps(list(networkx.generate_adjlist(subgraph)))
-    c.execute("SELECT subgraphid FROM subgraphs WHERE subgraph=?", (subgraph,))
+    subgraphid = c.execute("SELECT subgraphid FROM subgraphs WHERE subgraph=?", (subgraph,)).fetchall
+    if subgraphid == []:
+        for row in c.execute("SELECT subgraphid, subgraph FROM subgraphs WHERE length=?", (length,)):
+            sgid, sgadj = row
+            sg = networkx.parse_adjlist(json.loads(sgadj), nodetype=int, create_using=networkx.DiGraph())
+            if networkx.is_isomorphic(sg, canonized):
+                subgraphid = [(sgid,)]
+                break
+    subgraphid = subgraphid[0][0]
+    query = "SELECT sentid, %s FROM subgraphs%d WHERE subgraphid=?" % (", ".join("v%d" % i for i in range(1, length + 1)), length)
+    for row in c.execute(query, (subgraphid,)):
+        pass
+
