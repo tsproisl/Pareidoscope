@@ -191,6 +191,28 @@ def export_to_cwb_format(nx_graph):
     return output
 
 
+def is_purely_structural(nx_graph):
+    """Is query_graph purely structural, i.e. does it contain no
+    restrictions on vertice and edge labels?
+    
+    Arguments:
+    - `query_graph`:
+    """
+    return all([_is_unrestricted(edge[2]) for edge in nx_graph.edges(data = True)])
+
+
+def _is_unrestricted(dictionary):
+    """Is the dictionary unrestricted, i.e. is it empty or does it
+    only have ".+" or ".*" as values?
+    
+    Arguments:
+    - `dictionary`:
+    """
+    if dictionary == {}:
+        return True
+    return all([val == ".+" or val == ".*" for val in dictionary.values()])
+
+
 def _get_vertice_tuple(nx_graph, vertice):
     """Return a tuple for the vertice that can be used for sorting
     
@@ -300,3 +322,31 @@ def canonize(nx_graph, order=False):
         return canonized, co
     else:
         return canonized
+
+
+def skeletize(nx_graph):
+    """Return skeleton copy of nx_graph
+    
+    Arguments:
+    - `nx_graph`:
+
+    """
+    copy = nx_graph.copy()
+    for v in copy.nodes():
+        copy.node[v] = {}
+    for s, t in copy.edges():
+        copy.edge[s][t] = {}
+    return copy
+
+
+def skeletize_inplace(nx_graph):
+    """Turn nx_graph into a skeleton
+    
+    Arguments:
+    - `nx_graph`:
+
+    """
+    for v in nx_graph.nodes():
+        nx_graph.node[v] = {}
+    for s, t in nx_graph.edges():
+        nx_graph.edge[s][t] = {}

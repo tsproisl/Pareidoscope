@@ -11,7 +11,10 @@ import sqlite3
 import subprocess
 import sys
 
-import pareidoscope.query
+from networkx.readwrite import json_graph
+
+from pareidoscope import subgraph_isomorphism
+from pareidoscope import query
 from pareidoscope.utils import cwb
 from pareidoscope.utils import database
 from pareidoscope.utils import helper
@@ -27,6 +30,20 @@ def read_queries(queries_file):
     queries = [line.decode("utf-8").rstrip("\n").split("\t") for line in queries_file]
     queries = [[nx_graph.create_nx_digraph(json.loads(q)) for q in l] for l in queries]
     return queries
+
+
+def check_tables(c):
+    """Check tables in database and return values for no_subgraphs and
+    just_freqs.
+    
+    Arguments:
+    - `c`:
+
+    """
+    q = "SELECT name FROM sqlite_master WHERE type=? AND name=?"
+    iso_frequencies = c.execute(q, ("table", "subgraphs")).fetchall() != []
+    iso_occurrences = c.execute(q, ("table", "subgraphs2")).fetchall() != []
+    return iso_frequencies, iso_occurrences
 
 
 def write_results(prefix, results):
@@ -86,6 +103,32 @@ def write_results(prefix, results):
         subprocess.call([script_directory+"/analyze_batch_queries.R", "%s/%s_%s.mi" % (working_directory, prefix, suffix), suffix])
 
 
+def isomorphisms_test_1(args):
+    """Count isomorphisms
+    
+    Arguments:
+    - `go11`:
+    - `gr1`:
+    - `gc1`:
+    - `gn`:
+    - `gs`:
+    - `candidates`:
+    """
+    go11, gr1, gc1, gn, sentence, candidates = args
+    iso_ct = {x: 0 for x in ["o11", "r1", "c1", "n"]}
+    gs = json_graph.node_link_graph(json.loads(sentence))
+    for isomorphism in subgraph_isomorphism.get_subgraph_isomorphisms_nx(gn, gs, vertice_candidates=candidates):
+        iso_ct["n"] += 1
+        if query.matches(go11, isomorphism, gs):
+            iso_ct["o11"] += 1
+        if query.matches(gr1, isomorphism, gs):
+            iso_ct["r1"] += 1
+        if query.matches(gc1, isomorphism, gs):
+            iso_ct["c1"] += 1
+    return iso_ct
+
+
+
 
 if __name__ == "__main__":
     if sys.version_info < (2, 7):
@@ -98,8 +141,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     groupsize = 5 * 10 * multiprocessing.cpu_count()
+    pool = multiprocessing.Pool(processes = multiprocessing.cpu_count())
     conn = sqlite3.connect(args.db)
     c = conn.cursor()
+    c.execute("PRAGMA cache_size=100000")
+    iso_frequencies, iso_occurrences = check_tables(c)
     conn.create_function("REGEXP", 2, database.regexp)
     queries = read_queries(args.QUERIES)
     # Strategien
@@ -107,7 +153,20 @@ if __name__ == "__main__":
     # ansonsten: database.get_candidates()
     for qline in queries:
         go11, ga, gb, gr1, gc1, gn = qline
-        database.get_candidates(c, ga)
+        candidates = None
+        if nx_graph.is_purely_structural(gn) and iso_occurrences:
+            candidates = database.get_structure_candidates(c, gn)
+        else:
+            candidates = database.get_candidates(c, gn)
+        for sentids in helper.grouper_nofill(groupsize, candidates):
+            q = "SELECT graph FROM sentences WHERE sentid=?"
+            sentences = [c.execute(q, (sentid,)).fetchone()[0] for sentid in sentids]
+            cands = [candidates[sentid] for sentid in sentids]
+            args = itertools.izip(itertools.repeat(go11), itertools.repeat(gr1), itertools.repeat(gc1), itertools.repeat(gn), sentences, cands)
+            r = pool.imap(isomorphisms_test_1, args, 10)
+            # r = map(isomorphisms_test_1, args)
+            for result in r:
+                print result
     # results = [{} for q in queries]
     # pool = multiprocessing.Pool(processes = multiprocessing.cpu_count())
     # distribute queries, not sentences

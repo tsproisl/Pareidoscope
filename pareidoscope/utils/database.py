@@ -1,23 +1,26 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+import json
 import operator
 import re
 
+from pareidoscope.utils import nx_graph
 
-def get_candidates(c, nx_graph):
+
+def get_candidates(c, graph):
     """Get candidate tokens for each vertice in the graph from the
     database.
     
     Arguments:
     - `c`: Database cursor
-    - `nx_graph`:
+    - `graph`:
 
     """
-    mapping = {v: i for i, v in enumerate(sorted(nx_graph.nodes()))}
+    mapping = {v: i for i, v in enumerate(sorted(graph.nodes()))}
     sentpos = {}
     sentences = []
-    queries = [(i, _create_sql_query(nx_graph, v)) for v, i in mapping.iteritems()]
+    queries = [(i, _create_sql_query(graph, v)) for v, i in mapping.iteritems()]
     for i, (query, args) in queries:
         print query, args
         sentpos[i] = {}
@@ -25,8 +28,8 @@ def get_candidates(c, nx_graph):
         for row in c.execute(query, args):
             sentid, position = row
             if sentid not in sentpos[i]:
-                sentpos[i][sentid] = []
-            sentpos[i][sentid].append(position)
+                sentpos[i][sentid] = set()
+            sentpos[i][sentid].add(position)
             vsents.add(sentid)
         sentences.append(vsents)
     sent_intersect = reduce(lambda x, y: x.intersection(y), sentences)
@@ -34,12 +37,12 @@ def get_candidates(c, nx_graph):
     return candidates
 
 
-def _create_sql_query(nx_graph, v):
+def _create_sql_query(graph, v):
     """Create an SQL query for the given node and return a tuple
     consisting of query string and parameters.
     
     Arguments:
-    - `nx_graph`:
+    - `graph`:
     - `v`:
 
     """
@@ -50,7 +53,7 @@ def _create_sql_query(nx_graph, v):
     pos_lexical = set(["word", "pos", "lemma", "wc", "root"])
     neg_lexical = set(["not_%s" % pl for pl in pos_lexical])
     match_all = set([".*", ".+", "^.*$", "^.+$"])
-    for key, value in nx_graph.node[v].iteritems():
+    for key, value in graph.node[v].iteritems():
         # check if value could be a regular expression
         if key in pos_lexical:
             if might_contain_re(value):
@@ -80,13 +83,13 @@ def _create_sql_query(nx_graph, v):
         else:
             raise Exception("Unsupported key: %s" % key)
     query_where.append("t.indeg>=?")
-    arguments.append(nx_graph.in_degree(v))
+    arguments.append(graph.in_degree(v))
     query_where.append("t.outdeg>=?")
-    arguments.append(nx_graph.out_degree(v))
+    arguments.append(graph.out_degree(v))
     # dependency relations only support alternations, e.g. "dobj|iobj"
     # to express any object
     incounter = 0
-    for s, t, l in nx_graph.in_edges(v, data=True):
+    for s, t, l in graph.in_edges(v, data=True):
         for key, value in l.iteritems():
             if key == "relation":
                 if value in match_all:
@@ -103,7 +106,7 @@ def _create_sql_query(nx_graph, v):
             else:
                 raise Exception("Unsupported key: %s" % key)
     outcounter = 0
-    for s, t, l in nx_graph.out_edges(v, data=True):
+    for s, t, l in graph.out_edges(v, data=True):
         for key, value in l.iteritems():
             if key == "relation":
                 if value in match_all:
@@ -145,3 +148,19 @@ def regexp(expression, item):
     """
     reg = re.compile(expression)
     return reg.search(item) is not None
+
+
+def get_structure_candidates(c, graph):
+    """Get candidate tokens for each vertice in the graph from the
+    database.
+    
+    Arguments:
+    - `c`: Database cursor
+    - `graph`:
+
+    """
+    skel = nx_graph.skeletize(graph)
+    mapping = {v: i for i, v in enumerate(sorted(skel.nodes()))}
+    canonized, order = nx_graph.canonize(skel, order=True)
+    subgraph = json.dumps(list(networkx.generate_adjlist(subgraph)))
+    c.execute("SELECT subgraphid FROM subgraphs WHERE subgraph=?", (subgraph,))

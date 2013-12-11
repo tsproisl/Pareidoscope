@@ -16,7 +16,7 @@ def get_subgraph_isomorphisms_nx(query_graph, target_graph, vertice_candidates=N
     subgraph_isomorphisms = None
     if vertice_candidates is None:
         vertice_candidates = nx_graph.get_vertice_candidates(query_graph, target_graph)
-    if is_purely_structural(query_graph):
+    if nx_graph.is_purely_structural(query_graph):
         subgraph_isomorphisms = match_structural(query_graph, target_graph, vertice_candidates, 0)
     else:
         subgraph_isomorphisms = match(query_graph, target_graph, vertice_candidates, 0)
@@ -34,28 +34,6 @@ def get_subgraph_isomorphisms(query_graph, target_graph):
     query_graph = nx_graph.create_nx_digraph(query_graph)
     target_graph = nx_graph.create_nx_digraph(target_graph)
     return get_subgraph_isomorphisms_nx(query_graph, target_graph)
-
-
-def is_purely_structural(query_graph):
-    """Is query_graph purely structural, i.e. does it contain no
-    restrictions on vertice and edge labels?
-    
-    Arguments:
-    - `query_graph`:
-    """
-    return all([is_unrestricted(edge[2]) for edge in query_graph.edges(data = True)])
-
-
-def is_unrestricted(dictionary):
-    """Is the dictionary unrestricted, i.e. is it empty or does it
-    only have ".+" or ".*" as values?
-    
-    Arguments:
-    - `dictionary`:
-    """
-    if dictionary == {}:
-        return True
-    return all([val == ".+" or val == ".*" for val in dictionary.values()])
 
 
 def match(query_graph, target_graph, vertice_candidates, index):
