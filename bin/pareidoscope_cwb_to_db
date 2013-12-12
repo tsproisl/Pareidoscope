@@ -23,7 +23,7 @@ from pareidoscope.utils import nx_graph
 logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=logging.INFO)
 
 
-def create_db(filename, no_subgraphs, just_freqs):
+def create_db(filename, no_subgraphs):
     """Create an empty database
     
     Arguments:
@@ -58,8 +58,6 @@ def create_db(filename, no_subgraphs, just_freqs):
         return conn, c
     ## tables for abstract subgraphs
     c.execute("CREATE TABLE subgraphs (subgraphid INTEGER PRIMARY KEY AUTOINCREMENT, subgraph TEXT UNIQUE, length INTEGER, isomorphisms INTEGER)")
-    if just_freqs:
-        return conn, c
     # size 2
     c.execute("CREATE TABLE subgraphs2 (subgraphid INTEGER, sentid INTEGER, v1 INTEGER, v2 INTEGER, FOREIGN KEY (subgraphid) REFERENCES subgraphs)")
     c.execute("CREATE INDEX subgraphs2_idx ON subgraphs2 (subgraphid)")
@@ -161,7 +159,7 @@ def extract_subgraphs(args):
     return result
 
 
-def insert_subgraphs(conn, c, result, subgraphs, just_freqs):
+def insert_subgraphs(conn, c, result, subgraphs):
     """Insert subgraphs into database
     
     Arguments:
@@ -186,8 +184,6 @@ def insert_subgraphs(conn, c, result, subgraphs, just_freqs):
                 subgraphs["id"][sg] = subgraphs["id"][isomorphic[0]]
         subgraphid = subgraphs["id"][sg]
         subgraphs["isomorphisms"][subgraphid] = subgraphs["isomorphisms"].get(subgraphid, 0) + 1
-        if just_freqs:
-            continue
         length = len(sg)
         if length > 5 or length < 2:
             raise Exception("Subgraph of length %d: %s" % (length, subgraph))
@@ -202,9 +198,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Convert a corpus in CWB format to an SQLite database')
     # parser.add_argument("--min-subgraph", type=int, help="Minimum subgraph size for indexing (default: 2 vertices)", default=2, metavar="N")
     # parser.add_argument("--max-subgraph", type=int, help="Maximum subgraph size for indexing (default: 5 vertices)", default=5, metavar="N")
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument("--no-subgraphs", action="store_true", help="Do not create subgraph indexes")
-    group.add_argument("--just-freqs", action="store_true", help="Just store number of isomorphisms for each subgraph")
+    parser.add_argument("--no-subgraphs", action="store_true", help="Do not create subgraph indexes")
     parser.add_argument("--db", type=os.path.abspath, required=True, help="SQLite3 database")
     parser.add_argument("CORPUS", type=argparse.FileType("r"), help="Corpus in CWB format")
     args = parser.parse_args()
@@ -213,7 +207,7 @@ if __name__ == "__main__":
     # raise exeception if args.db already exists
     if os.path.exists(args.db):
         raise Exception("Database file already exists")
-    conn, c = create_db(args.db, args.no_subgraphs, args.just_freqs)
+    conn, c = create_db(args.db, args.no_subgraphs)
     pool = multiprocessing.Pool(processes = multiprocessing.cpu_count())
     sents = cwb.sentences_iter(args.CORPUS, return_id=True)
     results = {}
@@ -240,7 +234,7 @@ if __name__ == "__main__":
         r = pool.imap_unordered(extract_subgraphs, sentences, 10)
         #r = map(extract_subgraphs, sentences)
         for result in r:
-            insert_subgraphs(conn, c, result, subgraphs, args.just_freqs)
+            insert_subgraphs(conn, c, result, subgraphs)
     isomorphisms = ((isos, sgid) for sgid, isos in subgraphs["isomorphisms"].iteritems())
     logging.info("insert isomorphism counts")
     c.executemany("UPDATE subgraphs SET isomorphisms=? WHERE subgraphid=?", isomorphisms)

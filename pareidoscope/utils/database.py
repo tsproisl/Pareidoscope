@@ -24,7 +24,6 @@ def get_candidates(c, graph):
     sentences = []
     queries = [(i, _create_sql_query(graph, v)) for v, i in mapping.iteritems()]
     for i, (query, args) in queries:
-        print query, args
         sentpos[i] = {}
         vsents = set()
         for row in c.execute(query, args):
@@ -163,10 +162,11 @@ def get_structure_candidates(c, graph):
     """
     skel = nx_graph.skeletize(graph)
     mapping = {v: i for i, v in enumerate(sorted(skel.nodes()))}
+    candidates = {}
     canonized, order = nx_graph.canonize(skel, order=True)
     length = len(order)
-    subgraph = json.dumps(list(networkx.generate_adjlist(subgraph)))
-    subgraphid = c.execute("SELECT subgraphid FROM subgraphs WHERE subgraph=?", (subgraph,)).fetchall
+    subgraph = json.dumps(list(networkx.generate_adjlist(canonized)))
+    subgraphid = c.execute("SELECT subgraphid FROM subgraphs WHERE subgraph=?", (subgraph,)).fetchall()
     if subgraphid == []:
         for row in c.execute("SELECT subgraphid, subgraph FROM subgraphs WHERE length=?", (length,)):
             sgid, sgadj = row
@@ -174,8 +174,16 @@ def get_structure_candidates(c, graph):
             if networkx.is_isomorphic(sg, canonized):
                 subgraphid = [(sgid,)]
                 break
+    if subgraphid == []:
+        return candidates
     subgraphid = subgraphid[0][0]
     query = "SELECT sentid, %s FROM subgraphs%d WHERE subgraphid=?" % (", ".join("v%d" % i for i in range(1, length + 1)), length)
     for row in c.execute(query, (subgraphid,)):
-        pass
-
+        sentid = row[0]
+        positions = row[1:]
+        if sentid not in candidates:
+            candidates[sentid] = [set() for _ in range(length)]
+        for j, pos in enumerate(positions):
+            i = mapping[order[j]]
+            candidates[sentid][i].add(pos)
+    return candidates

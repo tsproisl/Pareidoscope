@@ -52,7 +52,7 @@ def subsumes(query_graph, target_graph):
     return subsumes_nx(qg, tg)
 
 
-def subsumes_nx(query_graph, target_graph):
+def subsumes_nx(query_graph, target_graph, vertice_candidates=None):
     """Return whether the query_graph subsumes the target graph.
     
     Arguments:
@@ -65,8 +65,9 @@ def subsumes_nx(query_graph, target_graph):
         return False
     if qg.number_of_edges() > tg.number_of_edges():
         return False
-    vc = nx_graph.get_vertice_candidates(qg, tg)
-    return match_yes_no(qg, tg, vc, 0)
+    if vertice_candidates is None:
+        vertice_candidates = nx_graph.get_vertice_candidates(qg, tg)
+    return match_yes_no(qg, tg, vertice_candidates, 0)
 
 
 def get_bfo(target_graph):

@@ -1,7 +1,10 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+import json
 import operator
+
+from networkx.readwrite import json_graph
 
 from pareidoscope.utils import nx_graph
 from pareidoscope import subgraph_enumeration
@@ -22,7 +25,7 @@ def matches(query_graph, isomorphism, target_graph):
     return vertice_match and edge_match
 
 
-def isomorphisms(go11, gr1, gc1, gn, gs):
+def isomorphisms(go11, gr1, gc1, gn, gs, candidates=None):
     """Count isomorphisms
     
     Arguments:
@@ -31,13 +34,15 @@ def isomorphisms(go11, gr1, gc1, gn, gs):
     - `gc1`:
     - `gn`:
     - `gs`:
+    - `candidates`:
+
     """
     iso_ct = {x: 0 for x in ["o11", "r1", "c1", "n"]}
     # dmatch = lambda g1, g2: nx_graph.dictionary_match(g2, g1)
     # dgm = networkx.algorithms.isomorphism.DiGraphMatcher(gs, gn, dmatch, dmatch)
     # for iso in dgm.subgraph_isomorphisms_iter():
     #     isomorphism = tuple([x[0] for x in sorted(iso.iteritems(), key=operator.itemgetter(1))])
-    for isomorphism in subgraph_isomorphism.get_subgraph_isomorphisms_nx(gn, gs):
+    for isomorphism in subgraph_isomorphism.get_subgraph_isomorphisms_nx(gn, gs, vertice_candidates=candidates):
         iso_ct["n"] += 1
         if matches(go11, isomorphism, gs):
             iso_ct["o11"] += 1
@@ -48,7 +53,7 @@ def isomorphisms(go11, gr1, gc1, gn, gs):
     return iso_ct
 
 
-def subgraphs(go11, ga, gb, gr1, gc1, gn, gs):
+def subgraphs(go11, ga, gb, gr1, gc1, gn, gs, candidates=None):
     """Count subgraphs
     
     Arguments:
@@ -57,11 +62,13 @@ def subgraphs(go11, ga, gb, gr1, gc1, gn, gs):
     - `gc1`:
     - `gn`:
     - `gs`:
+    - `candidates`:
+
     """
     ct = {x: 0 for x in ["o11", "r1", "c1", "n"]}
     bn_large = {x: 0 for x in ["o11", "r1", "c1", "n", "a", "b", "r1+c1"]}
     bn_small = {x: 0 for x in ["o11", "n", "a", "b", "a+b"]}
-    for subgraph in subgraph_enumeration.get_subgraphs_nx(gn, gs):
+    for subgraph in subgraph_enumeration.get_subgraphs_nx(gn, gs, vertice_candidates=candidates):
         ct["n"] += 1
         bn_large["n"] += 1
         bn_small["n"] += 1
@@ -127,7 +134,7 @@ def subgraphs(go11, ga, gb, gr1, gc1, gn, gs):
     return ct, bn_large, bn_small
 
 
-def sentences(go11, ga, gb, gr1, gc1, gn, gs):
+def sentences(go11, ga, gb, gr1, gc1, gn, gs, candidates=None):
     """Count sentences
     
     Arguments:
@@ -138,15 +145,30 @@ def sentences(go11, ga, gb, gr1, gc1, gn, gs):
     - `gc1`:
     - `gn`:
     - `gs`:
+    - `candidates`:
+
     """
     bn_large = {x: 0 for x in ["size", "o11", "r1", "c1", "n", "a", "b", "r1+c1", "a+n", "b+n"]}
     bn_small = {x: 0 for x in ["size", "o11", "n", "a", "b", "a+b+n"]}
-    subsumed_by_o11 = subgraph_enumeration.subsumes_nx(go11, gs)
-    subsumed_by_r1 = subgraph_enumeration.subsumes_nx(gr1, gs)
-    subsumed_by_c1 = subgraph_enumeration.subsumes_nx(gc1, gs)
-    subsumed_by_n = subgraph_enumeration.subsumes_nx(gn, gs)
-    subsumed_by_a = subgraph_enumeration.subsumes_nx(ga, gs)
-    subsumed_by_b = subgraph_enumeration.subsumes_nx(gb, gs)
+    subsumed_by_o11, subsumed_by_r1, subsumed_by_c1, subsumed_by_a, subsumed_by_b, subsumed_by_n = None, None, None, None, None, None
+    subsumed_by_n = subgraph_enumeration.subsumes_nx(gn, gs, vertice_candidates=candidates)
+    if subsumed_by_n:
+        subsumed_by_o11 = subgraph_enumeration.subsumes_nx(go11, gs)
+        if subsumed_by_o11:
+            subsumed_by_r1, subsumed_by_c1, subsumed_by_a, subsumed_by_b = True, True, True, True
+        else:
+            subsumed_by_r1 = subgraph_enumeration.subsumes_nx(gr1, gs)
+            if subsumed_by_r1:
+                subsumed_by_a = True
+            else:
+                subsumed_by_a = subgraph_enumeration.subsumes_nx(ga, gs)
+            subsumed_by_c1 = subgraph_enumeration.subsumes_nx(gc1, gs)
+            if subsumed_by_c1:
+                subsumed_by_b = True
+            else:
+                subsumed_by_b = subgraph_enumeration.subsumes_nx(gb, gs)
+    else:
+        subsumed_by_o11, subsumed_by_r1, subsumed_by_c1, subsumed_by_a, subsumed_by_b = False, False, False, False, False
     bn_large["size"] += 1
     bn_small["size"] += 1
     if subsumed_by_o11:
@@ -181,9 +203,7 @@ def run_queries(args):
     output_queue.
     
     Arguments:
-    - `input_queue`:
-    - `output_queue`:
-    - `queries`:
+    - `args`:
     """
     sentence, queries = args
     result = []
@@ -204,6 +224,29 @@ def run_queries(args):
     return result
 
 
+def run_queries_db(args):
+    """Run queries on graphs from input_queue and write output to
+    output_queue.
+    
+    Arguments:
+    - `args`:
+    """
+    go11, ga, gb, gr1, gc1, gn, sentence, candidates = args
+    gs = json_graph.node_link_graph(json.loads(sentence))
+    # isomorphisms
+    iso_ct = isomorphisms(go11, gr1, gc1, gn, gs, candidates)
+    # subgraphs (contingency table, large bayesian network,
+    # small bayesian network)
+    sub_ct, sub_bnl, sub_bns = subgraphs(go11, ga, gb, gr1, gc1, gn, gs, candidates)
+    # sentences (large bayesian network, small bayesian
+    # network)
+    sent_bnl, sent_bns = sentences(go11, ga, gb, gr1, gc1, gn, gs, candidates)
+    # we could also append gziped JSON strings if full data
+    # structures need too much memory
+    result = {"iso_ct": iso_ct, "sub_ct": sub_ct, "sub_bnl": sub_bnl, "sub_bns": sub_bns, "sent_bnl": sent_bnl, "sent_bns": sent_bns}
+    return result
+
+
 def merge_result(result, results):
     """Merge result with results
     
@@ -217,3 +260,18 @@ def merge_result(result, results):
                 results[i][method] = {}
             for frequency in query[method]:
                 results[i][method][frequency] = results[i][method].get(frequency, 0) + query[method][frequency]
+
+
+def merge_result_db(result, query_number, results):
+    """Merge result with results
+    
+    Arguments:
+    - `query`:
+    - `query_number`:
+    - `results`:
+    """
+    for method in result:
+        if method not in results[query_number]:
+            results[query_number][method] = {}
+        for frequency in result[method]:
+            results[query_number][method][frequency] = results[query_number][method].get(frequency, 0) + result[method][frequency]
