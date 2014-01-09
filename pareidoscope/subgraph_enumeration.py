@@ -78,7 +78,16 @@ def get_bfo(target_graph):
     - `target_graph`:
     """
     graph = networkx.DiGraph()
-    root = [v[0] for v in target_graph.nodes(data = True) if "root" in v[1]][0]
+    root = None
+    try:
+        root = [v[0] for v in target_graph.nodes(data = True) if "root" in v[1]][0]
+    except IndexError:
+        all_vertices = set(target_graph.nodes())
+        roots = [v for v in target_graph.nodes() if all([networkx.has_path(nx_graph, v, u) for u in all_vertices - set([v])])]
+        if roots:
+            root = roots[0]
+        else:
+            raise Exception("No root found")
     raw_to_bfo = {root: 0}
     bfo_to_raw = {0: root}
     graph.add_node(0, target_graph.node[root])
