@@ -83,7 +83,7 @@ def get_bfo(target_graph, fragment=False):
     roots = [v[0] for v in target_graph.nodes(data = True) if "root" in v[1]]
     if len(roots) == 0 and fragment:
         all_vertices = set(target_graph.nodes())
-        roots = [v for v in target_graph.nodes() if all([networkx.has_path(nx_graph, v, u) for u in all_vertices - set([v])])]
+        roots = [v for v in target_graph.nodes() if all([networkx.has_path(target_graph, v, u) for u in all_vertices - set([v])])]
     root = roots[0]
     raw_to_bfo = {root: 0}
     bfo_to_raw = {0: root}
