@@ -95,7 +95,8 @@ if __name__ == "__main__":
     parser.add_argument("DB", type=os.path.abspath, help="SQLite3 database")
     args = parser.parse_args()
 
-    groupsize = 50 * 10 * multiprocessing.cpu_count()
+    # groupsize = 50 * 10 * multiprocessing.cpu_count()
+    groupsize = 100
     conn, c = connect_to_db(args.DB)
     pool = multiprocessing.Pool(processes = multiprocessing.cpu_count())
     sent_count = c.execute("SELECT count(*) FROM sentences").fetchone()[0]
@@ -119,7 +120,7 @@ if __name__ == "__main__":
         sentences = c.execute("SELECT sentid, graph FROM sentences LIMIT ? OFFSET ?", (groupsize, offset)).fetchall()
         logging.info("process sentences %d to %d", offset+1, offset+len(sentences))
         arguments = itertools.izip(sentences, itertools.repeat(vertice_whitelist), itertools.repeat(edge_whitelist), itertools.repeat(args.min_subgraph), itertools.repeat(args.max_subgraph))
-        if offset < 24000:
+        if offset < 36000:
             continue
         # r = pool.imap(get_subgraphs, arguments, 10)
         r = map(get_subgraphs, arguments)
