@@ -77,7 +77,9 @@ def get_bfo(target_graph, fragment=False):
     Arguments:
     - `target_graph`:
     - `fragment`: is target graph a fragment?
-
+    
+    Raises:
+    - IndexError: No root vertice has been found
     """
     graph = networkx.DiGraph()
     roots = [v[0] for v in target_graph.nodes(data = True) if "root" in v[1]]
