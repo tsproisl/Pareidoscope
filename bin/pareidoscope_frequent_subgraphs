@@ -124,8 +124,6 @@ if __name__ == "__main__":
         sentences = c.execute("SELECT sentid, graph FROM sentences LIMIT ? OFFSET ?", (groupsize, offset)).fetchall()
         logging.info("process sentences %d to %d", offset+1, offset+len(sentences))
         arguments = itertools.izip(sentences, itertools.repeat(vertice_whitelist), itertools.repeat(edge_whitelist), itertools.repeat(args.min_subgraph), itertools.repeat(args.max_subgraph))
-        if offset < 46900:
-            continue
         r = pool.imap_unordered(get_subgraphs, arguments, 10)
         # r = map(get_subgraphs, arguments)
         for sgs in r:
