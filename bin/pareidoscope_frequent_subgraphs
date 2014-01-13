@@ -79,7 +79,11 @@ def get_subgraphs(args):
     for comp in networkx.weakly_connected_components(gs):
         if comp.__len__() < min_vertices:
             continue
-        bfo_graph, bfo_to_raw = subgraph_enumeration.get_bfo(gs, fragment=True)
+        bfo_graph, bfo_to_raw = None, None
+        try:
+            bfo_graph, bfo_to_raw = subgraph_enumeration.get_bfo(gs, fragment=True)
+        except IndexError:
+            continue
         for subgraph in subgraph_enumeration.enumerate_csg_minmax(bfo_graph, bfo_to_raw, min_vertices=min_vertices, max_vertices=max_vertices):
             subgraph = nx_graph.canonize(subgraph)
             result.append(json.dumps(json_graph.node_link_data(subgraph)))
@@ -92,11 +96,11 @@ if __name__ == "__main__":
     parser.add_argument("--min-subgraph", type=int, help="Minimum subgraph size (default: 2 vertices)", default=2, metavar="N")
     parser.add_argument("--max-subgraph", type=int, help="Maximum subgraph size (default: 5 vertices)", default=5, metavar="N")
     parser.add_argument("-s", "--support", type=int, help="Minimum support (default: 50 sentences)", default=50, metavar="N")
+    parser.add_argument("-o", "--outfile", type=argparse.FileType("w"), required=True, help="Output file (JSON)")
     parser.add_argument("DB", type=os.path.abspath, help="SQLite3 database")
     args = parser.parse_args()
 
-    # groupsize = 50 * 10 * multiprocessing.cpu_count()
-    groupsize = 100
+    groupsize = 50 * 10 * multiprocessing.cpu_count()
     conn, c = connect_to_db(args.DB)
     pool = multiprocessing.Pool(processes = multiprocessing.cpu_count())
     sent_count = c.execute("SELECT count(*) FROM sentences").fetchone()[0]
@@ -122,9 +126,8 @@ if __name__ == "__main__":
         arguments = itertools.izip(sentences, itertools.repeat(vertice_whitelist), itertools.repeat(edge_whitelist), itertools.repeat(args.min_subgraph), itertools.repeat(args.max_subgraph))
         if offset < 46900:
             continue
-        # r = pool.imap(get_subgraphs, arguments, 10)
-        r = map(get_subgraphs, arguments)
+        r = pool.imap_unordered(get_subgraphs, arguments, 10)
+        # r = map(get_subgraphs, arguments)
         for sgs in r:
             for sg in sgs: subgraphs[sg] += 1
-    with open("test.json", mode="w") as fh:
-        json.dump(subgraphs, fh)
+    json.dump(subgraphs, args.outfile)
