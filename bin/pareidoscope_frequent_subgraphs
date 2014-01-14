@@ -76,12 +76,12 @@ def get_subgraphs(args):
     for s, t, l in gs.edges(data=True):
         if l["relation"] not in edge_whitelist:
             gs.remove_edge(s, t)
-    for comp in networkx.weakly_connected_components(gs):
+    for comp in networkx.weakly_connected_component_subgraphs(gs):
         if comp.__len__() < min_vertices:
             continue
         bfo_graph, bfo_to_raw = None, None
         try:
-            bfo_graph, bfo_to_raw = subgraph_enumeration.get_bfo(gs, fragment=True)
+            bfo_graph, bfo_to_raw = subgraph_enumeration.get_bfo(comp, fragment=True)
         except IndexError:
             continue
         for subgraph in subgraph_enumeration.enumerate_csg_minmax(bfo_graph, bfo_to_raw, min_vertices=min_vertices, max_vertices=max_vertices):
