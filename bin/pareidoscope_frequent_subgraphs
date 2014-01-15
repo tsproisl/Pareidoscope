@@ -123,6 +123,7 @@ if __name__ == "__main__":
     subgraphs = collections.Counter()
     logging.info("find subgraphs with support >= %d" % args.support)
     sent_count = c.execute("SELECT count(*) FROM sentences INNER JOIN tokens USING (sentid) INNER JOIN types USING (typeid) WHERE types.lemma=?", (args.lemmafilter, )).fetchone()[0]
+    logging.info("%d sentences containing %s" % (sent_count, args.lemmafilter)
     for offset in xrange(0, sent_count, groupsize):
         sentences = c.execute("SELECT DISTINCT sentid, graph FROM sentences INNER JOIN tokens USING (sentid) INNER JOIN types USING (typeid) WHERE types.lemma=? LIMIT ? OFFSET ?", (args.lemmafilter, groupsize, offset)).fetchall()
         logging.info("process sentences %d to %d", offset+1, offset+len(sentences))
