@@ -199,7 +199,7 @@ if __name__ == "__main__":
     #         for sg in sgs: subgraphs[sg] += 1
     sent_count = c.execute("SELECT count(*) FROM sentences INNER JOIN tokens USING (sentid) INNER JOIN types USING (typeid) WHERE types.word=?", (args.wordfilter, )).fetchone()[0]
     for offset in xrange(0, sent_count, groupsize):
-        sentences = c.execute("SELECT DISTINCT(sentid, graph) FROM sentences INNER JOIN tokens USING (sentid) INNER JOIN types USING (typeid) WHERE types.word=? LIMIT ? OFFSET ?", (args.wordfilter, groupsize, offset)).fetchall()
+        sentences = c.execute("SELECT DISTINCT sentid, graph FROM sentences INNER JOIN tokens USING (sentid) INNER JOIN types USING (typeid) WHERE types.word=? LIMIT ? OFFSET ?", (args.wordfilter, groupsize, offset)).fetchall()
         logging.info("process sentences %d to %d", offset+1, offset+len(sentences))
         arguments = itertools.izip(sentences, itertools.repeat(args.wordfilter), itertools.repeat(word_whitelist), itertools.repeat(edge_whitelist), itertools.repeat(args.min_subgraph), itertools.repeat(args.max_subgraph))
         r = pool.imap_unordered(get_filtered_subgraphs, arguments, 10)
