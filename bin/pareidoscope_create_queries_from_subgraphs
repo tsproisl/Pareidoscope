@@ -27,6 +27,7 @@ def underspecify(graph, probability):
 
     """
     for v in graph.nodes():
+        graph.node[v].pop("root", "")
         if random.random() < probability:
             graph.node[v]["word"] = ".+"
             graph.node[v]["pos"] = ".+"
