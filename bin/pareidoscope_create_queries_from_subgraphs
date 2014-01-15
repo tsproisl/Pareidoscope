@@ -7,12 +7,28 @@ import itertools
 import json
 import operator
 import os
+import random
 import sys
+
+from networkx.readwrite import json_graph
 
 from pareidoscope.utils import nx_graph
 from pareidoscope.utils import random_trees
 from pareidoscope.utils import cwb
 
+
+def underspecify(graph, probability):
+    """
+    """
+    for v in graph.nodes():
+        if random.random() < probability:
+            graph.node[v]["word"] = ".+"
+            graph.node[v]["pos"] = ".+"
+            graph.node[v]["lemma"] = ".+"
+            graph.node[v]["wc"] = ".+"
+    for s, t in graph.edges():
+        if random.random() < probability:
+            graph.edge[s][t]["relation"] = ".+"
 
 
 
@@ -24,9 +40,10 @@ if __name__ == "__main__":
     parser.add_argument("SUBGRAPHS", type=argparse.FileType("r"), help="Frequent subgraphs file (JSON)")
     args = parser.parse_args()
     
-    vertice_dist, edge_dist = get_distributions(args.corpus, args.vocabulary, args.relations)
-    for i in range(args.QUERIES):
-        length = random_trees.get_length("uniform", 0, 0, args.min_length, args.max_length)
-        tree = random_trees.get_random_tree(length, vertice_dist, edge_dist, "zipf", 10, True, args.underspec)
-        a, b, r1, c1, n = random_trees.split_tree(tree)
-        print "\t".join([json.dumps(nx_graph.export_to_adjacency_matrix(x)) for x in [tree, a, b, r1, c1, n]])
+    subgraphs = json.load(args.SUBGRAPHS)
+    for subgraph in subgraphs:
+        sg = json_graph.node_link_graph(json.loads(subgraph))
+        underspecify(sg, args.underspec)
+        # a, b, r1, c1, n = random_trees.split_tree(tree)
+        # args.outfile.write("\t".join([json.dumps(nx_graph.export_to_adjacency_matrix(x)) for x in [subgraph, a, b, r1, c1, n]]) + "\n")
+        print json.dumps(json_graph.node_link_data(sg))
