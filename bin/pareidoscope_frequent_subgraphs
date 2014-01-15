@@ -110,7 +110,7 @@ if __name__ == "__main__":
     for offset in xrange(0, sent_count, groupsize):
         sentences = c.execute("SELECT sentid, graph FROM sentences LIMIT ? OFFSET ?", (groupsize, offset)).fetchall()
         logging.info("process sentences %d to %d", offset+1, offset+len(sentences))
-        r = pool.imap_unordered(get_words_and_edges, sentences, 10)
+        r = pool.imap_unordered(get_lemmata_and_edges, sentences, 10)
         # r = map(get_vertices_and_edges, sentences)
         for ls, es in r:
             for l in ls: lemmata[l] += 1
