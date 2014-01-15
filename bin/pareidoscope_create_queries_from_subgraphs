@@ -12,3 +12,21 @@ import sys
 from pareidoscope.utils import nx_graph
 from pareidoscope.utils import random_trees
 from pareidoscope.utils import cwb
+
+
+
+
+if __name__ == "__main__":
+    description = "Create queries based on frequent subgraphs (extracted with pareidoscope_frequent_subgraphs)."
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument("--underspec", help="Probability for a vertice or edge to be underspecified, i.e. to be labeled '.+'; default: 0.0", type=float, default=0.0, metavar="R")
+    parser.add_argument("-o", "--outfile", type=argparse.FileType("w"), required=True, help="Output file")
+    parser.add_argument("SUBGRAPHS", type=argparse.FileType("r"), help="Frequent subgraphs file (JSON)")
+    args = parser.parse_args()
+    
+    vertice_dist, edge_dist = get_distributions(args.corpus, args.vocabulary, args.relations)
+    for i in range(args.QUERIES):
+        length = random_trees.get_length("uniform", 0, 0, args.min_length, args.max_length)
+        tree = random_trees.get_random_tree(length, vertice_dist, edge_dist, "zipf", 10, True, args.underspec)
+        a, b, r1, c1, n = random_trees.split_tree(tree)
+        print "\t".join([json.dumps(nx_graph.export_to_adjacency_matrix(x)) for x in [tree, a, b, r1, c1, n]])
