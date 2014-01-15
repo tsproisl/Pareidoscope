@@ -10,6 +10,7 @@ import os
 import random
 import sys
 
+import networkx
 from networkx.readwrite import json_graph
 
 from pareidoscope.utils import nx_graph
@@ -54,7 +55,7 @@ def split_graph(graph):
         b_vertices = all_vertices_set - a_vertices
         a = graph.subgraph(a_vertices)
         b = graph.subgraph(b_vertices)
-        both_connected = nx_graph.is_weakly_connected(a) and nx_graph.is_weakly_connected(b)
+        both_connected = networkx.is_weakly_connected(a) and networkx.is_weakly_connected(b)
     for s, t, l in graph.edges(data=True):
         if (not a.has_edge(s, t)) and (not b.has_edge(s, t)):
             if random.choice(["a", "b"]) == "a":
@@ -66,16 +67,19 @@ def split_graph(graph):
     n = graph.copy()
     for vertice in n.nodes():
         n.node[vertice]["word"] = ".+"
+        n.node[vertice]["pos"] = ".+"
+        n.node[vertice]["lemma"] = ".+"
+        n.node[vertice]["wc"] = ".+"
     for s, t in n.edges():
         n.edge[s][t]["relation"] = ".+"
     r1 = n.copy()
     for vertice in a.nodes():
-        r1.node[vertice]["word"] = a.node[vertice]["word"]
+        r1.node[vertice] = a.node[vertice]
     for s, t in a.edges():
         r1.edge[s][t]["relation"] = a.edge[s][t]["relation"]
     c1 = n.copy()
     for vertice in b.nodes():
-        c1.node[vertice]["word"] = b.node[vertice]["word"]
+        c1.node[vertice] = b.node[vertice]
     for s, t in b.edges():
         c1.edge[s][t]["relation"] = b.edge[s][t]["relation"]
     return a, b, r1, c1, n
