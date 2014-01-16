@@ -4,6 +4,7 @@
 import argparse
 import itertools
 import json
+import logging
 import math
 import multiprocessing
 import os
@@ -19,6 +20,8 @@ from pareidoscope.utils import cwb
 from pareidoscope.utils import database
 from pareidoscope.utils import helper
 from pareidoscope.utils import nx_graph
+
+logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=logging.INFO)
 
 
 def read_queries(queries_file):
@@ -115,21 +118,29 @@ if __name__ == "__main__":
     
     groupsize = 5 * 10 * multiprocessing.cpu_count()
     pool = multiprocessing.Pool(processes = multiprocessing.cpu_count())
+    logging.info("connect to database '%s'" % args.db)
     conn = sqlite3.connect(args.db)
     c = conn.cursor()
     c.execute("PRAGMA cache_size=100000")
     subgraphs = check_tables(c)
     conn.create_function("REGEXP", 2, database.regexp)
+    logging.info("read query file '%s'", args.QUERIES)
     queries = read_queries(args.QUERIES)
     results = [{} for q in queries]
+    logging.info("%d queries", len(queries))
     for query_number, qline in enumerate(queries):
+        logging.info("process query %d", query_number)
         go11, ga, gb, gr1, gc1, gn = qline
         candidates = None
         if nx_graph.is_purely_structural(gn) and subgraphs:
+            logging.info("get structure candidates")
             candidates = database.get_structure_candidates(c, gn)
         else:
+            logging.info("get candidates")
             candidates = database.get_candidates(c, gn)
+        logging.info("%d candidate sentences", len(candidates))
         for sentids in helper.grouper_nofill(groupsize, candidates):
+            logging.info("process %d sentences", len(sentids))
             q = "SELECT graph FROM sentences WHERE sentid=?"
             sentences = [c.execute(q, (sentid,)).fetchone()[0] for sentid in sentids]
             cands = [candidates[sentid] for sentid in sentids]
@@ -138,4 +149,5 @@ if __name__ == "__main__":
             # r = map(query.run_queries_db, args)
             for result in r:
                 query.merge_result_db(result, query_number, results)
+    logging.info("write results")
     write_results(args.output, results)
