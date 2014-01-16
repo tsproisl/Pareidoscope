@@ -116,7 +116,7 @@ if __name__ == "__main__":
     parser.add_argument("QUERIES", type=argparse.FileType("r"), help="Queries for O11, A, B, R1, C1 and N")
     args = parser.parse_args()
     
-    groupsize = 5 * 10 * multiprocessing.cpu_count()
+    groupsize = 5 * 100 * multiprocessing.cpu_count()
     pool = multiprocessing.Pool(processes = multiprocessing.cpu_count())
     logging.info("connect to database '%s'" % args.db)
     conn = sqlite3.connect(args.db)
@@ -124,12 +124,12 @@ if __name__ == "__main__":
     c.execute("PRAGMA cache_size=100000")
     subgraphs = check_tables(c)
     conn.create_function("REGEXP", 2, database.regexp)
-    logging.info("read query file '%s'", args.QUERIES)
+    logging.info("read query file")
     queries = read_queries(args.QUERIES)
     results = [{} for q in queries]
     logging.info("%d queries", len(queries))
     for query_number, qline in enumerate(queries):
-        logging.info("process query %d", query_number)
+        logging.info("process query %d", query_number+1)
         go11, ga, gb, gr1, gc1, gn = qline
         candidates = None
         if nx_graph.is_purely_structural(gn) and subgraphs:
