@@ -208,20 +208,22 @@ def run_queries(args):
     sentence, queries = args
     result = []
     gs = nx_graph.create_nx_digraph_from_cwb(sentence)
-    for qline in queries:
-        go11, ga, gb, gr1, gc1, gn = qline
-        # isomorphisms
-        iso_ct = isomorphisms(go11, gr1, gc1, gn, gs)
-        # subgraphs (contingency table, large bayesian network,
-        # small bayesian network)
-        sub_ct, sub_bnl, sub_bns = subgraphs(go11, ga, gb, gr1, gc1, gn, gs)
-        # sentences (large bayesian network, small bayesian
-        # network)
-        sent_bnl, sent_bns = sentences(go11, ga, gb, gr1, gc1, gn, gs)
-        # we could also append gziped JSON strings if full data
-        # structures need too much memory
-        result.append({"iso_ct": iso_ct, "sub_ct": sub_ct, "sub_bnl": sub_bnl, "sub_bns": sub_bns, "sent_bnl": sent_bnl, "sent_bns": sent_bns})
-    return result
+    sensible = nx_graph.is_sensible_graph(gs)
+    if sensible:
+        for qline in queries:
+            go11, ga, gb, gr1, gc1, gn = qline
+            # isomorphisms
+            iso_ct = isomorphisms(go11, gr1, gc1, gn, gs)
+            # subgraphs (contingency table, large bayesian network,
+            # small bayesian network)
+            sub_ct, sub_bnl, sub_bns = subgraphs(go11, ga, gb, gr1, gc1, gn, gs)
+            # sentences (large bayesian network, small bayesian
+            # network)
+            sent_bnl, sent_bns = sentences(go11, ga, gb, gr1, gc1, gn, gs)
+            # we could also append gziped JSON strings if full data
+            # structures need too much memory
+            result.append({"iso_ct": iso_ct, "sub_ct": sub_ct, "sub_bnl": sub_bnl, "sub_bns": sub_bns, "sent_bnl": sent_bnl, "sent_bns": sent_bns})
+    return result, sensible
 
 
 def run_queries_db(args):

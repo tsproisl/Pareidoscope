@@ -70,8 +70,9 @@ def run_queries(input_queue, output_queue):
             job = input_queue.get(block=True, timeout=5)
             sentences, queries = job
             for sentence in sentences:
-                result = pareidoscope.query.run_query((sentence, queries))
-                results.append(result)
+                result, sensible = pareidoscope.query.run_query((sentence, queries))
+                if sensible:
+                    results.append(result)
             output_queue.put(results)
         except Queue.Empty:
             return
