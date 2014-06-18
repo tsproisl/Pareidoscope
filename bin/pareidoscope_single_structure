@@ -1,0 +1,42 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+import argparse
+import itertools
+import json
+import math
+import multiprocessing
+import os
+import subprocess
+import sys
+
+import pareidoscope.frequency
+import pareidoscope.query
+from pareidoscope.utils import cwb
+from pareidoscope.utils import helper
+from pareidoscope.utils import nx_graph
+
+
+
+if __name__ == "__main__":
+    os.nice(10)
+    parser = argparse.ArgumentParser(description='Get frequencies for a single linguistic structure')
+    parser.add_argument("-c", "--corpus", type=argparse.FileType("r"), required=True, help="Corpus in CWB format")
+    # parser.add_argument("-o", "--output", type=str, required=True, help="Output prefix")
+    parser.add_argument("QUERY", type=str, help="Query for a linguistic structure")
+    args = parser.parse_args()
+    
+    groupsize = 5 * 10 * multiprocessing.cpu_count()
+    print args.QUERY
+    query = nx_graph.create_nx_digraph(json.loads(args.QUERY.strip()))
+    results = {}
+    pool = multiprocessing.Pool(processes = multiprocessing.cpu_count())
+    sents = cwb.sentences_iter(args.corpus, return_id=True)
+    for sentences in helper.grouper_nofill(groupsize, sents):
+        r = pool.imap(pareidoscope.frequency.get_frequencies, itertools.izip(sentences, itertools.repeat(query)), 10)
+        # r = map(pareidoscope.frequency.get_frequencies, itertools.izip(sentences, itertools.repeat(query)))
+        for sid, result, sensible in r:
+            if sensible:
+                pareidoscope.frequency.merge_result(result, results)
+    # write_results(args.output, results)
+    print results
