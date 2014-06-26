@@ -24,11 +24,11 @@ def get_frequencies(args):
     sensible = nx_graph.is_sensible_graph(gs)
     candidates = None
     if sensible:
-        isomorphisms = sum(1 for _ in subgraph_isomorphism.get_subgraph_isomorphisms_nx(query, gs, vertice_candidates=candidates))
-        subgraphs = sum(1 for _ in subgraph_enumeration.get_subgraphs_nx(query, gs, vertice_candidates=candidates))
-        graphs = 0
+        isomorphisms, subgraphs, graphs = 0, 0, 0
         if subgraph_enumeration.subsumes_nx(query, gs, vertice_candidates=candidates):
             graphs = 1
+            isomorphisms = sum(1 for _ in subgraph_isomorphism.get_subgraph_isomorphisms_nx(query, gs, vertice_candidates=candidates))
+            subgraphs = sum(1 for _ in subgraph_enumeration.get_subgraphs_nx(query, gs, vertice_candidates=candidates))
         result = {"isomorphisms": isomorphisms, "subgraphs": subgraphs, "graphs": graphs}
     return sid, result, sensible
 
