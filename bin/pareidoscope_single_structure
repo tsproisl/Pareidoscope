@@ -10,6 +10,8 @@ import os
 import subprocess
 import sys
 
+import numpy as np
+
 import pareidoscope.frequency
 import pareidoscope.query
 from pareidoscope.utils import cwb
@@ -30,13 +32,21 @@ if __name__ == "__main__":
     print args.QUERY
     query = nx_graph.create_nx_digraph(json.loads(args.QUERY.strip()))
     results = {}
+    isomorphisms = []
+    subgraphs = []
     pool = multiprocessing.Pool(processes = multiprocessing.cpu_count())
     sents = cwb.sentences_iter(args.corpus, return_id=True)
     for sentences in helper.grouper_nofill(groupsize, sents):
-        r = pool.imap(pareidoscope.frequency.get_frequencies, itertools.izip(sentences, itertools.repeat(query)), 10)
+        r = pool.imap(pareidoscope.frequency.get_frequencies, itertools.izip(sentences, itertools.repeat(query)), chunksize=10)
         # r = map(pareidoscope.frequency.get_frequencies, itertools.izip(sentences, itertools.repeat(query)))
         for sid, result, sensible in r:
-            if sensible:
+            if sensible and result["graphs"] > 0:
+                isomorphisms.append(result["isomorphisms"])
+                subgraphs.append(result["subgraphs"])
                 pareidoscope.frequency.merge_result(result, results)
     # write_results(args.output, results)
+    isomorphisms = np.array(isomorphisms)
+    subgraphs = np.array(subgraphs)
     print results
+    print np.histogram(isomorphisms, bins=helper.get_int_bins(np.nanmin(isomorphisms), np.nanmax(isomorphisms), 10))
+    print np.histogram(subgraphs, bins=helper.get_int_bins(np.nanmin(subgraphs), np.nanmax(subgraphs), 10))
