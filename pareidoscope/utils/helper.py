@@ -33,7 +33,11 @@ def get_int_bins(min_value, max_value, nr_of_bins=10):
         A list of bin edges.
 
     """
+    bin_edges = None
     if max_value <= min_value + nr_of_bins - 1:
-        return list(range(min_value, max_value + 2))
-    bin_size = int(math.ceil(float((max_value - min_value) + 1) / nr_of_bins))
-    return list(range(min_value, 1 + min_value + bin_size * nr_of_bins, bin_size))
+        bin_edges = list(range(min_value, max_value + 2))
+    else:
+        bin_size = int(math.ceil(float((max_value - min_value) + 1) / nr_of_bins))
+        bin_edges = list(range(min_value, 1 + min_value + bin_size * nr_of_bins, bin_size))
+    bin_edges[-1] = bin_edges[-1] - 1
+    return bin_edges
