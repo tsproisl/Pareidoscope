@@ -338,7 +338,7 @@ def canonical_order(nx_graph):
     vertices = nx_graph.nodes()
     vtuples = {v: _get_vertice_tuple(nx_graph, v) for v in vertices}
     roots = [v for v in vtuples if vtuples[v][0]]
-    antiroots = [v for v in vtuples if vtuples[v][0]]
+    antiroots = [v for v in vtuples if vtuples[v][1]]
     if len(roots) == 1:
         return _dfs(nx_graph, roots[0], vtuples, return_ids=True)
     if len(antiroots) == 1:
