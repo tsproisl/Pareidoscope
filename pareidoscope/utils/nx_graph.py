@@ -393,3 +393,25 @@ def skeletize_inplace(nx_graph):
         nx_graph.node[v] = {}
     for s, t in nx_graph.edges():
         nx_graph.edge[s][t] = {}
+
+
+def get_root_or_antiroot(nx_graph):
+    """Return one of the root or antiroot vertices if there are any.
+    
+    Arguments:
+        nx_graph:
+    
+    Returns:
+        The first root vertice in canonical order. If there aren't
+        any, the first antiroot vertice in canonical order. Else None.
+
+    """
+    vertices = canonical_order(nx_graph)
+    vtuples = {v: _get_vertice_tuple(nx_graph, v) for v in vertices}
+    roots = [v for v in vertices if vtuples[v][0]]
+    antiroots = [v for v in vertices if vtuples[v][1]]
+    if len(roots) >= 1:
+        return roots[0]
+    if len(antiroots) >= 1:
+        return antiroots[0]
+    return None
