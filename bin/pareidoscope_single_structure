@@ -35,6 +35,7 @@ if __name__ == "__main__":
     results = {}
     isomorphisms = []
     subgraphs = []
+    roots = []
     pool = multiprocessing.Pool(processes = multiprocessing.cpu_count())
     sents = cwb.sentences_iter(args.corpus, return_id=True)
     for sentences in helper.grouper_nofill(groupsize, sents):
@@ -44,6 +45,7 @@ if __name__ == "__main__":
             if sensible and result["graphs"] > 0:
                 isomorphisms.append(result["isomorphisms"])
                 subgraphs.append(result["subgraphs"])
+                roots.append(result["roots"])
                 pareidoscope.frequency.merge_result(result, results)
     # write_results(args.output, results)
     isomorphisms = np.array(isomorphisms)
