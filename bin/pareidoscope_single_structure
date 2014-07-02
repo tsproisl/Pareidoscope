@@ -31,14 +31,15 @@ if __name__ == "__main__":
     groupsize = 5 * 10 * multiprocessing.cpu_count()
     print args.QUERY
     query = nx_graph.create_nx_digraph(json.loads(args.QUERY.strip()))
+    root = nx_graph.get_root_or_antiroot(query)
     results = {}
     isomorphisms = []
     subgraphs = []
     pool = multiprocessing.Pool(processes = multiprocessing.cpu_count())
     sents = cwb.sentences_iter(args.corpus, return_id=True)
     for sentences in helper.grouper_nofill(groupsize, sents):
-        r = pool.imap(pareidoscope.frequency.get_frequencies, itertools.izip(sentences, itertools.repeat(query)), chunksize=10)
-        # r = map(pareidoscope.frequency.get_frequencies, itertools.izip(sentences, itertools.repeat(query)))
+        r = pool.imap(pareidoscope.frequency.get_frequencies, itertools.izip(sentences, itertools.repeat(query), itertools.repeat(root)), chunksize=10)
+        # r = map(pareidoscope.frequency.get_frequencies, itertools.izip(sentences, itertools.repeat(query), itertools.repeat(root)))
         for sid, result, sensible in r:
             if sensible and result["graphs"] > 0:
                 isomorphisms.append(result["isomorphisms"])
@@ -47,12 +48,17 @@ if __name__ == "__main__":
     # write_results(args.output, results)
     isomorphisms = np.array(isomorphisms)
     subgraphs = np.array(subgraphs)
+    roots = np.array(roots)
     iso_min = np.nanmin(isomorphisms)
     iso_max = np.nanmax(isomorphisms)
     sub_min = np.nanmin(subgraphs)
     sub_max = np.nanmax(subgraphs)
+    roots_min = np.nanmin(roots)
+    roots_max = np.nanmax(roots)
     print results
     print "Isomorphisms: min %d, max %d, median %d" % (iso_min, iso_max, np.median(isomorphisms))
     print np.histogram(isomorphisms, bins=helper.get_int_bins(iso_min, iso_max, 10))
     print "Subgraphs: min %d, max %d, median %d" % (sub_min, sub_max, np.median(subgraphs))
     print np.histogram(subgraphs, bins=helper.get_int_bins(sub_min, sub_max, 10))
+    print "Roots: min %d, max %d, median %d" % (roots_min, roots_max, np.median(roots))
+    print np.histogram(roots, bins=helper.get_int_bins(roots_min, roots_max, 10))
