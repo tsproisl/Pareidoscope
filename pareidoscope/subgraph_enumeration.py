@@ -1,6 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+import copy
 import itertools
 
 import networkx
@@ -68,6 +69,28 @@ def subsumes_nx(query_graph, target_graph, vertice_candidates=None):
     if vertice_candidates is None:
         vertice_candidates = nx_graph.get_vertice_candidates(qg, tg)
     return match_yes_no(qg, tg, vertice_candidates, 0)
+
+
+def get_root_matches(query_graph, target_graph, root):
+    """Return the vertices from target that match the root or antiroot
+    vertice from query.
+    
+    Arguments:
+        query_graph:
+        target_graph:
+        root: Root or antiroot vertice in query_graph
+    
+    Returns:
+        Vertices from target_graph that correspond to the root or
+        antiroot vertice from query_graph.
+
+    """
+    vertice_candidates = nx_graph.get_vertice_candidates(query_graph, target_graph)
+    for root_candidate in vertice_candidates[root]:
+        local_candidates = copy.deepcopy(vertice_candidates)
+        local_candidates[root] = set([root_candidate])
+        if subsumes_nx(query_graph, target_graph, local_candidates):
+            yield root_candidate
 
 
 def get_bfo(target_graph, fragment=False):
