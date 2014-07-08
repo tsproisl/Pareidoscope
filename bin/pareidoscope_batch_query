@@ -27,6 +27,14 @@ def read_queries(queries_file):
     return queries
 
 
+def search_roots(queries):
+    """Search for root or antiroot vertices"""
+    # Attention: argument is being modified!
+    for qline in queries:
+        qline.append(nx_graph.get_root_or_antiroot(qline[0]))
+    return queries
+    
+
 def write_results(prefix, results):
     """Write results to files
     
@@ -44,39 +52,13 @@ def write_results(prefix, results):
                 e11 = 0
                 if s["o11"] == 0:
                     continue
-                if suffix in ["iso_ct", "sub_ct"]:
+                if suffix in ["iso_ct", "sub_ct", "root_ct", "sent_ct"]:
                     if any([s[x] == 0 for x in ["r1", "c1", "n"]]):
                         e11 = 0
                     else:
                         e11 = (s["r1"] * s["c1"]) / float(s["n"])
-                elif suffix == "sub_bnl":
-                    if any([s[x] == 0 for x in s.keys()]):
-                        e11 = 0
-                    else:
-                        # po11 = sum([math.log(x) for x in [s["a"]/float(s["n"]), s["b"]/float(s["n"]), s["r1"]/float(s["a"]), s["c1"]/float(s["b"]), s["o11"]/float(s["r1+c1"])]])
-                        po11 = sum([math.log(x) for x in [s["a"]/float(s["n"]), s["b"]/float(s["n"]), s["r1"]/float(s["a"]), s["c1"]/float(s["b"])]])
-                        e11 = (math.e ** po11) * s["n"]
-                elif suffix == "sub_bns":
-                    if any([s[x] == 0 for x in s.keys()]):
-                        e11 = 0
-                    else:
-                        # po11 = sum([math.log(x) for x in [s["a"]/float(s["n"]), s["b"]/float(s["n"]), s["o11"]/float(s["a+b"])]])
-                        po11 = sum([math.log(x) for x in [s["a"]/float(s["n"]), s["b"]/float(s["n"])]])
-                        e11 = (math.e ** po11) * s["n"]
-                elif suffix == "sent_bnl":
-                    if any([s[x] == 0 for x in s.keys()]):
-                        e11 = 0
-                    else:
-                        # po11 = sum([math.log(x) for x in [s["a"]/float(s["size"]), s["n"]/float(s["size"]), s["b"]/float(s["size"]), s["r1"]/float(s["a+n"]), s["c1"]/float(s["b+n"]), s["o11"]/float(s["r1+c1"])]])
-                        po11 = sum([math.log(x) for x in [s["a"]/float(s["size"]), s["n"]/float(s["size"]), s["b"]/float(s["size"]), s["r1"]/float(s["a+n"]), s["c1"]/float(s["b+n"])]])
-                        e11 = (math.e ** po11) * s["size"]
-                elif suffix == "sent_bns":
-                    if any([s[x] == 0 for x in s.keys()]):
-                        e11 = 0
-                    else:
-                        # po11 = sum([math.log(x) for x in [s["a"]/float(s["size"]), s["n"]/float(s["size"]), s["b"]/float(s["size"]), s["o11"]/float(s["a+b+n"])]])
-                        po11 = sum([math.log(x) for x in [s["a"]/float(s["size"]), s["n"]/float(s["size"]), s["b"]/float(s["size"])]])
-                        e11 = (math.e ** po11) * s["size"]
+                else:
+                    pass
                 mi = math.log(s["o11"]/float(e11), 2)
                 fh.write("%d\t%f\n" % (i+1, mi))
         script_directory = os.path.abspath(os.path.dirname(sys.argv[0]))
@@ -97,6 +79,7 @@ if __name__ == "__main__":
     
     groupsize = 5 * 10 * multiprocessing.cpu_count()
     queries = read_queries(args.QUERIES)
+    queries = search_roots(queries)
     results = [{} for q in queries]
     pool = multiprocessing.Pool(processes = multiprocessing.cpu_count())
     sents = cwb.sentences_iter(args.corpus)
