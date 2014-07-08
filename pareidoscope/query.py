@@ -53,7 +53,7 @@ def isomorphisms(go11, gr1, gc1, gn, gs, candidates=None):
     return iso_ct
 
 
-def subgraphs(go11, ga, gb, gr1, gc1, gn, gs, candidates=None):
+def subgraphs(go11, gr1, gc1, gn, gs, candidates=None):
     """Count subgraphs
     
     Arguments:
@@ -66,81 +66,34 @@ def subgraphs(go11, ga, gb, gr1, gc1, gn, gs, candidates=None):
 
     """
     ct = {x: 0 for x in ["o11", "r1", "c1", "n"]}
-    bn_large = {x: 0 for x in ["o11", "r1", "c1", "n", "a", "b", "r1+c1"]}
-    bn_small = {x: 0 for x in ["o11", "n", "a", "b", "a+b"]}
     for subgraph in subgraph_enumeration.get_subgraphs_nx(gn, gs, vertice_candidates=candidates):
         ct["n"] += 1
-        bn_large["n"] += 1
-        bn_small["n"] += 1
-        subsumed_by_o11, subsumed_by_r1, subsumed_by_c1, subsumed_by_a, subsumed_by_b = None, None, None, None, None
-        # isomorphisms = list(subgraph_isomorphism.get_subgraph_isomorphisms_nx(gn, subgraph))
-        # subsumed_by_o11 = any([matches(go11, iso, subgraph) for iso in isomorphisms])
-        # if subsumed_by_o11:
-        #     subsumed_by_r1, subsumed_by_c1, subsumed_by_a, subsumed_by_b = True, True, True, True
-        # else:
-        #     subsumed_by_r1 = any([matches(gr1, iso, subgraph) for iso in isomorphisms])
-        #     if subsumed_by_r1:
-        #         subsumed_by_a = True
-        #     else:
-        #         subsumed_by_a = subgraph_enumeration.subsumes_nx(ga, subgraph)
-        #     subsumed_by_c1 = any([matches(gc1, iso, subgraph) for iso in isomorphisms])
-        #     if subsumed_by_c1:
-        #         subsumed_by_b = True
-        #     else:
-        #         subsumed_by_b = subgraph_enumeration.subsumes_nx(gb, subgraph)
+        subsumed_by_o11, subsumed_by_r1, subsumed_by_c1 = None, None, None
         subsumed_by_o11 = subgraph_enumeration.subsumes_nx(go11, subgraph)
         if subsumed_by_o11:
-            subsumed_by_r1, subsumed_by_c1, subsumed_by_a, subsumed_by_b = True, True, True, True
+            subsumed_by_r1, subsumed_by_c1 = True, True
         else:
             subsumed_by_r1 = subgraph_enumeration.subsumes_nx(gr1, subgraph)
-            if subsumed_by_r1:
-                subsumed_by_a = True
-            else:
-                subsumed_by_a = subgraph_enumeration.subsumes_nx(ga, subgraph)
             subsumed_by_c1 = subgraph_enumeration.subsumes_nx(gc1, subgraph)
-            if subsumed_by_c1:
-                subsumed_by_b = True
-            else:
-                subsumed_by_b = subgraph_enumeration.subsumes_nx(gb, subgraph)
         if subsumed_by_o11:
             ct["o11"] += 1
             ct["r1"] += 1
             ct["c1"] += 1
-            bn_large["o11"] += 1
-            bn_large["r1"] += 1
-            bn_large["c1"] += 1
-            bn_large["r1+c1"] += 1
-            bn_small["o11"] += 1
         if subsumed_by_r1 and subsumed_by_c1 and not subsumed_by_o11:
             ct["r1"] += 0.5
             ct["c1"] += 0.5
-            bn_large["r1"] += 1
-            bn_large["c1"] += 1
-            bn_large["r1+c1"] += 1
         if subsumed_by_r1 and not subsumed_by_c1:
             ct["r1"] += 1
-            bn_large["r1"] += 1
         if subsumed_by_c1 and not subsumed_by_r1:
             ct["c1"] += 1
-            bn_large["c1"] += 1
-        if subsumed_by_a:
-            bn_large["a"] += 1
-            bn_small["a"] += 1
-        if subsumed_by_b:
-            bn_large["b"] += 1
-            bn_small["b"] += 1
-        if subsumed_by_a and subsumed_by_b:
-            bn_small["a+b"] += 1
-    return ct, bn_large, bn_small
+    return ct
 
 
-def sentences(go11, ga, gb, gr1, gc1, gn, gs, candidates=None):
+def sentences(go11, gr1, gc1, gn, gs, candidates=None):
     """Count sentences
     
     Arguments:
     - `go11`:
-    - `ga`:
-    - `gb`:
     - `gr1`:
     - `gc1`:
     - `gn`:
@@ -148,54 +101,32 @@ def sentences(go11, ga, gb, gr1, gc1, gn, gs, candidates=None):
     - `candidates`:
 
     """
-    bn_large = {x: 0 for x in ["size", "o11", "r1", "c1", "n", "a", "b", "r1+c1", "a+n", "b+n"]}
-    bn_small = {x: 0 for x in ["size", "o11", "n", "a", "b", "a+b+n"]}
-    subsumed_by_o11, subsumed_by_r1, subsumed_by_c1, subsumed_by_a, subsumed_by_b, subsumed_by_n = None, None, None, None, None, None
+    ct = {x: 0 for x in ["o11", "r1", "c1", "n"]}
+    subsumed_by_o11, subsumed_by_r1, subsumed_by_c1, subsumed_by_n = None, None, None, None
     subsumed_by_n = subgraph_enumeration.subsumes_nx(gn, gs, vertice_candidates=candidates)
     if subsumed_by_n:
         subsumed_by_o11 = subgraph_enumeration.subsumes_nx(go11, gs)
         if subsumed_by_o11:
-            subsumed_by_r1, subsumed_by_c1, subsumed_by_a, subsumed_by_b = True, True, True, True
+            subsumed_by_r1, subsumed_by_c1 = True, True
         else:
             subsumed_by_r1 = subgraph_enumeration.subsumes_nx(gr1, gs)
-            if subsumed_by_r1:
-                subsumed_by_a = True
-            else:
-                subsumed_by_a = subgraph_enumeration.subsumes_nx(ga, gs)
             subsumed_by_c1 = subgraph_enumeration.subsumes_nx(gc1, gs)
-            if subsumed_by_c1:
-                subsumed_by_b = True
-            else:
-                subsumed_by_b = subgraph_enumeration.subsumes_nx(gb, gs)
     else:
-        subsumed_by_o11, subsumed_by_r1, subsumed_by_c1, subsumed_by_a, subsumed_by_b = False, False, False, False, False
-    bn_large["size"] += 1
-    bn_small["size"] += 1
-    if subsumed_by_o11:
-        bn_large["o11"] += 1
-        bn_small["o11"] += 1
-    if subsumed_by_a:
-        bn_large["a"] += 1
-        bn_small["a"] += 1
-    if subsumed_by_b:
-        bn_large["b"] += 1
-        bn_small["b"] += 1
+        subsumed_by_o11, subsumed_by_r1, subsumed_by_c1 = False, False, False
     if subsumed_by_n:
-        bn_large["n"] += 1
-        bn_small["n"] += 1
-    if subsumed_by_a and subsumed_by_b and subsumed_by_n:
-        bn_small["a+b+n"] += 1
-    if subsumed_by_a and subsumed_by_n:
-        bn_large["a+n"] += 1
-    if subsumed_by_b and subsumed_by_n:
-        bn_large["b+n"] += 1
-    if subsumed_by_r1:
-        bn_large["r1"] += 1
-    if subsumed_by_c1:
-        bn_large["c1"] += 1
-    if subsumed_by_r1 and subsumed_by_c1:
-        bn_large["r1+c1"] += 1
-    return bn_large, bn_small
+        ct["n"] += 1
+    if subsumed_by_o11:
+        ct["o11"] += 1
+        ct["r1"] += 1
+        ct["c1"] += 1
+    if subsumed_by_r1 and subsumed_by_c1 and not subsumed_by_o11:
+        ct["r1"] += 0.5
+        ct["c1"] += 0.5
+    if subsumed_by_r1 and not subsumed_by_c1:
+        ct["r1"] += 1
+    if subsumed_by_c1 and not subsumed_by_r1:
+        ct["c1"] += 1
+    return ct
 
 
 def run_queries(args):
@@ -211,18 +142,16 @@ def run_queries(args):
     sensible = nx_graph.is_sensible_graph(gs)
     if sensible:
         for qline in queries:
-            go11, ga, gb, gr1, gc1, gn = qline
+            go11, gr1, gc1, gn = qline
             # isomorphisms
             iso_ct = isomorphisms(go11, gr1, gc1, gn, gs)
-            # subgraphs (contingency table, large bayesian network,
-            # small bayesian network)
-            sub_ct, sub_bnl, sub_bns = subgraphs(go11, ga, gb, gr1, gc1, gn, gs)
-            # sentences (large bayesian network, small bayesian
-            # network)
-            sent_bnl, sent_bns = sentences(go11, ga, gb, gr1, gc1, gn, gs)
+            # subgraphs (contingency table)
+            sub_ct = subgraphs(go11, gr1, gc1, gn, gs)
+            # sentences (contingency table)
+            sent_ct = sentences(go11, gr1, gc1, gn, gs)
             # we could also append gziped JSON strings if full data
             # structures need too much memory
-            result.append({"iso_ct": iso_ct, "sub_ct": sub_ct, "sub_bnl": sub_bnl, "sub_bns": sub_bns, "sent_bnl": sent_bnl, "sent_bns": sent_bns})
+            result.append({"iso_ct": iso_ct, "sub_ct": sub_ct, "sent_ct": sent_ct})
     return result, sensible
 
 
@@ -233,19 +162,17 @@ def run_queries_db(args):
     Arguments:
     - `args`:
     """
-    go11, ga, gb, gr1, gc1, gn, sentence, candidates = args
+    go11, gr1, gc1, gn, sentence, candidates = args
     gs = json_graph.node_link_graph(json.loads(sentence))
     # isomorphisms
     iso_ct = isomorphisms(go11, gr1, gc1, gn, gs, candidates)
-    # subgraphs (contingency table, large bayesian network,
-    # small bayesian network)
-    sub_ct, sub_bnl, sub_bns = subgraphs(go11, ga, gb, gr1, gc1, gn, gs, candidates)
-    # sentences (large bayesian network, small bayesian
-    # network)
-    sent_bnl, sent_bns = sentences(go11, ga, gb, gr1, gc1, gn, gs, candidates)
+    # subgraphs (contingency table)
+    sub_ct = subgraphs(go11, gr1, gc1, gn, gs, candidates)
+    # sentences (contingency table)
+    sent_ct = sentences(go11, gr1, gc1, gn, gs, candidates)
     # we could also append gziped JSON strings if full data
     # structures need too much memory
-    result = {"iso_ct": iso_ct, "sub_ct": sub_ct, "sub_bnl": sub_bnl, "sub_bns": sub_bns, "sent_bnl": sent_bnl, "sent_bns": sent_bns}
+    result = {"iso_ct": iso_ct, "sub_ct": sub_ct, "sent_ct": sent_ct}
     return result
 
 
