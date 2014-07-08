@@ -84,8 +84,8 @@ if __name__ == "__main__":
     pool = multiprocessing.Pool(processes = multiprocessing.cpu_count())
     sents = cwb.sentences_iter(args.corpus)
     for sentences in helper.grouper_nofill(groupsize, sents):
-        # r = pool.imap(pareidoscope.query.run_queries, itertools.izip(sentences, itertools.repeat(queries)), 10)
-        r = map(pareidoscope.query.run_queries, itertools.izip(sentences, itertools.repeat(queries)))
+        r = pool.imap(pareidoscope.query.run_queries, itertools.izip(sentences, itertools.repeat(queries)), 10)
+        # r = map(pareidoscope.query.run_queries, itertools.izip(sentences, itertools.repeat(queries)))
         for result, sensible in r:
             if sensible:
                 pareidoscope.query.merge_result(result, results)
