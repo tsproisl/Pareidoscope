@@ -1,6 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+import copy
 import json
 import operator
 
@@ -89,6 +90,45 @@ def subgraphs(go11, gr1, gc1, gn, gs, candidates=None):
     return ct
 
 
+def roots(go11, gr1, gc1, gn, gs, root):
+    """Count roots
+    
+    Arguments:
+    - `go11`:
+    - `gr1`:
+    - `gc1`:
+    - `gn`:
+    - `gs`:
+    - `root`:
+
+    """
+    ct = {x: 0 for x in ["o11", "r1", "c1", "n"]}
+    candidates = nx_graph.get_vertice_candidates(query_graph, target_graph)
+    for root_vertice in subgraph_enumeration.get_root_matches(gn, gs, root, vertice_candidates=candidates):
+        ct["n"] += 1
+        local_candidates = copy.deepcopy(candidates)
+        local_candidates[root] = set([root_vertice])
+        subsumed_by_o11, subsumed_by_r1, subsumed_by_c1 = None, None, None
+        subsumed_by_o11 = subgraph_enumeration.subsumes_nx(go11, gs, vertice_candidates=local_candidates)
+        if subsumed_by_o11:
+            subsumed_by_r1, subsumed_by_c1 = True, True
+        else:
+            subsumed_by_r1 = subgraph_enumeration.subsumes_nx(gr1, gs, vertice_candidates=local_candidates)
+            subsumed_by_c1 = subgraph_enumeration.subsumes_nx(gc1, gs, vertice_candidates=local_candidates)
+        if subsumed_by_o11:
+            ct["o11"] += 1
+            ct["r1"] += 1
+            ct["c1"] += 1
+        if subsumed_by_r1 and subsumed_by_c1 and not subsumed_by_o11:
+            ct["r1"] += 0.5
+            ct["c1"] += 0.5
+        if subsumed_by_r1 and not subsumed_by_c1:
+            ct["r1"] += 1
+        if subsumed_by_c1 and not subsumed_by_r1:
+            ct["c1"] += 1
+    return ct
+
+
 def sentences(go11, gr1, gc1, gn, gs, candidates=None):
     """Count sentences
     
@@ -142,16 +182,20 @@ def run_queries(args):
     sensible = nx_graph.is_sensible_graph(gs)
     if sensible:
         for qline in queries:
-            go11, gr1, gc1, gn = qline
+            go11, gr1, gc1, gn, root = qline
             # isomorphisms
             iso_ct = isomorphisms(go11, gr1, gc1, gn, gs)
             # subgraphs (contingency table)
             sub_ct = subgraphs(go11, gr1, gc1, gn, gs)
+            # roots (contingency table)
+            root_ct = {}
+            if root is not None:
+                root_ct = roots(go11, gr1, gc1, gn, gs, root)
             # sentences (contingency table)
             sent_ct = sentences(go11, gr1, gc1, gn, gs)
             # we could also append gziped JSON strings if full data
             # structures need too much memory
-            result.append({"iso_ct": iso_ct, "sub_ct": sub_ct, "sent_ct": sent_ct})
+            result.append({"iso_ct": iso_ct, "sub_ct": sub_ct, "root_ct": root_ct, "sent_ct": sent_ct})
     return result, sensible
 
 
