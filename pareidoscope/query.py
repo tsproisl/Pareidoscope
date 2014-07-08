@@ -103,7 +103,7 @@ def roots(go11, gr1, gc1, gn, gs, root):
 
     """
     ct = {x: 0 for x in ["o11", "r1", "c1", "n"]}
-    candidates = nx_graph.get_vertice_candidates(query_graph, target_graph)
+    candidates = nx_graph.get_vertice_candidates(gn, gs)
     for root_vertice in subgraph_enumeration.get_root_matches(gn, gs, root, vertice_candidates=candidates):
         ct["n"] += 1
         local_candidates = copy.deepcopy(candidates)
