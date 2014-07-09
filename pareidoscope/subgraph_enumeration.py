@@ -94,6 +94,25 @@ def get_root_matches(query_graph, target_graph, root, vertice_candidates=None):
             yield root_candidate
 
 
+def root_subsumes_nx(query_graph, target_graph, root, root_candidate, vertice_candidates=None):
+    """Return whether the query_graph subsumes the target graph.
+    
+    Arguments:
+    - `query_graph`:
+    - `target_graph`:
+    """
+    qg = query_graph
+    tg = target_graph
+    if qg.number_of_nodes() > tg.number_of_nodes():
+        return False
+    if qg.number_of_edges() > tg.number_of_edges():
+        return False
+    if vertice_candidates is None:
+        vertice_candidates = nx_graph.get_vertice_candidates(qg, tg)
+    vertice_candidates[root] = vertice_candidates[root].intersection(set([root_candidate]))
+    return match_yes_no(qg, tg, vertice_candidates, 0)
+
+
 def get_bfo(target_graph, fragment=False):
     """Return target_graph in breadth-first-order as well as a mapping of
     vertices.
