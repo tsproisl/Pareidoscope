@@ -103,18 +103,15 @@ def roots(go11, gr1, gc1, gn, gs, root):
 
     """
     ct = {x: 0 for x in ["o11", "r1", "c1", "n"]}
-    candidates = nx_graph.get_vertice_candidates(gn, gs)
-    for root_vertice in subgraph_enumeration.get_root_matches(gn, gs, root, vertice_candidates=candidates):
+    for root_vertice in subgraph_enumeration.get_root_matches(gn, gs, root):
         ct["n"] += 1
-        local_candidates = copy.deepcopy(candidates)
-        local_candidates[root] = set([root_vertice])
         subsumed_by_o11, subsumed_by_r1, subsumed_by_c1 = None, None, None
-        subsumed_by_o11 = subgraph_enumeration.subsumes_nx(go11, gs, vertice_candidates=local_candidates)
+        subsumed_by_o11 = subgraph_enumeration.root_subsumes_nx(go11, gs, root, root_vertice)
         if subsumed_by_o11:
             subsumed_by_r1, subsumed_by_c1 = True, True
         else:
-            subsumed_by_r1 = subgraph_enumeration.subsumes_nx(gr1, gs, vertice_candidates=local_candidates)
-            subsumed_by_c1 = subgraph_enumeration.subsumes_nx(gc1, gs, vertice_candidates=local_candidates)
+            subsumed_by_r1 = subgraph_enumeration.root_subsumes_nx(gr1, gs, root, root_vertice)
+            subsumed_by_c1 = subgraph_enumeration.root_subsumes_nx(gc1, gs, root, root_vertice)
         if subsumed_by_o11:
             ct["o11"] += 1
             ct["r1"] += 1
