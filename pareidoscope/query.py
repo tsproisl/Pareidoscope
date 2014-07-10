@@ -194,7 +194,7 @@ def run_queries(args):
             # structures need too much memory
             result.append({"iso_ct": iso_ct, "sub_ct": sub_ct, "choke_point_ct": choke_point_ct, "sent_ct": sent_ct})
         # DEBUG:
-        if result[0]["choke_point_ct"]["r1"] != result[1]["choke_point_ct"]["r1"]:
+        if result[0]["choke_point_ct"]["r1"] != result[2]["choke_point_ct"]["r1"]:
             print sentence
             print result
     return result, sensible
