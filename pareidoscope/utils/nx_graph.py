@@ -267,12 +267,17 @@ def _get_vertice_tuple(nx_graph, vertice):
     other_vertices.remove(vertice)
     root = all((networkx.has_path(nx_graph, vertice, x) for x in other_vertices))
     antiroot = all((networkx.has_path(nx_graph, x, vertice) for x in other_vertices))
+    choke_point = None
+    if root or antiroot:
+        choke_point = True
+    else:
+        choke_point = all((networkx.has_path(nx_graph, vertice, x) or networkx.has_path(nx_graph, x, vertice) for x in other_vertices))
     label = tuple(sorted(nx_graph.node[vertice].items()))
     indegree = nx_graph.in_degree(vertice)
     outdegree = nx_graph.out_degree(vertice)
     inedgelabels = tuple(sorted([tuple(sorted(nx_graph.edge[s][t].items())) for s, t in nx_graph.in_edges(vertice)]))
     outedgelabels = tuple(sorted([tuple(sorted(nx_graph.edge[s][t].items())) for s, t in nx_graph.out_edges(vertice)]))
-    return (root, antiroot, label, indegree, outdegree, inedgelabels, outedgelabels)
+    return (root, antiroot, choke_point, label, indegree, outdegree, inedgelabels, outedgelabels)
 
 
 def _dfs(nx_graph, vertice, vtuples, return_ids=False, blacklist=[]):
@@ -395,23 +400,27 @@ def skeletize_inplace(nx_graph):
         nx_graph.edge[s][t] = {}
 
 
-def get_root_or_antiroot(nx_graph):
-    """Return one of the root or antiroot vertices if there are any.
+def get_choke_point(nx_graph):
+    """Return one of the choke point vertices if there are any.
     
     Arguments:
         nx_graph:
     
     Returns:
         The first root vertice in canonical order. If there aren't
-        any, the first antiroot vertice in canonical order. Else None.
+        any, the first antiroot vertice in canonical order. Else the
+        first other choke point in canonical order.
 
     """
     vertices = canonical_order(nx_graph)
     vtuples = {v: _get_vertice_tuple(nx_graph, v) for v in vertices}
     roots = [v for v in vertices if vtuples[v][0]]
     antiroots = [v for v in vertices if vtuples[v][1]]
+    choke_points = [v for v in vertices if vtuples[v][2]]
     if len(roots) >= 1:
         return roots[0]
     if len(antiroots) >= 1:
         return antiroots[0]
+    if len(choke_points) >= 1:
+        return choke_points[0]
     return None
