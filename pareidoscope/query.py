@@ -90,8 +90,8 @@ def subgraphs(go11, gr1, gc1, gn, gs, candidates=None):
     return ct
 
 
-def roots(go11, gr1, gc1, gn, gs, root):
-    """Count roots
+def choke_points(go11, gr1, gc1, gn, gs, choke_point):
+    """Count choke points
     
     Arguments:
     - `go11`:
@@ -99,19 +99,19 @@ def roots(go11, gr1, gc1, gn, gs, root):
     - `gc1`:
     - `gn`:
     - `gs`:
-    - `root`:
+    - `choke_point`:
 
     """
     ct = {x: 0 for x in ["o11", "r1", "c1", "n"]}
-    for root_vertice in subgraph_enumeration.get_root_matches(gn, gs, root):
+    for choke_point_vertice in subgraph_enumeration.get_choke_point_matches(gn, gs, choke_point):
         ct["n"] += 1
         subsumed_by_o11, subsumed_by_r1, subsumed_by_c1 = None, None, None
-        subsumed_by_o11 = subgraph_enumeration.root_subsumes_nx(go11, gs, root, root_vertice)
+        subsumed_by_o11 = subgraph_enumeration.choke_point_subsumes_nx(go11, gs, choke_point, choke_point_vertice)
         if subsumed_by_o11:
             subsumed_by_r1, subsumed_by_c1 = True, True
         else:
-            subsumed_by_r1 = subgraph_enumeration.root_subsumes_nx(gr1, gs, root, root_vertice)
-            subsumed_by_c1 = subgraph_enumeration.root_subsumes_nx(gc1, gs, root, root_vertice)
+            subsumed_by_r1 = subgraph_enumeration.choke_point_subsumes_nx(gr1, gs, choke_point, choke_point_vertice)
+            subsumed_by_c1 = subgraph_enumeration.choke_point_subsumes_nx(gc1, gs, choke_point, choke_point_vertice)
         if subsumed_by_o11:
             ct["o11"] += 1
             ct["r1"] += 1
@@ -179,22 +179,22 @@ def run_queries(args):
     sensible = nx_graph.is_sensible_graph(gs)
     if sensible:
         for qline in queries:
-            go11, gr1, gc1, gn, root = qline
+            go11, gr1, gc1, gn, choke_point = qline
             # isomorphisms
             iso_ct = isomorphisms(go11, gr1, gc1, gn, gs)
             # subgraphs (contingency table)
             sub_ct = subgraphs(go11, gr1, gc1, gn, gs)
-            # roots (contingency table)
-            root_ct = {}
-            if root is not None:
-                root_ct = roots(go11, gr1, gc1, gn, gs, root)
+            # choke_points (contingency table)
+            choke_point_ct = {}
+            if choke_point is not None:
+                choke_point_ct = choke_points(go11, gr1, gc1, gn, gs, choke_point)
             # sentences (contingency table)
             sent_ct = sentences(go11, gr1, gc1, gn, gs)
             # we could also append gziped JSON strings if full data
             # structures need too much memory
-            result.append({"iso_ct": iso_ct, "sub_ct": sub_ct, "root_ct": root_ct, "sent_ct": sent_ct})
+            result.append({"iso_ct": iso_ct, "sub_ct": sub_ct, "choke_point_ct": choke_point_ct, "sent_ct": sent_ct})
         # DEBUG:
-        if result[0]["root_ct"]["r1"] != result[1]["root_ct"]["r1"]:
+        if result[0]["choke_point_ct"]["r1"] != result[1]["choke_point_ct"]["r1"]:
             print sentence
             print result
     return result, sensible
