@@ -71,35 +71,32 @@ def subsumes_nx(query_graph, target_graph, vertice_candidates=None):
     return match_yes_no(qg, tg, vertice_candidates, 0)
 
 
-def get_root_matches(query_graph, target_graph, root, vertice_candidates=None):
-    """Return the vertices from target that match the root or antiroot
-    vertice from query.
+def get_choke_point_matches(query_graph, target_graph, choke_point, vertice_candidates=None):
+    """Return the vertices from target that match the choke point vertice
+    from query.
     
     Arguments:
         query_graph:
         target_graph:
-        root: Root or antiroot vertice in query_graph
+        choke_point:
     
     Returns:
-        Vertices from target_graph that correspond to the root or
-        antiroot vertice from query_graph.
+        Vertices from target_graph that correspond to the choke point
+        vertice from query_graph.
 
     """
     if vertice_candidates is None:
         vertice_candidates = nx_graph.get_vertice_candidates(query_graph, target_graph)
-    for root_candidate in vertice_candidates[root]:
+    for choke_point_candidate in vertice_candidates[choke_point]:
         local_candidates = copy.deepcopy(vertice_candidates)
-        local_candidates[root] = set([root_candidate])
+        local_candidates[choke_point] = set([choke_point_candidate])
         if subsumes_nx(query_graph, target_graph, local_candidates):
-            yield root_candidate
+            yield choke_point_candidate
 
 
-def root_subsumes_nx(query_graph, target_graph, root, root_candidate, vertice_candidates=None):
+def choke_point_subsumes_nx(query_graph, target_graph, choke_point, choke_point_candidate, vertice_candidates=None):
     """Return whether the query_graph subsumes the target graph.
-    
-    Arguments:
-    - `query_graph`:
-    - `target_graph`:
+
     """
     qg = query_graph
     tg = target_graph
@@ -109,7 +106,7 @@ def root_subsumes_nx(query_graph, target_graph, root, root_candidate, vertice_ca
         return False
     if vertice_candidates is None:
         vertice_candidates = nx_graph.get_vertice_candidates(qg, tg)
-    vertice_candidates[root] = vertice_candidates[root].intersection(set([root_candidate]))
+    vertice_candidates[choke_point] = vertice_candidates[choke_point].intersection(set([choke_point_candidate]))
     return match_yes_no(qg, tg, vertice_candidates, 0)
 
 
