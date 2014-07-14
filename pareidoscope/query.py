@@ -224,6 +224,9 @@ def merge_result(result, results):
     - `result`:
     - `results`:
     """
+    # DEBUG
+    if result[0]["choke_point_ct"]["r1"] != result[2]["choke_point_ct"]["r1"]:
+        print result
     for i, query in enumerate(result):
         for method in query:
             if method not in results[i]:
