@@ -23,7 +23,7 @@ def read_queries(queries_file):
     - `queries_file`:
     """
     queries = [line.decode("utf-8").rstrip("\n").split("\t") for line in queries_file]
-    queries = [[nx_graph.create_nx_digraph(json.loads(q)) for q in l] for l in queries]
+    queries = [[nx_graph.create_nx_digraph(json.loads(q)) for q in l] for l in queries if not l.startswith("#")]
     return queries
 
 
