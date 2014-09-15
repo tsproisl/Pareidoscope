@@ -430,9 +430,10 @@ def get_choke_point(nx_graph):
 def is_star(nx_graph, return_centers=False):
     """Check if the graph is a star, i.e. if it has one vertice that is
     adjacent to all others."""
-    centers = [v for v in nx_graph.nodes() if set([v] + nx_graph.predecessors(v) + nx_graph.successors(v)) == vertices]
-    is_center = len(centers) >= 1
+    vertices = set(nx_graph.nodes())
     if return_centers:
-        return is_center, set(centers)
+        centers = [v for v in vertices if set([v] + nx_graph.predecessors(v) + nx_graph.successors(v)) == vertices]
+        is_star = len(centers) >= 1
+        return is_star, set(centers)
     else:
-        return is_center
+        return any((set([v] + nx_graph.predecessors(v) + nx_graph.successors(v)) == vertices for v in vertices))
