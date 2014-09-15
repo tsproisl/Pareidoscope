@@ -388,7 +388,7 @@ def skeletize(nx_graph):
     return copy
 
 
-def skeletize_inplace(nx_graph):
+def skeletize_inplace(nx_graph, only_vertices=False):
     """Turn nx_graph into a skeleton
     
     Arguments:
@@ -397,8 +397,9 @@ def skeletize_inplace(nx_graph):
     """
     for v in nx_graph.nodes():
         nx_graph.node[v] = {}
-    for s, t in nx_graph.edges():
-        nx_graph.edge[s][t] = {}
+    if not only_vertices:
+        for s, t in nx_graph.edges():
+            nx_graph.edge[s][t] = {}
 
 
 def get_choke_point(nx_graph):
