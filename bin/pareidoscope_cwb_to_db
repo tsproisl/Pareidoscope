@@ -91,8 +91,7 @@ def tupleize(stuple):
         pos = gs.node[v]["pos"]
         lemma = gs.node[v]["lemma"]
         wc = gs.node[v]["wc"]
-        root = gs.node[v].get("root", "") != ""
-        root = 1 if root else 0
+        root = 1 if "root" in gs.node[v] else 0
         indegree = gs.in_degree(v)
         outdegree = gs.out_degree(v)
         indeps = set([gs.edge[s][t]["relation"] for s, t in gs.in_edges(v)])
