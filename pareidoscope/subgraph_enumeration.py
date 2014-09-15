@@ -376,6 +376,93 @@ def enumerate_csg_minmax_recursive(graph, subgraph, prohibited_edges, graph_to_r
                         yield result
 
 
+def enumerate_stars(graph, graph_to_raw):
+    """Enumerate stars. A star is a graph with a vertice that is adjacent
+    to all other vertices.
+    
+    Arguments:
+    - `graph`:
+    - `graph_to_raw`:
+    - `min_vertices`:
+    - `max_vertices`:
+
+    """
+    for vertice in sorted(graph.nodes(), reverse=True):
+        subgraph = networkx.DiGraph()
+        subgraph.add_node(vertice, graph.node[vertice])
+        nr_of_subgraph_vertices = subgraph.number_of_nodes()
+        if min_vertices <= nr_of_subgraph_vertices <= max_vertices:
+            yield return_corpus_order(subgraph, graph_to_raw)
+        prohibited_edges = set([])
+        for v in [u for u in graph.nodes() if u < vertice]:
+            prohibited_edges.update(set(graph.out_edges(nbunch=[v])))
+            prohibited_edges.update(set(graph.in_edges(nbunch=[v])))
+        for result in enumerate_stars_recursive(graph, subgraph, prohibited_edges, graph_to_raw):
+            yield result
+
+
+def enumerate_stars_recursive(graph, subgraph, prohibited_edges, graph_to_raw):
+    """See enumerate_stars()
+    
+    Arguments:
+    - `graph`:
+    - `subgraph`:
+    - `prohibited_edges`:
+    - `graph_to_raw`:
+    """
+    out_edges, in_edges, neighbours = set([]), set([]), set([])
+    neighbour_edges = {}
+    subgraph_size = subgraph.number_of_nodes()
+    subgraph_edges = subgraph.number_of_edges()
+    for vertice in subgraph.nodes():
+        for e in graph.out_edges(nbunch = [vertice]):
+            if e in prohibited_edges:
+                continue
+            out_edges.add(e)
+            neighbours.add(e[1])
+            if e[1] not in neighbour_edges:
+                neighbour_edges[e[1]] = []
+            neighbour_edges[e[1]].append(e)
+        for e in graph.in_edges(nbunch = [vertice]):
+            if e in prohibited_edges:
+                continue
+            in_edges.add(e)
+            neighbours.add(e[0])
+            if e[0] not in neighbour_edges:
+                neighbour_edges[e[0]] = []
+            neighbour_edges[e[0]].append(e)
+    # all combinations of vertices
+    for combination in powerset(neighbours, 1):
+        # all combinations of edges
+        edges = tuple([powerset(neighbour_edges[vertice], 1) for vertice in combination])
+        for edge_combi in list(itertools.product(*edges)):
+            ec = []
+            for edges in edge_combi:
+                ec.extend(edges)
+            # new vertices
+            new_vertices = set([e[0] if e[0] in neighbours else e[1] for e in ec])
+            # edges between new vertices
+            new_edges = set([])
+            for new_vertice in new_vertices:
+                new_edges.update([e for e in graph.out_edges(nbunch=[new_vertice]) if e[1] in new_vertices])
+            for new_edge_combi in powerset(new_edges, 0):
+                nec = list(new_edge_combi)
+                local_subgraph = subgraph.copy()
+                # add edges
+                for s, t in ec + nec:
+                    local_subgraph.add_edge(s, t, graph.edge[s][t])
+                    local_subgraph.node[s] = graph.node[s]
+                    local_subgraph.node[t] = graph.node[t]
+                nr_of_subgraph_vertices = local_subgraph.number_of_nodes()
+                nr_of_subgraph_edges = local_subgraph.number_of_edges()
+                if nr_of_subgraph_edges != subgraph_edges + len(ec + nec):
+                    raise Exception("WAAAAH")
+                if nx_graph.is_star(local_subgraph):
+                    yield return_corpus_order(local_subgraph, graph_to_raw)
+                    for result in enumerate_stars_recursive(graph, local_subgraph, prohibited_edges.union(in_edges, out_edges, new_edges), graph_to_raw):
+                        yield result
+
+
 def powerset(iterable, min_size, max_size = -1):
     """(Partial) powerset of set with at most max_size elements.
     
