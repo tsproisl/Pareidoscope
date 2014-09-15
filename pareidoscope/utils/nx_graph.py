@@ -267,8 +267,9 @@ def _get_vertice_tuple(nx_graph, vertice):
     other_vertices.remove(vertice)
     root = all((networkx.has_path(nx_graph, vertice, x) for x in other_vertices))
     antiroot = all((networkx.has_path(nx_graph, x, vertice) for x in other_vertices))
+    star_center = all((nx_graph.has_edge(vertice, x) or nx_graph.has_edge(x, vertice) for x in other_vertices))
     choke_point = None
-    if root or antiroot:
+    if root or antiroot or star_center:
         choke_point = True
     else:
         choke_point = all((networkx.has_path(nx_graph, vertice, x) or networkx.has_path(nx_graph, x, vertice) for x in other_vertices))
@@ -277,7 +278,7 @@ def _get_vertice_tuple(nx_graph, vertice):
     outdegree = nx_graph.out_degree(vertice)
     inedgelabels = tuple(sorted([tuple(sorted(nx_graph.edge[s][t].items())) for s, t in nx_graph.in_edges(vertice)]))
     outedgelabels = tuple(sorted([tuple(sorted(nx_graph.edge[s][t].items())) for s, t in nx_graph.out_edges(vertice)]))
-    return (root, antiroot, choke_point, label, indegree, outdegree, inedgelabels, outedgelabels)
+    return (root, antiroot, star_center, choke_point, label, indegree, outdegree, inedgelabels, outedgelabels)
 
 
 def _dfs(nx_graph, vertice, vtuples, return_ids=False, blacklist=[]):
@@ -424,3 +425,14 @@ def get_choke_point(nx_graph):
     if len(choke_points) >= 1:
         return choke_points[0]
     return None
+
+
+def is_star(nx_graph, return_centers=False):
+    """Check if the graph is a star, i.e. if it has one vertice that is
+    adjacent to all others."""
+    centers = [v for v in nx_graph.nodes() if set([v] + nx_graph.predecessors(v) + nx_graph.successors(v)) == vertices]
+    is_center = len(centers) >= 1
+    if return_centers:
+        return is_center, set(centers)
+    else:
+        return is_center
