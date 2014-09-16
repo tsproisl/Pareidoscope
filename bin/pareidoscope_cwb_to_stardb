@@ -21,7 +21,8 @@ from pareidoscope.utils import cwb
 from pareidoscope.utils import helper
 from pareidoscope.utils import nx_graph
 
-logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=logging.INFO)
+# logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=logging.INFO)
+logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=logging.DEBUG)
 
 
 def create_db(filename):
@@ -56,8 +57,8 @@ def create_db(filename):
     # tokens
     c.execute("CREATE TABLE tokens (typeid INTEGER, sentid INTEGER, position INTEGER, FOREIGN KEY (typeid) REFERENCES types, FOREIGN KEY (sentid) REFERENCES sentences, UNIQUE (typeid, sentid, position))")
     ## tables for stars
-    c.execute("CREATE TABLE edge_stars (subgraphid INTEGER PRIMARY KEY AUTOINCREMENT, subgraph TEXT UNIQUE, length INTEGER, stars INTEGER, star_centers INTEGER)")
-    c.execute("CREATE TABLE skel_stars (subgraphid INTEGER PRIMARY KEY AUTOINCREMENT, subgraph TEXT UNIQUE, length INTEGER, stars INTEGER, star_centers INTEGER)")
+    c.execute("CREATE TABLE edge_stars (starid INTEGER PRIMARY KEY AUTOINCREMENT, subgraph TEXT UNIQUE, length INTEGER, stars INTEGER, star_centers INTEGER)")
+    c.execute("CREATE TABLE skel_stars (starid INTEGER PRIMARY KEY AUTOINCREMENT, subgraph TEXT UNIQUE, length INTEGER, stars INTEGER, star_centers INTEGER)")
     return conn, c
 
 
@@ -140,7 +141,7 @@ def extract_stars(args):
     gs = json_graph.node_link_graph(json.loads(graph))
     bfo_graph, bfo_to_raw = subgraph_enumeration.get_bfo(gs)
     for vertice in bfo_graph.nodes():
-        whole_star = gs.subgraph(vertice)
+        whole_star = gs.subgraph([vertice])
         for subgraph in subgraph_enumeration.enumerate_csg_minmax(whole_star, bfo_to_raw, min_vertices=2, max_vertices=whole_star.__len__()):
             # vertice must be in subgraph
             if not subgraph.has_node(vertice):
@@ -177,21 +178,22 @@ def insert_stars(conn, c, result, stars):
     sentid, edge_stars, skel_stars = result
     for varstr, variant in [("edge", edge_stars), ("skel", skel_stars)]:
         for star in variant:
-            if star not in stars["id"]:
+            logging.debug(star)
+            if star not in stars[varstr]["id"]:
                 graph = networkx.parse_adjlist(star[0], nodetype=int, create_using=networkx.DiGraph())
                 # check if star is isomorphic to any known subgraph
                 # and if one of the isomorphisms maps the star centers
                 # to each other
-                dgm = isomorphism.DiGraphMatcher(graph, stars["graph"][isomorphic[0]], edge_match=lambda x, y: x.get("relation", "") == y.get("relation", ""))
+                dgm = isomorphism.DiGraphMatcher(graph, stars[varstr]["graph"][isomorphic[0]], edge_match=lambda x, y: x.get("relation", "") == y.get("relation", ""))
                 if any(iso[star[1]] == isomorphic[0][1] for iso in dgm.isomorphisms_iter()):
-                    stars["id"][star] = stars["id"][isomorphic[0]]
+                    stars[varstr]["id"][star] = stars[varstr]["id"][isomorphic[0]]
                 else:
-                    c.execute("INSERT INTO stars (star, length) VALUES (?,?)", (json.dumps(list(star)),len(star[0])))
-                    stars["graph"][star] = graph
-                    stars["id"][star] = c.lastrowid
-            starid = stars["id"][star]
-            stars["star_centers"][starid] = stars["star_centers"].get(starid, 0) + 1
-            stars["stars"][starid] = stars["stars"].get(starid, 0) + variant[star]
+                    c.execute("INSERT INTO %s_stars (subgraph, length) VALUES (?,?)" % varstr, (json.dumps(list(star)),len(star[0])))
+                    stars[varstr]["graph"][star] = graph
+                    stars[varstr]["id"][star] = c.lastrowid
+            starid = stars[varstr]["id"][star]
+            stars[varstr]["star_centers"][starid] = stars[varstr]["star_centers"].get(starid, 0) + 1
+            stars[varstr]["stars"][starid] = stars[varstr]["stars"].get(starid, 0) + variant[star]
 
 
 
@@ -218,7 +220,7 @@ if __name__ == "__main__":
                 preprocess_results(conn, c, result, results)
     logging.info("insert tokens")
     insert_tokens(conn, c, results)
-    stars = {"stars": {}, "star_centers": {}, "id": {}, "graph": {}}
+    stars = {"edge": {"stars": {}, "star_centers": {}, "id": {}, "graph": {}}, "skel": {"stars": {}, "star_centers": {}, "id": {}, "graph": {}}}
     logging.info("exctract stars")
     sent_count = c.execute("SELECT count(*) FROM sentences").fetchone()[0]
     logging.info("%d sentences" % sent_count)
@@ -229,11 +231,12 @@ if __name__ == "__main__":
         #r = map(extract_stars, sentences)
         for result in r:
             insert_stars(conn, c, result, stars)
-    stars_count = ((sc, sgid) for sgid, sc in stars["stars"].iteritems())
-    logging.info("insert stars counts")
-    c.executemany("UPDATE subgraphs SET stars=? WHERE starid=?", stars_count)
-    star_centers_count = ((sc, sgid) for sgid, sc in stars["star_centers"].iteritems())
-    logging.info("insert star centers counts")
-    c.executemany("UPDATE subgraphs SET star_centers=? WHERE starid=?", star_centers_count)
+    for varstr in ["edge", "skel"]:
+        stars_count = ((sc, sgid) for sgid, sc in stars[varstr]["stars"].iteritems())
+        logging.info("insert %s stars counts" % varstr)
+        c.executemany("UPDATE %s_stars SET stars=? WHERE starid=?" %varstr, stars_count)
+        star_centers_count = ((sc, sgid) for sgid, sc in stars[varstr]["star_centers"].iteritems())
+        logging.info("insert %s star centers counts" % varstr)
+        c.executemany("UPDATE %s_stars SET star_centers=? WHERE starid=?" % varstr, star_centers_count)
     conn.commit()
     conn.close()
