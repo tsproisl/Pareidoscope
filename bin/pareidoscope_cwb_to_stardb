@@ -13,6 +13,7 @@ import sys
 import tempfile
 
 import networkx
+from networkx.algorithms import isomorphism
 from networkx.readwrite import json_graph
 
 from pareidoscope import subgraph_enumeration
@@ -134,23 +135,37 @@ def extract_stars(args):
     - `graph`:
     """
     sentid, graph = args
-    result = []
+    edge_stars = collections.Counter()
+    skel_stars = collections.Counter()
     gs = json_graph.node_link_graph(json.loads(graph))
     bfo_graph, bfo_to_raw = subgraph_enumeration.get_bfo(gs)
-    for star in subgraph_enumeration.enumerate_stars(bfo_graph, bfo_to_raw):
-        edge_star = star.copy()
-        nx_graph.skeletize_inplace(edge_star, only_vertices=True)
-        edge_star, edge_order = nx_graph.canonize(edge_star, order=True)
-        edge_t = tuple(networkx.generate_edgelist(edge_star, data=True))
-        skel_star = star.copy()
-        nx_graph.skeletize_inplace(skel_star)
-        skel_star, skel_order = nx_graph.canonize(skel_star, order=True)
-        skel_t = tuple(networkx.generate_adjlist(skel_star))
-        result.append([sentid, edge_t, edge_order, skel_t, skel_order])
-    return result
+    for vertice in bfo_graph.nodes():
+        whole_star = gs.subgraph(vertice)
+        for subgraph in subgraph_enumeration.enumerate_csg_minmax(whole_star, bfo_to_raw, min_vertices=2, max_vertices=whole_star.__len__()):
+            # vertice must be in subgraph
+            if not subgraph.has_node(vertice):
+                continue
+            # vertice must be center of star
+            other_vertices = set(subgraph.nodes()).remove(vertice)
+            if not all((subgraph.has_edge(vertice, x) or subgraph.has_edge(x, vertice) for x in other_vertices)):
+                continue
+            edge_star = subgraph.copy()
+            nx_graph.skeletize_inplace(edge_star, only_vertices=True)
+            edge_star, order = nx_graph.canonize(edge_star, order=True)
+            edge_center = order.index(vertice)
+            edge_t = tuple(networkx.generate_edgelist(edge_star, data=True))
+            edge_stars[(edge_t, edge_center)][] += 1
+            skel_star = subgraph.copy()
+            nx_graph.skeletize_inplace(skel_star)
+            skel_star, order = nx_graph.canonize(skel_star, order=True)
+            skel_center = order.index(vertice)
+            skel_t = tuple(networkx.generate_edgelist(skel_star))
+            skel_stars[(skel_t, skel_center)] += 1
+            # result.append([sentid, edge_t, edge_center, skel_t, skel_center])
+    return sentid, edge_stars, skel_stars
 
 
-def insert_subgraphs(conn, c, result, subgraphs):
+def insert_stars(conn, c, result, stars):
     """Insert subgraphs into database
     
     Arguments:
@@ -159,29 +174,24 @@ def insert_subgraphs(conn, c, result, subgraphs):
     - `result`:
     - `subgraphs`:
     """
-    for r in result:
-        sg, sentid, positions = r
-        if sg not in subgraphs["id"]:
-            graph = networkx.parse_adjlist(sg, nodetype=int, create_using=networkx.DiGraph())
-            # check if sg is isomorphic to any known subgraph
-            isomorphic = [t for t, g in subgraphs["graph"].iteritems() if networkx.is_isomorphic(g, graph)]
-            if len(isomorphic) == 0:
-                c.execute("INSERT INTO subgraphs (subgraph, length) VALUES (?,?)", (json.dumps(list(sg)),len(sg)))
-                subgraphs["graph"][sg] = graph
-                subgraphs["id"][sg] = c.lastrowid
-            else:
-                if len(isomorphic) > 1:
-                    raise Exception("There are already more than one isomorphic subgraphs in the database!")
-                subgraphs["id"][sg] = subgraphs["id"][isomorphic[0]]
-        subgraphid = subgraphs["id"][sg]
-        subgraphs["isomorphisms"][subgraphid] = subgraphs["isomorphisms"].get(subgraphid, 0) + 1
-        length = len(sg)
-        if length > 5 or length < 2:
-            raise Exception("Subgraph of length %d: %s" % (length, subgraph))
-        query = "INSERT INTO subgraphs%d (subgraphid, sentid, %s) VALUES (?,?,%s)" % (length, ", ".join("v%d" % i for i in range(1, length + 1)), ",".join(["?"] * length))
-        params = [subgraphid, sentid]
-        params.extend(positions)
-        c.execute(query, tuple(params))
+    sentid, edge_stars, skel_stars = result
+    for varstr, variant in [("edge", edge_stars), ("skel", skel_stars)]:
+        for star in variant:
+            if star not in stars["id"]:
+                graph = networkx.parse_adjlist(star[0], nodetype=int, create_using=networkx.DiGraph())
+                # check if star is isomorphic to any known subgraph
+                # and if one of the isomorphisms maps the star centers
+                # to each other
+                dgm = isomorphism.DiGraphMatcher(graph, stars["graph"][isomorphic[0]], edge_match=lambda x, y: x.get("relation", "") == y.get("relation", ""))
+                if any(iso[star[1]] == isomorphic[0][1] for iso in dgm.isomorphisms_iter()):
+                    stars["id"][star] = stars["id"][isomorphic[0]]
+                else:
+                    c.execute("INSERT INTO stars (star, length) VALUES (?,?)", (json.dumps(list(star)),len(star[0])))
+                    stars["graph"][star] = graph
+                    stars["id"][star] = c.lastrowid
+            starid = stars["id"][star]
+            stars["star_centers"][starid] = stars["star_centers"].get(starid, 0) + 1
+            stars["stars"][starid] = stars["stars"].get(starid, 0) + variant[star]
 
 
 
@@ -208,8 +218,8 @@ if __name__ == "__main__":
                 preprocess_results(conn, c, result, results)
     logging.info("insert tokens")
     insert_tokens(conn, c, results)
-    subgraphs = {"isomorphisms": {}, "id": {}, "graph": {}}
-    logging.info("exctract subgraphs")
+    stars = {"stars": {}, "star_centers": {}, "id": {}, "graph": {}}
+    logging.info("exctract stars")
     sent_count = c.execute("SELECT count(*) FROM sentences").fetchone()[0]
     logging.info("%d sentences" % sent_count)
     for offset in xrange(0, sent_count, groupsize):
@@ -218,9 +228,12 @@ if __name__ == "__main__":
         r = pool.imap_unordered(extract_stars, sentences, 10)
         #r = map(extract_stars, sentences)
         for result in r:
-            insert_subgraphs(conn, c, result, subgraphs)
-    isomorphisms = ((isos, sgid) for sgid, isos in subgraphs["isomorphisms"].iteritems())
-    logging.info("insert isomorphism counts")
-    c.executemany("UPDATE subgraphs SET isomorphisms=? WHERE subgraphid=?", isomorphisms)
+            insert_stars(conn, c, result, stars)
+    stars_count = ((sc, sgid) for sgid, sc in stars["stars"].iteritems())
+    logging.info("insert stars counts")
+    c.executemany("UPDATE subgraphs SET stars=? WHERE starid=?", stars_count)
+    star_centers_count = ((sc, sgid) for sgid, sc in stars["star_centers"].iteritems())
+    logging.info("insert star centers counts")
+    c.executemany("UPDATE subgraphs SET star_centers=? WHERE starid=?", star_centers_count)
     conn.commit()
     conn.close()
