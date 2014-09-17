@@ -348,7 +348,7 @@ def canonical_order(nx_graph):
     if len(roots) == 1:
         return _dfs(nx_graph, roots[0], vtuples, return_ids=True)
     if len(antiroots) == 1:
-        return reversed(_dfs(nx_graph.reverse(), antiroots[0], vtuples, return_ids=True))
+        return list(reversed(_dfs(nx_graph.reverse(), antiroots[0], vtuples, return_ids=True)))
     keyfunc = lambda v: vtuples[v]
     sorted_vertices = sorted(vertices, key=keyfunc)
     return _get_unique_order(nx_graph, sorted_vertices, vtuples)
