@@ -211,9 +211,9 @@ def insert_stars(conn, c, result, stars):
                         sorted_edge_tuples[sorted_edge_tuple] = [star]
                 if varstr == "skel":
                     _check_isomorphisms(star, graph, stars, varstr)
+                stars[varstr]["graph"][star] = graph
                 if star not in stars[varstr]["id"]:
                     c.execute("INSERT INTO %s_stars (subgraph, length) VALUES (?,?)" % varstr, (json.dumps(list(star)),len(star[0])))
-                    stars[varstr]["graph"][star] = graph
                     stars[varstr]["id"][star] = c.lastrowid
             starid = stars[varstr]["id"][star]
             stars[varstr]["star_centers"][starid] = stars[varstr]["star_centers"].get(starid, 0) + 1
