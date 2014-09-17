@@ -140,14 +140,17 @@ def extract_stars(args):
     skel_stars = collections.Counter()
     gs = json_graph.node_link_graph(json.loads(graph))
     bfo_graph, bfo_to_raw = subgraph_enumeration.get_bfo(gs)
+    bfo_to_bfo = {v: v for v in bfo_graph.nodes()}
     for vertice in bfo_graph.nodes():
-        whole_star = gs.subgraph([vertice])
-        for subgraph in subgraph_enumeration.enumerate_csg_minmax(whole_star, bfo_to_raw, min_vertices=2, max_vertices=whole_star.__len__()):
+        whole_star = bfo_graph.subgraph(set([vertice] + bfo_graph.predecessors(vertice) + bfo_graph.successors(vertice)))
+        for subgraph in subgraph_enumeration.enumerate_csg_minmax(whole_star, bfo_to_bfo, min_vertices=2, max_vertices=whole_star.__len__()):
             # vertice must be in subgraph
             if not subgraph.has_node(vertice):
                 continue
             # vertice must be center of star
-            other_vertices = set(subgraph.nodes()).remove(vertice)
+            other_vertices = set(subgraph.nodes()) - set([vertice])
+            if len(other_vertices) == 0:
+                continue
             if not all((subgraph.has_edge(vertice, x) or subgraph.has_edge(x, vertice) for x in other_vertices)):
                 continue
             edge_star = subgraph.copy()
@@ -166,6 +169,24 @@ def extract_stars(args):
     return sentid, edge_stars, skel_stars
 
 
+def _check_isomorphisms(star, graph, stars, varstr, candidates=[]):
+    """Check if star is isomorphic to any known subgraph and if one of the
+       isomorphisms maps the star centers to each other.
+
+    """
+    t_g_iterator = stars[varstr]["graph"].iteritems()
+    if len(candidates) > 0:
+        t_g_iterator = ((c, stars[varstr]["graph"][c]) for c in candidates)
+    isomorphics = [t for t, g in t_g_iterator if networkx.is_isomorphic(g, graph, edge_match=lambda x, y: x.get("relation", "") == y.get("relation", ""))]
+    for isomorphic in isomorphics:
+        dgm = isomorphism.DiGraphMatcher(graph, stars[varstr]["graph"][isomorphic], edge_match=lambda x, y: x.get("relation", "") == y.get("relation", ""))
+        if any(iso[star[1]] == isomorphic[1] for iso in dgm.isomorphisms_iter()):
+            stars[varstr]["id"][star] = stars[varstr]["id"][isomorphic]
+            logging.debug("%s is isomorphic to %s" % (star, isomorphic))
+            return
+    
+
+
 def insert_stars(conn, c, result, stars):
     """Insert subgraphs into database
     
@@ -176,18 +197,21 @@ def insert_stars(conn, c, result, stars):
     - `subgraphs`:
     """
     sentid, edge_stars, skel_stars = result
+    sorted_edge_tuples = {}
     for varstr, variant in [("edge", edge_stars), ("skel", skel_stars)]:
         for star in variant:
-            logging.debug(star)
             if star not in stars[varstr]["id"]:
-                graph = networkx.parse_adjlist(star[0], nodetype=int, create_using=networkx.DiGraph())
-                # check if star is isomorphic to any known subgraph
-                # and if one of the isomorphisms maps the star centers
-                # to each other
-                dgm = isomorphism.DiGraphMatcher(graph, stars[varstr]["graph"][isomorphic[0]], edge_match=lambda x, y: x.get("relation", "") == y.get("relation", ""))
-                if any(iso[star[1]] == isomorphic[0][1] for iso in dgm.isomorphisms_iter()):
-                    stars[varstr]["id"][star] = stars[varstr]["id"][isomorphic[0]]
-                else:
+                graph = networkx.parse_edgelist(star[0], nodetype=int, create_using=networkx.DiGraph())
+                if varstr == "edge":
+                    sorted_edge_tuple = tuple(sorted([l["relation"] for s, t, l in graph.edges(data=True)]))
+                    if sorted_edge_tuple in sorted_edge_tuples:
+                        _check_isomorphisms(star, graph, stars, varstr, sorted_edge_tuples[sorted_edge_tuple])
+                        sorted_edge_tuples[sorted_edge_tuple].append(star)
+                    else:
+                        sorted_edge_tuples[sorted_edge_tuple] = [star]
+                if varstr == "skel":
+                    _check_isomorphisms(star, graph, stars, varstr)
+                if star not in stars[varstr]["id"]:
                     c.execute("INSERT INTO %s_stars (subgraph, length) VALUES (?,?)" % varstr, (json.dumps(list(star)),len(star[0])))
                     stars[varstr]["graph"][star] = graph
                     stars[varstr]["id"][star] = c.lastrowid
@@ -214,7 +238,7 @@ if __name__ == "__main__":
     logging.info("tupleize and preprocess")
     for sentences in helper.grouper_nofill(groupsize, sents):
         r = pool.imap_unordered(tupleize, sentences, 10)
-        #r = map(tupleize, sentences)
+        # r = map(tupleize, sentences)
         for result, sensible in r:
             if sensible:
                 preprocess_results(conn, c, result, results)
@@ -228,7 +252,7 @@ if __name__ == "__main__":
         sentences = c.execute("SELECT sentid, graph FROM sentences LIMIT ? OFFSET ?", (groupsize, offset)).fetchall()
         logging.info("process sentences %d to %d", offset+1, offset+len(sentences))
         r = pool.imap_unordered(extract_stars, sentences, 10)
-        #r = map(extract_stars, sentences)
+        # r = map(extract_stars, sentences)
         for result in r:
             insert_stars(conn, c, result, stars)
     for varstr in ["edge", "skel"]:
