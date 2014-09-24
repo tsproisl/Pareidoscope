@@ -57,8 +57,11 @@ def create_db(filename):
     # tokens
     c.execute("CREATE TABLE tokens (typeid INTEGER, sentid INTEGER, position INTEGER, FOREIGN KEY (typeid) REFERENCES types, FOREIGN KEY (sentid) REFERENCES sentences, UNIQUE (typeid, sentid, position))")
     ## tables for stars
-    c.execute("CREATE TABLE edge_stars (starid INTEGER PRIMARY KEY AUTOINCREMENT, subgraph TEXT UNIQUE, length INTEGER, stars INTEGER, star_centers INTEGER)")
-    c.execute("CREATE TABLE skel_stars (starid INTEGER PRIMARY KEY AUTOINCREMENT, subgraph TEXT UNIQUE, length INTEGER, stars INTEGER, star_centers INTEGER)")
+    c.execute("CREATE TABLE edge_stars (starid INTEGER PRIMARY KEY AUTOINCREMENT, subgraph TEXT UNIQUE, length INTEGER, degree_sequence TEXT, edge_list TEXT, stars INTEGER, star_centers INTEGER)")
+    c.execute("CREATE INDEX edegseq_idx ON edge_stars (degree_sequence)")
+    c.execute("CREATE INDEX edge_list_idx ON edge_stars (edge_list)")
+    c.execute("CREATE TABLE skel_stars (starid INTEGER PRIMARY KEY AUTOINCREMENT, subgraph TEXT UNIQUE, length INTEGER, degree_sequence TEXT, stars INTEGER, star_centers INTEGER)")
+    c.execute("CREATE INDEX sdegseq_idx ON skel_stars (degree_sequence)")
     return conn, c
 
 
@@ -153,19 +156,21 @@ def extract_stars(args):
                 continue
             if not all((subgraph.has_edge(vertice, x) or subgraph.has_edge(x, vertice) for x in other_vertices)):
                 continue
+            length = subgraph.__len__()
+            degree_sequence = " ".join([str(_) for _ in sorted([subgraph.degree(_) for _ in subgraph.nodes()], reverse=True)])
+            sorted_edges = " ".join(sorted([l["relation"] for s, t, l in subgraph.edges(data=True)]))
             edge_star = subgraph.copy()
             nx_graph.skeletize_inplace(edge_star, only_vertices=True)
             edge_star, order = nx_graph.canonize(edge_star, order=True)
             edge_center = order.index(vertice)
             edge_t = tuple(networkx.generate_edgelist(edge_star, data=True))
-            edge_stars[(edge_t, edge_center)] += 1
+            edge_stars[(edge_t, length, edge_center, degree_sequence, sorted_edges)] += 1
             skel_star = subgraph.copy()
             nx_graph.skeletize_inplace(skel_star)
             skel_star, order = nx_graph.canonize(skel_star, order=True)
             skel_center = order.index(vertice)
             skel_t = tuple(networkx.generate_edgelist(skel_star))
-            skel_stars[(skel_t, skel_center)] += 1
-            # result.append([sentid, edge_t, edge_center, skel_t, skel_center])
+            skel_stars[(skel_t, length, skel_center, degree_sequence)] += 1
     return sentid, edge_stars, skel_stars
 
 
@@ -187,7 +192,7 @@ def _check_isomorphisms(star, graph, stars, varstr, candidates=[]):
     
 
 
-def insert_stars(conn, c, result, stars):
+def insert_stars(conn, c, result):
     """Insert subgraphs into database
     
     Arguments:
@@ -197,27 +202,39 @@ def insert_stars(conn, c, result, stars):
     - `subgraphs`:
     """
     sentid, edge_stars, skel_stars = result
-    sorted_edge_tuples = {}
-    for varstr, variant in [("edge", edge_stars), ("skel", skel_stars)]:
-        for star in variant:
-            if star not in stars[varstr]["id"]:
-                graph = networkx.parse_edgelist(star[0], nodetype=int, create_using=networkx.DiGraph())
-                if varstr == "edge":
-                    sorted_edge_tuple = tuple(sorted([l["relation"] for s, t, l in graph.edges(data=True)]))
-                    if sorted_edge_tuple in sorted_edge_tuples:
-                        _check_isomorphisms(star, graph, stars, varstr, sorted_edge_tuples[sorted_edge_tuple])
-                        sorted_edge_tuples[sorted_edge_tuple].append(star)
-                    else:
-                        sorted_edge_tuples[sorted_edge_tuple] = [star]
-                if varstr == "skel":
-                    _check_isomorphisms(star, graph, stars, varstr)
-                stars[varstr]["graph"][star] = graph
-                if star not in stars[varstr]["id"]:
-                    c.execute("INSERT INTO %s_stars (subgraph, length) VALUES (?,?)" % varstr, (json.dumps(list(star)),len(star[0])))
-                    stars[varstr]["id"][star] = c.lastrowid
-            starid = stars[varstr]["id"][star]
-            stars[varstr]["star_centers"][starid] = stars[varstr]["star_centers"].get(starid, 0) + 1
-            stars[varstr]["stars"][starid] = stars[varstr]["stars"].get(starid, 0) + variant[star]
+    for star, freq in edge_stars.iteritems():
+        graph_tuple, length, center, degree_sequence, sorted_edges = star
+        # graph = networkx.parse_edgelist(graph_tuple, nodetype=int, create_using=networkx.DiGraph())
+        graph_string = json.dumps(list(graph_tuple))
+        c.execute("INSERT OR IGNORE INTO edge_stars (subgraph, length, degree_sequence, edge_list, stars, star_centers) VALUES (?, ?, ?, ?, 0, 0)", (graph_string, length, degree_sequence, sorted_edges))
+        c.execute("UPDATE edge_stars SET stars = stars + ?, star_centers = star_centers + ? WHERE subgraph = ?", (freq, 1, graph_string))
+    for star, freq in skel_stars.iteritems():
+        graph_tuple, length, center, degree_sequence = star
+        # graph = networkx.parse_edgelist(graph_tuple, nodetype=int, create_using=networkx.DiGraph())
+        graph_string = json.dumps(list(graph_tuple))
+        c.execute("INSERT OR IGNORE INTO skel_stars (subgraph, length, degree_sequence, stars, star_centers) VALUES (?, ?, ?, 0, 0)", (graph_string, length, degree_sequence))
+        c.execute("UPDATE skel_stars SET stars = stars + ?, star_centers = star_centers + ? WHERE subgraph = ?", (freq, 1, graph_string))
+    # sorted_edge_tuples = {}
+    # for varstr, variant in [("edge", edge_stars), ("skel", skel_stars)]:
+    #     for star in variant:
+    #         if star not in stars[varstr]["id"]:
+    #             graph = networkx.parse_edgelist(star[0], nodetype=int, create_using=networkx.DiGraph())
+    #             if varstr == "edge":
+    #                 sorted_edge_tuple = tuple(sorted([l["relation"] for s, t, l in graph.edges(data=True)]))
+    #                 if sorted_edge_tuple in sorted_edge_tuples:
+    #                     _check_isomorphisms(star, graph, stars, varstr, sorted_edge_tuples[sorted_edge_tuple])
+    #                     sorted_edge_tuples[sorted_edge_tuple].append(star)
+    #                 else:
+    #                     sorted_edge_tuples[sorted_edge_tuple] = [star]
+    #             if varstr == "skel":
+    #                 _check_isomorphisms(star, graph, stars, varstr)
+    #             stars[varstr]["graph"][star] = graph
+    #             if star not in stars[varstr]["id"]:
+    #                 c.execute("INSERT INTO %s_stars (subgraph, length) VALUES (?,?)" % varstr, (json.dumps(list(star)),len(star[0])))
+    #                 stars[varstr]["id"][star] = c.lastrowid
+    #         starid = stars[varstr]["id"][star]
+    #         stars[varstr]["star_centers"][starid] = stars[varstr]["star_centers"].get(starid, 0) + 1
+    #         stars[varstr]["stars"][starid] = stars[varstr]["stars"].get(starid, 0) + variant[star]
 
 
 
@@ -244,7 +261,7 @@ if __name__ == "__main__":
                 preprocess_results(conn, c, result, results)
     logging.info("insert tokens")
     insert_tokens(conn, c, results)
-    stars = {"edge": {"stars": {}, "star_centers": {}, "id": {}, "graph": {}}, "skel": {"stars": {}, "star_centers": {}, "id": {}, "graph": {}}}
+    # stars = {"edge": {"stars": {}, "star_centers": {}, "id": {}, "graph": {}}, "skel": {"stars": {}, "star_centers": {}, "id": {}, "graph": {}}}
     logging.info("exctract stars")
     sent_count = c.execute("SELECT count(*) FROM sentences").fetchone()[0]
     logging.info("%d sentences" % sent_count)
@@ -254,13 +271,15 @@ if __name__ == "__main__":
         r = pool.imap_unordered(extract_stars, sentences, 10)
         # r = map(extract_stars, sentences)
         for result in r:
-            insert_stars(conn, c, result, stars)
-    for varstr in ["edge", "skel"]:
-        stars_count = ((sc, sgid) for sgid, sc in stars[varstr]["stars"].iteritems())
-        logging.info("insert %s stars counts" % varstr)
-        c.executemany("UPDATE %s_stars SET stars=? WHERE starid=?" %varstr, stars_count)
-        star_centers_count = ((sc, sgid) for sgid, sc in stars[varstr]["star_centers"].iteritems())
-        logging.info("insert %s star centers counts" % varstr)
-        c.executemany("UPDATE %s_stars SET star_centers=? WHERE starid=?" % varstr, star_centers_count)
+            insert_stars(conn, c, result)
+        conn.commit()
+            # print result
+    # for varstr in ["edge", "skel"]:
+    #     stars_count = ((sc, sgid) for sgid, sc in stars[varstr]["stars"].iteritems())
+    #     logging.info("insert %s stars counts" % varstr)
+    #     c.executemany("UPDATE %s_stars SET stars=? WHERE starid=?" %varstr, stars_count)
+    #     star_centers_count = ((sc, sgid) for sgid, sc in stars[varstr]["star_centers"].iteritems())
+    #     logging.info("insert %s star centers counts" % varstr)
+    #     c.executemany("UPDATE %s_stars SET star_centers=? WHERE starid=?" % varstr, star_centers_count)
     conn.commit()
     conn.close()
