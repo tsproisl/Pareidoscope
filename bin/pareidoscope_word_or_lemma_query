@@ -1,0 +1,132 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+import argparse
+import itertools
+import json
+import logging
+import math
+import multiprocessing
+import os
+import sqlite3
+import subprocess
+import sys
+
+from networkx.readwrite import json_graph
+
+from pareidoscope import subgraph_isomorphism
+from pareidoscope import query
+from pareidoscope.utils import cwb
+from pareidoscope.utils import database
+from pareidoscope.utils import helper
+from pareidoscope.utils import nx_graph
+
+logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=logging.INFO)
+
+
+def extract_stars(args):
+    """Extract subgraphs from sentence
+    
+    Arguments:
+    - `sentid`:
+    - `position`:
+    - `graph`:
+    """
+    sentid, position, graph = args
+    edge_stars = collections.Counter()
+    skel_stars = collections.Counter()
+    gs = json_graph.node_link_graph(json.loads(graph))
+    bfo_graph, bfo_to_raw = subgraph_enumeration.get_bfo(gs)
+    raw_to_bfo = {v: k for k, v in bfo_to_raw.iteritems()}
+    bfo_to_bfo = {v: v for v in bfo_graph.nodes()}
+    vertice = raw_to_bfo[position]
+    whole_star = bfo_graph.subgraph(set([vertice] + bfo_graph.predecessors(vertice) + bfo_graph.successors(vertice)))
+    for subgraph in subgraph_enumeration.enumerate_csg_minmax(whole_star, bfo_to_bfo, min_vertices=2, max_vertices=whole_star.__len__()):
+        # vertice must be in subgraph
+        if not subgraph.has_node(vertice):
+            continue
+        # vertice must be center of star
+        other_vertices = set(subgraph.nodes()) - set([vertice])
+        if len(other_vertices) == 0:
+            continue
+        if not all((subgraph.has_edge(vertice, x) or subgraph.has_edge(x, vertice) for x in other_vertices)):
+            continue
+        edge_star = subgraph.copy()
+        nx_graph.skeletize_inplace(edge_star, only_vertices=True)
+        edge_star, order = nx_graph.canonize(edge_star, order=True)
+        edge_center = order.index(vertice)
+        edge_t = tuple(networkx.generate_edgelist(edge_star, data=True))
+        edge_stars[(edge_t, edge_center)] += 1
+        skel_star = subgraph.copy()
+        nx_graph.skeletize_inplace(skel_star)
+        skel_star, order = nx_graph.canonize(skel_star, order=True)
+        skel_center = order.index(vertice)
+        skel_t = tuple(networkx.generate_edgelist(skel_star))
+        skel_stars[(skel_t, skel_center)] += 1
+        # result.append([sentid, edge_t, edge_center, skel_t, skel_center])
+    return sentid, edge_stars, skel_stars
+
+
+
+if __name__ == "__main__":
+    if sys.version_info < (2, 7):
+        raise Exception("Need at least Python 2.7!")
+    os.nice(10)
+    parser = argparse.ArgumentParser(description='Run a batch of queries against a corpus')
+    parser.add_argument("--db", type=os.path.abspath, required=True, help="Corpus database")
+    # parser.add_argument("-o", "--output", type=str, required=True, help="Output prefix")
+    parser.add_argument("-l", "--lemma", action="store_true", help="FORM is a lemma and TAG is a word class")
+    parser.add_argument("FORM", type=str, help="Word form or lemma")
+    parser.add_argument("TAG", type=str, help="part-of-speech or word-class tag")
+    args = parser.parse_args()
+    
+    groupsize = 5 * 100 * multiprocessing.cpu_count()
+    pool = multiprocessing.Pool(processes = multiprocessing.cpu_count())
+    logging.info("connect to database '%s'" % args.db)
+    conn = sqlite3.connect(args.db)
+    c = conn.cursor()
+    c.execute("PRAGMA cache_size=100000")
+    subgraphs = check_tables(c)
+    # conn.create_function("REGEXP", 2, database.regexp)
+    logging.info("perform query")
+    form = "word"
+    tag = "pos"
+    if args.lemma:
+        form = "lemma"
+        tag = "wc"
+    q = "SELECT tokens.sentid, tokens.position, sentences.graph FROM tokens INNER JOIN types ON types.typeid = tokens.typeid INNER JOIN sentences ON sentences.sentid = tokens.sentid WHERE %s=?" % form
+    t = (args.FORM,)
+    if args.TAG:
+        q += " AND %s=?" % tag
+        t = (args.FORM, args.TAG)
+    for occurrences in helper.grouper_nofill(groupsize, c.execute(q, t)):
+        r = map(lambda x: (x[0], x[1], x[2]), occurrences)
+        for result in r:
+            print result
+
+    # queries = read_queries(args.QUERIES)
+    # results = [{} for q in queries]
+    # logging.info("%d queries", len(queries))
+    # for query_number, qline in enumerate(queries):
+    #     logging.info("process query %d", query_number+1)
+    #     go11, ga, gb, gr1, gc1, gn = qline
+    #     candidates = None
+    #     if nx_graph.is_purely_structural(gn) and subgraphs:
+    #         logging.info("get structure candidates")
+    #         candidates = database.get_structure_candidates(c, gn)
+    #     else:
+    #         logging.info("get candidates")
+    #         candidates = database.get_candidates(c, gn)
+    #     logging.info("%d candidate sentences", len(candidates))
+    #     for sentids in helper.grouper_nofill(groupsize, candidates):
+    #         logging.info("process %d sentences", len(sentids))
+    #         q = "SELECT graph FROM sentences WHERE sentid=?"
+    #         sentences = [c.execute(q, (sentid,)).fetchone()[0] for sentid in sentids]
+    #         cands = [candidates[sentid] for sentid in sentids]
+    #         arguments = itertools.izip(itertools.repeat(go11), itertools.repeat(ga), itertools.repeat(gb), itertools.repeat(gr1), itertools.repeat(gc1), itertools.repeat(gn), sentences, cands)
+    #         r = pool.imap(query.run_queries_db, arguments, 10)
+    #         # r = map(query.run_queries_db, args)
+    #         for result in r:
+    #             query.merge_result_db(result, query_number, results)
+    # logging.info("write results")
+    # write_results(args.output, results)
