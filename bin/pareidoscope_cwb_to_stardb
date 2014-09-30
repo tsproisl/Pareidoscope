@@ -57,10 +57,10 @@ def create_db(filename):
     # tokens
     c.execute("CREATE TABLE tokens (typeid INTEGER, sentid INTEGER, position INTEGER, FOREIGN KEY (typeid) REFERENCES types, FOREIGN KEY (sentid) REFERENCES sentences, UNIQUE (typeid, sentid, position))")
     ## tables for stars
-    c.execute("CREATE TABLE edge_stars (starid INTEGER PRIMARY KEY AUTOINCREMENT, subgraph TEXT UNIQUE, length INTEGER, degree_sequence TEXT, edge_list TEXT, stars INTEGER, star_centers INTEGER)")
+    c.execute("CREATE TABLE edge_stars (starid INTEGER PRIMARY KEY AUTOINCREMENT, subgraph TEXT, center INTEGER, length INTEGER, degree_sequence TEXT, edge_list TEXT, stars INTEGER, star_centers INTEGER, UNIQUE (subgraph, center))")
     c.execute("CREATE INDEX edegseq_idx ON edge_stars (degree_sequence)")
     c.execute("CREATE INDEX edge_list_idx ON edge_stars (edge_list)")
-    c.execute("CREATE TABLE skel_stars (starid INTEGER PRIMARY KEY AUTOINCREMENT, subgraph TEXT UNIQUE, length INTEGER, degree_sequence TEXT, stars INTEGER, star_centers INTEGER)")
+    c.execute("CREATE TABLE skel_stars (starid INTEGER PRIMARY KEY AUTOINCREMENT, subgraph TEXT, center INTEGER, length INTEGER, degree_sequence TEXT, stars INTEGER, star_centers INTEGER, UNIQUE (subgraph, center))")
     c.execute("CREATE INDEX sdegseq_idx ON skel_stars (degree_sequence)")
     return conn, c
 
@@ -164,13 +164,13 @@ def extract_stars(args):
             edge_star, order = nx_graph.canonize(edge_star, order=True)
             edge_center = order.index(vertice)
             edge_t = tuple(networkx.generate_edgelist(edge_star, data=True))
-            edge_stars[(edge_t, length, edge_center, degree_sequence, sorted_edges)] += 1
+            edge_stars[(edge_t, vertice, length, edge_center, degree_sequence, sorted_edges)] += 1
             skel_star = subgraph.copy()
             nx_graph.skeletize_inplace(skel_star)
             skel_star, order = nx_graph.canonize(skel_star, order=True)
             skel_center = order.index(vertice)
             skel_t = tuple(networkx.generate_edgelist(skel_star))
-            skel_stars[(skel_t, length, skel_center, degree_sequence)] += 1
+            skel_stars[(skel_t, vertice, length, skel_center, degree_sequence)] += 1
     return sentid, edge_stars, skel_stars
 
 
@@ -203,16 +203,16 @@ def insert_stars(conn, c, result):
     """
     sentid, edge_stars, skel_stars = result
     for star, freq in edge_stars.iteritems():
-        graph_tuple, length, center, degree_sequence, sorted_edges = star
+        graph_tuple, center, length, center, degree_sequence, sorted_edges = star
         # graph = networkx.parse_edgelist(graph_tuple, nodetype=int, create_using=networkx.DiGraph())
         graph_string = json.dumps(list(graph_tuple))
-        c.execute("INSERT OR IGNORE INTO edge_stars (subgraph, length, degree_sequence, edge_list, stars, star_centers) VALUES (?, ?, ?, ?, 0, 0)", (graph_string, length, degree_sequence, sorted_edges))
+        c.execute("INSERT OR IGNORE INTO edge_stars (subgraph, center, length, degree_sequence, edge_list, stars, star_centers) VALUES (?, ?, ?, ?, 0, 0)", (graph_string, center, length, degree_sequence, sorted_edges))
         c.execute("UPDATE edge_stars SET stars = stars + ?, star_centers = star_centers + ? WHERE subgraph = ?", (freq, 1, graph_string))
     for star, freq in skel_stars.iteritems():
         graph_tuple, length, center, degree_sequence = star
         # graph = networkx.parse_edgelist(graph_tuple, nodetype=int, create_using=networkx.DiGraph())
         graph_string = json.dumps(list(graph_tuple))
-        c.execute("INSERT OR IGNORE INTO skel_stars (subgraph, length, degree_sequence, stars, star_centers) VALUES (?, ?, ?, 0, 0)", (graph_string, length, degree_sequence))
+        c.execute("INSERT OR IGNORE INTO skel_stars (subgraph, center, length, degree_sequence, stars, star_centers) VALUES (?, ?, ?, 0, 0)", (graph_string, center, length, degree_sequence))
         c.execute("UPDATE skel_stars SET stars = stars + ?, star_centers = star_centers + ? WHERE subgraph = ?", (freq, 1, graph_string))
     # sorted_edge_tuples = {}
     # for varstr, variant in [("edge", edge_stars), ("skel", skel_stars)]:
