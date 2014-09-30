@@ -206,13 +206,13 @@ def insert_stars(conn, c, result):
         graph_tuple, center, length, center, degree_sequence, sorted_edges = star
         # graph = networkx.parse_edgelist(graph_tuple, nodetype=int, create_using=networkx.DiGraph())
         graph_string = json.dumps(list(graph_tuple))
-        c.execute("INSERT OR IGNORE INTO edge_stars (subgraph, center, length, degree_sequence, edge_list, stars, star_centers) VALUES (?, ?, ?, ?, 0, 0)", (graph_string, center, length, degree_sequence, sorted_edges))
+        c.execute("INSERT OR IGNORE INTO edge_stars (subgraph, center, length, degree_sequence, edge_list, stars, star_centers) VALUES (?, ?, ?, ?, ?, 0, 0)", (graph_string, center, length, degree_sequence, sorted_edges))
         c.execute("UPDATE edge_stars SET stars = stars + ?, star_centers = star_centers + ? WHERE subgraph = ?", (freq, 1, graph_string))
     for star, freq in skel_stars.iteritems():
         graph_tuple, length, center, degree_sequence = star
         # graph = networkx.parse_edgelist(graph_tuple, nodetype=int, create_using=networkx.DiGraph())
         graph_string = json.dumps(list(graph_tuple))
-        c.execute("INSERT OR IGNORE INTO skel_stars (subgraph, center, length, degree_sequence, stars, star_centers) VALUES (?, ?, ?, 0, 0)", (graph_string, center, length, degree_sequence))
+        c.execute("INSERT OR IGNORE INTO skel_stars (subgraph, center, length, degree_sequence, stars, star_centers) VALUES (?, ?, ?, ?, 0, 0)", (graph_string, center, length, degree_sequence))
         c.execute("UPDATE skel_stars SET stars = stars + ?, star_centers = star_centers + ? WHERE subgraph = ?", (freq, 1, graph_string))
     # sorted_edge_tuples = {}
     # for varstr, variant in [("edge", edge_stars), ("skel", skel_stars)]:
