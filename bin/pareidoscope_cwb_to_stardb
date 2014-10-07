@@ -296,7 +296,8 @@ if __name__ == "__main__":
     #     for result in r:
     #         insert_stars(conn, c, result)
     #     conn.commit()
-    conn, c = sqlite3.connect(args.db)
+    conn = sqlite3.connect(args.db)
+    c = conn.cursor()
     logging.info("collapse isomorphic stars")
     for is_edge_star in [False, True]:
         cands = iso_candidates_iter(conn, is_edge_star)
