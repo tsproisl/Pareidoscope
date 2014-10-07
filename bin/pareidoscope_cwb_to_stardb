@@ -241,23 +241,27 @@ def collapse_isomorphisms(args):
     """"""
     candidates, is_edge_star = args
     #starid, subgraph, center, stars, star_centers = candidate
-    results = {}
+    sets = {}
+    frequencies = {}
     done = [False for _ in candidates]
-    subgraph = [networkx.parse_edgelist(json.loads(c[1])) for c in candidates]
+    subgraph = [networkx.parse_edgelist(json.loads(c[1]), nodetype=int, create_using=networkx.DiGraph()) for c in candidates]
     for i in range(len(candidates)):
         if done[i]:
             continue
-        results[i] = set([candidates[i][0]])
+        sets[i] = set([candidates[i][0]])
+        frequencies[i] = {"stars": candidates[i][3], "star_centers": candidates[i][4]}
         done[i] = True
         for j in range(len(candidates)):
             if done[j]:
                 continue
             dgm = isomorphism.DiGraphMatcher(subgraph[i], subgraph[j], edge_match=lambda x, y: x.get("relation", "") == y.get("relation", ""))
-            if any(iso[candidates[i][2]] == candidates[j][2] for iso in dgm.isomorphisms_iter()):
-                results[i].add(candidates[j][0])
-                done[j] = True
-                logging.debug("%s is isomorphic to %s" % (candidates[i][0], candidates[j][0]))
-    return results.values()
+            if any(iso[int(candidates[i][2])] == int(candidates[j][2]) for iso in dgm.isomorphisms_iter()):
+                sets[i].add(candidates[j][0])
+                frequencies[i]["stars"] += candidates[j][3]
+                frequencies[i]["star_centers"] += candidates[j][4]
+                sets[j] = True
+                logging.debug("%s is isomorphic to %s" % (candidates[i][1], candidates[j][1]))
+    return sets, frequencies
 
 
 
@@ -301,17 +305,10 @@ if __name__ == "__main__":
     logging.info("collapse isomorphic stars")
     for is_edge_star in [False, True]:
         cands = iso_candidates_iter(conn, is_edge_star)
-        for candidates in helper.grouper_nofill(groupsize, cands):
+        #for candidates in helper.grouper_nofill(groupsize, cands):
+        for candidates in helper.grouper_nofill(100, cands):
             r = map(collapse_isomorphisms, itertools.izip(candidates, itertools.repeat(is_edge_star)))
             for result in r:
                 print result
-            # print result
-    # for varstr in ["edge", "skel"]:
-    #     stars_count = ((sc, sgid) for sgid, sc in stars[varstr]["stars"].iteritems())
-    #     logging.info("insert %s stars counts" % varstr)
-    #     c.executemany("UPDATE %s_stars SET stars=? WHERE starid=?" %varstr, stars_count)
-    #     star_centers_count = ((sc, sgid) for sgid, sc in stars[varstr]["star_centers"].iteritems())
-    #     logging.info("insert %s star centers counts" % varstr)
-    #     c.executemany("UPDATE %s_stars SET star_centers=? WHERE starid=?" % varstr, star_centers_count)
     conn.commit()
     conn.close()
