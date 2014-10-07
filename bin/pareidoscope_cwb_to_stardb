@@ -302,7 +302,7 @@ if __name__ == "__main__":
     for is_edge_star in [False, True]:
         cands = iso_candidates_iter(conn, is_edge_star)
         for candidates in helper.grouper_nofill(groupsize, cands):
-            r = map(foo, itertools.izip(candidates, itertools.repeat(is_edge_star)))
+            r = map(collapse_isomorphisms, itertools.izip(candidates, itertools.repeat(is_edge_star)))
             for result in r:
                 print result
             # print result
