@@ -200,6 +200,7 @@ def insert_stars(conn, c, result):
     - `c`:
     - `result`:
     - `subgraphs`:
+
     """
     sentid, edge_stars, skel_stars = result
     for star, freq in edge_stars.iteritems():
@@ -214,27 +215,49 @@ def insert_stars(conn, c, result):
         graph_string = json.dumps(list(graph_tuple))
         c.execute("INSERT OR IGNORE INTO skel_stars (subgraph, center, length, degree_sequence, stars, star_centers) VALUES (?, ?, ?, ?, 0, 0)", (graph_string, center, length, degree_sequence))
         c.execute("UPDATE skel_stars SET stars = stars + ?, star_centers = star_centers + ? WHERE subgraph = ?", (freq, 1, graph_string))
-    # sorted_edge_tuples = {}
-    # for varstr, variant in [("edge", edge_stars), ("skel", skel_stars)]:
-    #     for star in variant:
-    #         if star not in stars[varstr]["id"]:
-    #             graph = networkx.parse_edgelist(star[0], nodetype=int, create_using=networkx.DiGraph())
-    #             if varstr == "edge":
-    #                 sorted_edge_tuple = tuple(sorted([l["relation"] for s, t, l in graph.edges(data=True)]))
-    #                 if sorted_edge_tuple in sorted_edge_tuples:
-    #                     _check_isomorphisms(star, graph, stars, varstr, sorted_edge_tuples[sorted_edge_tuple])
-    #                     sorted_edge_tuples[sorted_edge_tuple].append(star)
-    #                 else:
-    #                     sorted_edge_tuples[sorted_edge_tuple] = [star]
-    #             if varstr == "skel":
-    #                 _check_isomorphisms(star, graph, stars, varstr)
-    #             stars[varstr]["graph"][star] = graph
-    #             if star not in stars[varstr]["id"]:
-    #                 c.execute("INSERT INTO %s_stars (subgraph, length) VALUES (?,?)" % varstr, (json.dumps(list(star)),len(star[0])))
-    #                 stars[varstr]["id"][star] = c.lastrowid
-    #         starid = stars[varstr]["id"][star]
-    #         stars[varstr]["star_centers"][starid] = stars[varstr]["star_centers"].get(starid, 0) + 1
-    #         stars[varstr]["stars"][starid] = stars[varstr]["stars"].get(starid, 0) + variant[star]
+
+
+def iso_candidates_iter(conn, is_edge_star):
+    """Yield a list of potentially isomorphic subgraphs.
+
+    Arguments:
+    - `conn`:
+    - `c`:
+    - `is_edge_star`:
+
+    """
+    c1 = conn.cursor()
+    q1 = "SELECT DISTINCT degree_sequence FROM skel_stars"
+    q2 = "SELECT starid, subgraph, center, stars, star_centers FROM skel_stars WHERE degree_sequence=?"
+    if is_edge_star:
+        q1 = "SELECT DISTINCT degree_sequence, edge_list FROM edge_stars"
+        q2 = "SELECT starid, subgraph, center, stars, star_centers FROM edge_stars WHERE degree_sequence=? AND edge_list=?"
+    for row in c1.execute(q1):
+        c2 = conn.cursor()
+        yield c2.execute(q2, row).fetchall()
+
+
+def collapse_isomorphisms(args):
+    """"""
+    candidates, is_edge_star = args
+    #starid, subgraph, center, stars, star_centers = candidate
+    results = {}
+    done = [False for _ in candidates]
+    subgraph = [networkx.parse_edgelist(json.loads(c[1])) for c in candidates]
+    for i in range(len(candidates)):
+        if done[i]:
+            continue
+        results[i] = set([candidates[i][0]])
+        done[i] = True
+        for j in range(len(candidates)):
+            if done[j]:
+                continue
+            dgm = isomorphism.DiGraphMatcher(subgraph[i], subgraph[j], edge_match=lambda x, y: x.get("relation", "") == y.get("relation", ""))
+            if any(iso[candidates[i][2]] == candidates[j][2] for iso in dgm.isomorphisms_iter()):
+                results[i].add(candidates[j][0])
+                done[j] = True
+                logging.debug("%s is isomorphic to %s" % (candidates[i][0], candidates[j][0]))
+    return results.values()
 
 
 
@@ -244,35 +267,43 @@ if __name__ == "__main__":
     parser.add_argument("CORPUS", type=argparse.FileType("r"), help="Corpus in CWB format")
     args = parser.parse_args()
 
-    groupsize = 50 * 10 * multiprocessing.cpu_count()
-    # raise exeception if args.db already exists
-    if os.path.exists(args.db):
-        raise Exception("Database file already exists")
-    conn, c = create_db(args.db)
-    pool = multiprocessing.Pool(processes = multiprocessing.cpu_count())
-    sents = cwb.sentences_iter(args.CORPUS, return_id=True)
-    results = {}
-    logging.info("tupleize and preprocess")
-    for sentences in helper.grouper_nofill(groupsize, sents):
-        r = pool.imap_unordered(tupleize, sentences, 10)
-        # r = map(tupleize, sentences)
-        for result, sensible in r:
-            if sensible:
-                preprocess_results(conn, c, result, results)
-    logging.info("insert tokens")
-    insert_tokens(conn, c, results)
-    # stars = {"edge": {"stars": {}, "star_centers": {}, "id": {}, "graph": {}}, "skel": {"stars": {}, "star_centers": {}, "id": {}, "graph": {}}}
-    logging.info("exctract stars")
-    sent_count = c.execute("SELECT count(*) FROM sentences").fetchone()[0]
-    logging.info("%d sentences" % sent_count)
-    for offset in xrange(0, sent_count, groupsize):
-        sentences = c.execute("SELECT sentid, graph FROM sentences LIMIT ? OFFSET ?", (groupsize, offset)).fetchall()
-        logging.info("process sentences %d to %d", offset+1, offset+len(sentences))
-        r = pool.imap_unordered(extract_stars, sentences, 10)
-        # r = map(extract_stars, sentences)
-        for result in r:
-            insert_stars(conn, c, result)
-        conn.commit()
+    # groupsize = 50 * 10 * multiprocessing.cpu_count()
+    # # raise exeception if args.db already exists
+    # if os.path.exists(args.db):
+    #     raise Exception("Database file already exists")
+    # conn, c = create_db(args.db)
+    # pool = multiprocessing.Pool(processes = multiprocessing.cpu_count())
+    # sents = cwb.sentences_iter(args.CORPUS, return_id=True)
+    # results = {}
+    # logging.info("tupleize and preprocess")
+    # for sentences in helper.grouper_nofill(groupsize, sents):
+    #     r = pool.imap_unordered(tupleize, sentences, 10)
+    #     # r = map(tupleize, sentences)
+    #     for result, sensible in r:
+    #         if sensible:
+    #             preprocess_results(conn, c, result, results)
+    # logging.info("insert tokens")
+    # insert_tokens(conn, c, results)
+    # # stars = {"edge": {"stars": {}, "star_centers": {}, "id": {}, "graph": {}}, "skel": {"stars": {}, "star_centers": {}, "id": {}, "graph": {}}}
+    # logging.info("exctract stars")
+    # sent_count = c.execute("SELECT count(*) FROM sentences").fetchone()[0]
+    # logging.info("%d sentences" % sent_count)
+    # for offset in xrange(0, sent_count, groupsize):
+    #     sentences = c.execute("SELECT sentid, graph FROM sentences LIMIT ? OFFSET ?", (groupsize, offset)).fetchall()
+    #     logging.info("process sentences %d to %d", offset+1, offset+len(sentences))
+    #     r = pool.imap_unordered(extract_stars, sentences, 10)
+    #     # r = map(extract_stars, sentences)
+    #     for result in r:
+    #         insert_stars(conn, c, result)
+    #     conn.commit()
+    conn, c = sqlite3.connect(args.db)
+    logging.info("collapse isomorphic stars")
+    for is_edge_star in [False, True]:
+        cands = iso_candidates_iter(conn, is_edge_star)
+        for candidates in helper.grouper_nofill(groupsize, cands):
+            r = map(foo, itertools.izip(candidates, itertools.repeat(is_edge_star)))
+            for result in r:
+                print result
             # print result
     # for varstr in ["edge", "skel"]:
     #     stars_count = ((sc, sgid) for sgid, sc in stars[varstr]["stars"].iteritems())
