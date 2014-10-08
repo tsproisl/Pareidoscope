@@ -2,22 +2,18 @@
 # -*- coding: utf-8 -*-
 
 import argparse
+import collections
 import itertools
 import json
 import logging
-import math
 import multiprocessing
-import os
 import sqlite3
-import subprocess
-import sys
+import os
 
+import networkx
 from networkx.readwrite import json_graph
 
-from pareidoscope import subgraph_isomorphism
-from pareidoscope import query
-from pareidoscope.utils import cwb
-from pareidoscope.utils import database
+from pareidoscope import subgraph_enumeration
 from pareidoscope.utils import helper
 from pareidoscope.utils import nx_graph
 
@@ -35,6 +31,7 @@ def extract_stars(args):
     sentid, position, graph = args
     edge_stars = collections.Counter()
     skel_stars = collections.Counter()
+    edge_to_skel = {}
     gs = json_graph.node_link_graph(json.loads(graph))
     bfo_graph, bfo_to_raw = subgraph_enumeration.get_bfo(gs)
     raw_to_bfo = {v: k for k, v in bfo_to_raw.iteritems()}
@@ -63,15 +60,17 @@ def extract_stars(args):
         skel_center = order.index(vertice)
         skel_t = tuple(networkx.generate_edgelist(skel_star))
         skel_stars[(skel_t, skel_center)] += 1
-        # result.append([sentid, edge_t, edge_center, skel_t, skel_center])
-    return sentid, edge_stars, skel_stars
+        if (edge_t, edge_center) not in edge_to_skel:
+            edge_to_skel[(edge_t, edge_center)] = set([(skel_t, skel_center)])
+        else:
+            edge_to_skel[(edge_t, edge_center)] = add((skel_t, skel_center))
+    return sentid, edge_stars, skel_stars, edge_to_skel
+
+
 
 
 
 if __name__ == "__main__":
-    if sys.version_info < (2, 7):
-        raise Exception("Need at least Python 2.7!")
-    os.nice(10)
     parser = argparse.ArgumentParser(description='Run a batch of queries against a corpus')
     parser.add_argument("--db", type=os.path.abspath, required=True, help="Corpus database")
     # parser.add_argument("-o", "--output", type=str, required=True, help="Output prefix")
@@ -80,29 +79,45 @@ if __name__ == "__main__":
     parser.add_argument("TAG", type=str, help="part-of-speech or word-class tag")
     args = parser.parse_args()
     
-    groupsize = 5 * 100 * multiprocessing.cpu_count()
+    groupsize = 50 * 10 * multiprocessing.cpu_count()
     pool = multiprocessing.Pool(processes = multiprocessing.cpu_count())
+    
     logging.info("connect to database '%s'" % args.db)
     conn = sqlite3.connect(args.db)
     c = conn.cursor()
     c.execute("PRAGMA cache_size=100000")
-    subgraphs = check_tables(c)
     # conn.create_function("REGEXP", 2, database.regexp)
-    logging.info("perform query")
-    form = "word"
-    tag = "pos"
-    if args.lemma:
-        form = "lemma"
-        tag = "wc"
+    
+    logging.info("collect stars")
+    form = "lemma" if args.lemma else "word"
+    tag = "wc" if args.lemma else "pos"
     q = "SELECT tokens.sentid, tokens.position, sentences.graph FROM tokens INNER JOIN types ON types.typeid = tokens.typeid INNER JOIN sentences ON sentences.sentid = tokens.sentid WHERE %s=?" % form
     t = (args.FORM,)
     if args.TAG:
         q += " AND %s=?" % tag
         t = (args.FORM, args.TAG)
+    o11_stars = collections.Counter()
+    r1_stars = collections.Counter()
+    o11_centers = collections.Counter()
+    r1_centers = collections.Counter()
+    o11_to_r1 = {}
     for occurrences in helper.grouper_nofill(groupsize, c.execute(q, t)):
-        r = map(lambda x: (x[0], x[1], x[2]), occurrences)
-        for result in r:
-            print result
+        d = conn.cursor()
+        r = pool.imap_unordered(extract_stars, occurrences, 10)
+        # r = map(extract_stars, occurrences)
+        for sentid, e, s, m in r:
+            o11_stars += e
+            r1_stars += s
+            o11_centers += collections.Counter({k: 1 for k in e})
+            r1_centers += collections.Counter({k: 1 for k in s})
+    
+    logging.info("calculate association strengths")
+    c1_stars = collections.Counter()
+    n_stars = collections.Counter()
+    c1_centers = collections.Counter()
+    n_centers = collections.Counter()
+    # collapse isomorphic stars
+
 
     # queries = read_queries(args.QUERIES)
     # results = [{} for q in queries]
