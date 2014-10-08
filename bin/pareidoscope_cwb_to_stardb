@@ -21,8 +21,8 @@ from pareidoscope.utils import cwb
 from pareidoscope.utils import helper
 from pareidoscope.utils import nx_graph
 
-# logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=logging.INFO)
-logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=logging.DEBUG)
+logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=logging.INFO)
+# logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=logging.DEBUG)
 
 
 def create_db(filename):
@@ -62,6 +62,11 @@ def create_db(filename):
     c.execute("CREATE INDEX edge_list_idx ON edge_stars (edge_list)")
     c.execute("CREATE TABLE skel_stars (starid INTEGER PRIMARY KEY AUTOINCREMENT, subgraph TEXT, center INTEGER, length INTEGER, degree_sequence TEXT, stars INTEGER, star_centers INTEGER, UNIQUE (subgraph, center))")
     c.execute("CREATE INDEX sdegseq_idx ON skel_stars (degree_sequence)")
+    # equivalence classes of isomorphic stars
+    c.execute("CREATE TABLE edge_star_classes (classid INTEGER PRIMARY KEY AUTOINCREMENT, stars INTEGER, star_centers INTEGER)")
+    c.execute("CREATE TABLE skel_star_classes (classid INTEGER PRIMARY KEY AUTOINCREMENT, stars INTEGER, star_centers INTEGER)")
+    c.execute("CREATE TABLE edge_star_elements (classid INTEGER, elemid INTEGER, FOREIGN KEY (classid) REFERENCES edge_star_classes, FOREIGN KEY (elemid) REFERENCES edge_stars (starid), UNIQUE (elemid, classid))")
+    c.execute("CREATE TABLE skel_star_elements (classid INTEGER, elemid INTEGER, FOREIGN KEY (classid) REFERENCES skel_star_classes, FOREIGN KEY (elemid) REFERENCES skel_stars (starid), UNIQUE (elemid, classid))")
     return conn, c
 
 
@@ -259,9 +264,27 @@ def collapse_isomorphisms(args):
                 sets[i].add(candidates[j][0])
                 frequencies[i]["stars"] += candidates[j][3]
                 frequencies[i]["star_centers"] += candidates[j][4]
-                sets[j] = True
+                done[j] = True
                 logging.debug("%s is isomorphic to %s" % (candidates[i][1], candidates[j][1]))
     return sets, frequencies
+
+
+def insert_equivalence_classes(c, sets, frequencies, is_edge_star):
+    """Insert equivalence classes of isomorphic stars into the database.
+
+    """
+    q1 = "INSERT INTO skel_star_classes (stars, star_centers) VALUES (?, ?)"
+    q2 = "INSERT INTO skel_star_elements (classid, elemid) VALUES (?, ?)"
+    if is_edge_star:
+        q1 = "INSERT INTO edge_star_classes (stars, star_centers) VALUES (?, ?)"
+        q2 = "INSERT INTO edge_star_elements (classid, elemid) VALUES (?, ?)"
+    for i in sorted(sets.keys()):
+        s = sets[i]
+        stars = frequencies[i]["stars"]
+        star_centers = frequencies[i]["star_centers"]
+        c.execute(q1, (stars, star_centers))
+        classid = c.lastrowid
+        c.executemany(q2, zip(itertools.repeat(classid), s))
 
 
 
@@ -276,7 +299,7 @@ if __name__ == "__main__":
     # if os.path.exists(args.db):
     #     raise Exception("Database file already exists")
     # conn, c = create_db(args.db)
-    # pool = multiprocessing.Pool(processes = multiprocessing.cpu_count())
+    pool = multiprocessing.Pool(processes = multiprocessing.cpu_count())
     # sents = cwb.sentences_iter(args.CORPUS, return_id=True)
     # results = {}
     # logging.info("tupleize and preprocess")
@@ -304,11 +327,14 @@ if __name__ == "__main__":
     c = conn.cursor()
     logging.info("collapse isomorphic stars")
     for is_edge_star in [False, True]:
+        logging.info("... %s" % ("edge stars" if is_edge_star else "skel_stars"))
         cands = iso_candidates_iter(conn, is_edge_star)
-        #for candidates in helper.grouper_nofill(groupsize, cands):
-        for candidates in helper.grouper_nofill(100, cands):
-            r = map(collapse_isomorphisms, itertools.izip(candidates, itertools.repeat(is_edge_star)))
+        for candidates in helper.grouper_nofill(groupsize, cands):
+            r = pool.imap_unordered(collapse_isomorphisms, itertools.izip(candidates, itertools.repeat(is_edge_star)), 10)
+            # r = map(collapse_isomorphisms, itertools.izip(candidates, itertools.repeat(is_edge_star)))
             for result in r:
-                print result
+                sets, frequencies = result
+                insert_equivalence_classes(c, sets, frequencies, is_edge_star)
     conn.commit()
     conn.close()
+    logging.info("done")
