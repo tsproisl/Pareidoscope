@@ -53,17 +53,19 @@ def extract_stars(args):
         edge_star, order = nx_graph.canonize(edge_star, order=True)
         edge_center = order.index(vertice)
         edge_t = tuple(networkx.generate_edgelist(edge_star, data=True))
-        edge_stars[(edge_t, edge_center)] += 1
+        edge_string = json.dumps(list(edge_t))
+        edge_stars[(edge_string, edge_center)] += 1
         skel_star = subgraph.copy()
         nx_graph.skeletize_inplace(skel_star)
         skel_star, order = nx_graph.canonize(skel_star, order=True)
         skel_center = order.index(vertice)
         skel_t = tuple(networkx.generate_edgelist(skel_star))
-        skel_stars[(skel_t, skel_center)] += 1
-        if (edge_t, edge_center) not in edge_to_skel:
-            edge_to_skel[(edge_t, edge_center)] = set([(skel_t, skel_center)])
+        skel_string = json.dumps(list(skel_t))
+        skel_stars[(skel_string, skel_center)] += 1
+        if (edge_string, edge_center) not in edge_to_skel:
+            edge_to_skel[(edge_string, edge_center)] = set([(skel_string, skel_center)])
         else:
-            edge_to_skel[(edge_t, edge_center)].add((skel_t, skel_center))
+            edge_to_skel[(edge_string, edge_center)].add((skel_string, skel_center))
     return sentid, edge_stars, skel_stars, edge_to_skel
 
 
