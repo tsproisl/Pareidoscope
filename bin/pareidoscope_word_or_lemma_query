@@ -110,7 +110,7 @@ if __name__ == "__main__":
         for sentid, e, s, m in r:
             q1 = "SELECT ese.classid FROM edge_star_elements AS ese JOIN edge_stars AS es ON ese.elemid = es.starid WHERE es.subgraph=? AND es.center=?"
             q2 = "SELECT sse.classid FROM skel_star_elements AS sse JOIN skel_stars AS ss ON sse.elemid = ss.starid WHERE ss.subgraph=? AND ss.center=?"
-            get_classid = lambda q, t: d.execute(q, t).fetchall[0][0]
+            get_classid = lambda q, t: d.execute(q, t).fetchall()[0][0]
             for o11 in e:
                 classid = get_classid(q1, o11)
                 o11_stars[classid] += e[o11]
