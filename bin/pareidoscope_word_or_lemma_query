@@ -113,6 +113,7 @@ if __name__ == "__main__":
             get_classid = lambda q, t: d.execute(q, t).fetchall()[0][0]
             for o11 in e:
                 print o11
+                print d.execute(q1, o11).fetchall()
                 classid = get_classid(q1, o11)
                 o11_stars[classid] += e[o11]
                 o11_centers[classid] += 1
