@@ -112,6 +112,7 @@ if __name__ == "__main__":
             q2 = "SELECT sse.classid FROM skel_star_elements AS sse JOIN skel_stars AS ss ON sse.elemid = ss.starid WHERE ss.subgraph=? AND ss.center=?"
             get_classid = lambda q, t: d.execute(q, t).fetchall()[0][0]
             for o11 in e:
+                print o11
                 classid = get_classid(q1, o11)
                 o11_stars[classid] += e[o11]
                 o11_centers[classid] += 1
