@@ -132,31 +132,3 @@ if __name__ == "__main__":
     c1_centers = collections.Counter()
     n_centers = collections.Counter()
     # collapse isomorphic stars
-
-
-    # queries = read_queries(args.QUERIES)
-    # results = [{} for q in queries]
-    # logging.info("%d queries", len(queries))
-    # for query_number, qline in enumerate(queries):
-    #     logging.info("process query %d", query_number+1)
-    #     go11, ga, gb, gr1, gc1, gn = qline
-    #     candidates = None
-    #     if nx_graph.is_purely_structural(gn) and subgraphs:
-    #         logging.info("get structure candidates")
-    #         candidates = database.get_structure_candidates(c, gn)
-    #     else:
-    #         logging.info("get candidates")
-    #         candidates = database.get_candidates(c, gn)
-    #     logging.info("%d candidate sentences", len(candidates))
-    #     for sentids in helper.grouper_nofill(groupsize, candidates):
-    #         logging.info("process %d sentences", len(sentids))
-    #         q = "SELECT graph FROM sentences WHERE sentid=?"
-    #         sentences = [c.execute(q, (sentid,)).fetchone()[0] for sentid in sentids]
-    #         cands = [candidates[sentid] for sentid in sentids]
-    #         arguments = itertools.izip(itertools.repeat(go11), itertools.repeat(ga), itertools.repeat(gb), itertools.repeat(gr1), itertools.repeat(gc1), itertools.repeat(gn), sentences, cands)
-    #         r = pool.imap(query.run_queries_db, arguments, 10)
-    #         # r = map(query.run_queries_db, args)
-    #         for result in r:
-    #             query.merge_result_db(result, query_number, results)
-    # logging.info("write results")
-    # write_results(args.output, results)
