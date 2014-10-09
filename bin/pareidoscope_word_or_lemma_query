@@ -63,7 +63,7 @@ def extract_stars(args):
         if (edge_t, edge_center) not in edge_to_skel:
             edge_to_skel[(edge_t, edge_center)] = set([(skel_t, skel_center)])
         else:
-            edge_to_skel[(edge_t, edge_center)] = add((skel_t, skel_center))
+            edge_to_skel[(edge_t, edge_center)].add((skel_t, skel_center))
     return sentid, edge_stars, skel_stars, edge_to_skel
 
 
@@ -105,8 +105,7 @@ if __name__ == "__main__":
         d = conn.cursor()
         r = pool.imap_unordered(extract_stars, occurrences, 10)
         # r = map(extract_stars, occurrences)
-        for result in r:
-            sentid, e, s, m = result
+        for sentid, e, s, m in r:
             q1 = "SELECT classid FROM edge_star_elements WHERE elemid=?"
             q2 = "SELECT classid FROM skel_star_elements WHERE elemid=?"
             get_classid = lambda q, t: d.execute(q, t).fetchall[0][0]
