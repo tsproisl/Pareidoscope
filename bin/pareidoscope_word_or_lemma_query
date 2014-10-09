@@ -53,14 +53,14 @@ def extract_stars(args):
         edge_star, order = nx_graph.canonize(edge_star, order=True)
         edge_center = order.index(vertice)
         edge_t = tuple(networkx.generate_edgelist(edge_star, data=True))
-        edge_string = json.dumps(list(edge_t), ensure_ascii=True)
+        edge_string = json.dumps(list(edge_t), ensure_ascii=True, encoding="utf-8")
         edge_stars[(edge_string, edge_center)] += 1
         skel_star = subgraph.copy()
         nx_graph.skeletize_inplace(skel_star)
         skel_star, order = nx_graph.canonize(skel_star, order=True)
         skel_center = order.index(vertice)
         skel_t = tuple(networkx.generate_edgelist(skel_star))
-        skel_string = json.dumps(list(skel_t), ensure_ascii=True)
+        skel_string = json.dumps(list(skel_t), ensure_ascii=True, encoding="utf-8")
         skel_stars[(skel_string, skel_center)] += 1
         if (edge_string, edge_center) not in edge_to_skel:
             edge_to_skel[(edge_string, edge_center)] = set([(skel_string, skel_center)])
