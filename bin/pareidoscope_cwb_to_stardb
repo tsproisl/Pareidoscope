@@ -168,7 +168,7 @@ def extract_stars(args):
             nx_graph.skeletize_inplace(edge_star, only_vertices=True)
             edge_star, order = nx_graph.canonize(edge_star, order=True)
             edge_center = order.index(vertice)
-            edge_t = tuple(networkx.generate_edgelist(edge_star, data=True))
+            edge_t = tuple(networkx.generate_edgelist(edge_star, data=["relation"]))
             edge_stars[(edge_t, vertice, length, edge_center, degree_sequence, sorted_edges)] += 1
             skel_star = subgraph.copy()
             nx_graph.skeletize_inplace(skel_star)
@@ -247,7 +247,7 @@ def collapse_isomorphisms(args):
     sets = {}
     frequencies = {}
     done = [False for _ in candidates]
-    subgraph = [networkx.parse_edgelist(json.loads(c[1]), nodetype=int, create_using=networkx.DiGraph()) for c in candidates]
+    subgraph = [networkx.parse_edgelist(json.loads(c[1]), nodetype=int, create_using=networkx.DiGraph(), data=(("relation", str),)) for c in candidates]
     for i in range(len(candidates)):
         if done[i]:
             continue
