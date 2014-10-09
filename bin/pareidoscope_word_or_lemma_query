@@ -105,7 +105,8 @@ if __name__ == "__main__":
         d = conn.cursor()
         r = pool.imap_unordered(extract_stars, occurrences, 10)
         # r = map(extract_stars, occurrences)
-        for sentid, e, s, m in r:
+        for result in r:
+            sentid, e, s, m = result
             q1 = "SELECT classid FROM edge_star_elements WHERE elemid=?"
             q2 = "SELECT classid FROM skel_star_elements WHERE elemid=?"
             get_classid = lambda q, t: d.execute(q, t).fetchall[0][0]
