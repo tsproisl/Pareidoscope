@@ -293,33 +293,37 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     groupsize = 50 * 10 * multiprocessing.cpu_count()
-    # raise exeception if args.db already exists
-    if os.path.exists(args.db):
-        raise Exception("Database file already exists")
-    conn, c = create_db(args.db)
+    # # raise exeception if args.db already exists
+    # if os.path.exists(args.db):
+    #     raise Exception("Database file already exists")
+    # conn, c = create_db(args.db)
     pool = multiprocessing.Pool(processes = multiprocessing.cpu_count())
-    sents = cwb.sentences_iter(args.CORPUS, return_id=True)
-    results = {}
-    logging.info("tupleize and preprocess")
-    for sentences in helper.grouper_nofill(groupsize, sents):
-        r = pool.imap_unordered(tupleize, sentences, 10)
-        # r = map(tupleize, sentences)
-        for result, sensible in r:
-            if sensible:
-                preprocess_results(conn, c, result, results)
-    logging.info("insert tokens")
-    insert_tokens(conn, c, results)
-    logging.info("exctract stars")
-    sent_count = c.execute("SELECT count(*) FROM sentences").fetchone()[0]
-    logging.info("%d sentences" % sent_count)
-    for offset in xrange(0, sent_count, groupsize):
-        sentences = c.execute("SELECT sentid, graph FROM sentences LIMIT ? OFFSET ?", (groupsize, offset)).fetchall()
-        logging.info("process sentences %d to %d", offset+1, offset+len(sentences))
-        r = pool.imap_unordered(extract_stars, sentences, 10)
-        # r = map(extract_stars, sentences)
-        for result in r:
-            insert_stars(c, result)
-        conn.commit()
+    # sents = cwb.sentences_iter(args.CORPUS, return_id=True)
+    # results = {}
+    # logging.info("tupleize and preprocess")
+    # for sentences in helper.grouper_nofill(groupsize, sents):
+    #     r = pool.imap_unordered(tupleize, sentences, 10)
+    #     # r = map(tupleize, sentences)
+    #     for result, sensible in r:
+    #         if sensible:
+    #             preprocess_results(conn, c, result, results)
+    # logging.info("insert tokens")
+    # insert_tokens(conn, c, results)
+    # logging.info("exctract stars")
+    # sent_count = c.execute("SELECT count(*) FROM sentences").fetchone()[0]
+    # logging.info("%d sentences" % sent_count)
+    # for offset in xrange(0, sent_count, groupsize):
+    #     sentences = c.execute("SELECT sentid, graph FROM sentences LIMIT ? OFFSET ?", (groupsize, offset)).fetchall()
+    #     logging.info("process sentences %d to %d", offset+1, offset+len(sentences))
+    #     r = pool.imap_unordered(extract_stars, sentences, 10)
+    #     # r = map(extract_stars, sentences)
+    #     for result in r:
+    #         insert_stars(c, result)
+    #     conn.commit()
+    conn = sqlite3.connect(args.db)
+    c = conn.cursor()
+    c.execute("PRAGMA cache_size=100000")
+
     logging.info("collapse isomorphic stars")
     for is_edge_star in [False, True]:
         logging.info("... %s" % ("edge stars" if is_edge_star else "skel_stars"))
