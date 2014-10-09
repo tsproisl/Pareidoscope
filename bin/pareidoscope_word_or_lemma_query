@@ -106,11 +106,22 @@ if __name__ == "__main__":
         r = pool.imap_unordered(extract_stars, occurrences, 10)
         # r = map(extract_stars, occurrences)
         for sentid, e, s, m in r:
-            o11_stars += e
-            r1_stars += s
-            o11_centers += collections.Counter({k: 1 for k in e})
-            r1_centers += collections.Counter({k: 1 for k in s})
-    
+            q1 = "SELECT classid FROM edge_star_elements WHERE elemid=?"
+            q2 = "SELECT classid FROM skel_star_elements WHERE elemid=?"
+            get_classid = lambda q, t: d.execute(q, t).fetchall[0][0]
+            for o11 in e:
+                classid = get_classid(q1, o11)
+                o11_stars[classid] += e[o11]
+                o11_centers[classid] += 1
+            for r1 in s:
+                classid = get_classid(q2, r1)
+                r1_stars[classid] += s[r1]
+                r1_centers[classid] += 1
+            # o11_stars += e
+            # r1_stars += s
+            # o11_centers += collections.Counter({k: 1 for k in e})
+            # r1_centers += collections.Counter({k: 1 for k in s})
+    print r1_stars
     logging.info("calculate association strengths")
     c1_stars = collections.Counter()
     n_stars = collections.Counter()
