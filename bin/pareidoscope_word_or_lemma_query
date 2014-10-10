@@ -104,6 +104,7 @@ if __name__ == "__main__":
     r1_centers = collections.Counter()
     o11_to_r1 = {}
     for occurrences in helper.grouper_nofill(groupsize, c.execute(q, t)):
+        o11ids, r1ids = {}, {}
         d = conn.cursor()
         r = pool.imap_unordered(extract_stars, occurrences, 10)
         # r = map(extract_stars, occurrences)
@@ -114,21 +115,30 @@ if __name__ == "__main__":
             for o11 in e:
                 print o11
                 print d.execute(q1, o11).fetchall()
-                classid = get_classid(q1, o11)
+                if o11 not in o11ids:
+                    o11ids[o11] = get_classid(q1, o11)
+                classid = o11ids[o11]
                 o11_stars[classid] += e[o11]
                 o11_centers[classid] += 1
             for r1 in s:
-                classid = get_classid(q2, r1)
+                if r1 not in r1ids:
+                    r1ids[r1] = get_classid(q2, r1)
+                classid = r1ids[r1]
                 r1_stars[classid] += s[r1]
                 r1_centers[classid] += 1
-            # o11_stars += e
-            # r1_stars += s
-            # o11_centers += collections.Counter({k: 1 for k in e})
-            # r1_centers += collections.Counter({k: 1 for k in s})
+            for o11 in m:
+                oid = o11ids[o11]
+                rids = set([r1ids[r] for r in m[o11]])
+                if len(rids) != 1:
+                    raise Exception("More than one skel_star for edge_star %s: %s" % (oid, ", ".join(rids)))
+                if oid in o11_to_r1:
+                    if o11_to_r1[oid] != rids[0]:
+                        raise Exception("More than one skel_star for edge_star %s: %s" % (oid, ", ".join([o11_to_r1[oid], rids[0]])))
+                else:
+                    o11_to_r1[oid] = rids[0]
     print r1_stars
     logging.info("calculate association strengths")
     c1_stars = collections.Counter()
     n_stars = collections.Counter()
     c1_centers = collections.Counter()
     n_centers = collections.Counter()
-    # collapse isomorphic stars
