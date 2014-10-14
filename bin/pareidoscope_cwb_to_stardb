@@ -81,7 +81,7 @@ def tupleize(stuple):
     sensible = nx_graph.is_sensible_graph(gs)
     result = {}
     result["tokens"] = {}
-    result["graph"] = json.dumps(json_graph.node_link_data(gs))
+    result["graph"] = json.dumps(json_graph.node_link_data(gs), ensure_ascii=False)
     result["origid"] = origid
     for v in gs.nodes():
         word = gs.node[v]["word"]
@@ -208,12 +208,12 @@ def insert_stars(c, result):
     sentid, edge_stars, skel_stars = result
     for star, freq in edge_stars.iteritems():
         graph_tuple, center, length, center, degree_sequence, sorted_edges = star
-        graph_string = json.dumps(list(graph_tuple))
+        graph_string = json.dumps(list(graph_tuple), ensure_ascii=False)
         c.execute("INSERT OR IGNORE INTO edge_stars (subgraph, center, length, degree_sequence, edge_list, stars, star_centers) VALUES (?, ?, ?, ?, ?, 0, 0)", (graph_string, center, length, degree_sequence, sorted_edges))
         c.execute("UPDATE edge_stars SET stars = stars + ?, star_centers = star_centers + ? WHERE subgraph = ?", (freq, 1, graph_string))
     for star, freq in skel_stars.iteritems():
         graph_tuple, center, length, center, degree_sequence = star
-        graph_string = json.dumps(list(graph_tuple))
+        graph_string = json.dumps(list(graph_tuple), ensure_ascii=False)
         c.execute("INSERT OR IGNORE INTO skel_stars (subgraph, center, length, degree_sequence, stars, star_centers) VALUES (?, ?, ?, ?, 0, 0)", (graph_string, center, length, degree_sequence))
         c.execute("UPDATE skel_stars SET stars = stars + ?, star_centers = star_centers + ? WHERE subgraph = ?", (freq, 1, graph_string))
 
@@ -241,7 +241,6 @@ def iso_candidates_iter(conn, is_edge_star):
 def collapse_isomorphisms(args):
     """"""
     candidates, is_edge_star = args
-    print candidates
     #starid, subgraph, center, stars, star_centers = candidate
     sets = {}
     frequencies = {}
@@ -296,43 +295,42 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     groupsize = 50 * 10 * multiprocessing.cpu_count()
-    # # raise exeception if args.db already exists
-    # if os.path.exists(args.db):
-    #     raise Exception("Database file already exists")
-    # conn, c = create_db(args.db)
+    # raise exeception if args.db already exists
+    if os.path.exists(args.db):
+        raise Exception("Database file already exists")
+    conn, c = create_db(args.db)
     pool = multiprocessing.Pool(processes = multiprocessing.cpu_count())
-    # sents = cwb.sentences_iter(args.CORPUS, return_id=True)
-    # results = {}
-    # logging.info("tupleize and preprocess")
-    # for sentences in helper.grouper_nofill(groupsize, sents):
-    #     r = pool.imap_unordered(tupleize, sentences, 10)
-    #     # r = map(tupleize, sentences)
-    #     for result, sensible in r:
-    #         if sensible:
-    #             preprocess_results(conn, c, result, results)
-    # logging.info("insert tokens")
-    # insert_tokens(conn, c, results)
-    # logging.info("exctract stars")
-    # sent_count = c.execute("SELECT count(*) FROM sentences").fetchone()[0]
-    # logging.info("%d sentences" % sent_count)
-    # for offset in xrange(0, sent_count, groupsize):
-    #     sentences = c.execute("SELECT sentid, graph FROM sentences LIMIT ? OFFSET ?", (groupsize, offset)).fetchall()
-    #     logging.info("process sentences %d to %d", offset+1, offset+len(sentences))
-    #     r = pool.imap_unordered(extract_stars, sentences, 10)
-    #     # r = map(extract_stars, sentences)
-    #     for result in r:
-    #         insert_stars(c, result)
-    #     conn.commit()
+    sents = cwb.sentences_iter(args.CORPUS, return_id=True)
+    results = {}
+    logging.info("tupleize and preprocess")
+    for sentences in helper.grouper_nofill(groupsize, sents):
+        r = pool.imap_unordered(tupleize, sentences, 10)
+        # r = map(tupleize, sentences)
+        for result, sensible in r:
+            if sensible:
+                preprocess_results(conn, c, result, results)
+    logging.info("insert tokens")
+    insert_tokens(conn, c, results)
+    logging.info("exctract stars")
+    sent_count = c.execute("SELECT count(*) FROM sentences").fetchone()[0]
+    logging.info("%d sentences" % sent_count)
+    for offset in xrange(0, sent_count, groupsize):
+        sentences = c.execute("SELECT sentid, graph FROM sentences LIMIT ? OFFSET ?", (groupsize, offset)).fetchall()
+        logging.info("process sentences %d to %d", offset+1, offset+len(sentences))
+        r = pool.imap_unordered(extract_stars, sentences, 10)
+        # r = map(extract_stars, sentences)
+        for result in r:
+            insert_stars(c, result)
+        conn.commit()
     conn = sqlite3.connect(args.db)
     c = conn.cursor()
     logging.info("collapse isomorphic stars")
-    # for is_edge_star in [False, True]:
-    for is_edge_star in [True]:
+    for is_edge_star in [False, True]:
         logging.info("... %s" % ("edge stars" if is_edge_star else "skel_stars"))
         cands = iso_candidates_iter(conn, is_edge_star)
         for candidates in helper.grouper_nofill(groupsize, cands):
-            # r = pool.imap_unordered(collapse_isomorphisms, itertools.izip(candidates, itertools.repeat(is_edge_star)), 10)
-            r = map(collapse_isomorphisms, itertools.izip(candidates, itertools.repeat(is_edge_star)))
+            r = pool.imap_unordered(collapse_isomorphisms, itertools.izip(candidates, itertools.repeat(is_edge_star)), 10)
+            # r = map(collapse_isomorphisms, itertools.izip(candidates, itertools.repeat(is_edge_star)))
             for result in r:
                 sets, frequencies = result
                 insert_equivalence_classes(c, sets, frequencies, is_edge_star)
