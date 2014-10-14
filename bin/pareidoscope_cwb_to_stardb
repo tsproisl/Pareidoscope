@@ -325,12 +325,13 @@ if __name__ == "__main__":
     conn = sqlite3.connect(args.db)
     c = conn.cursor()
     logging.info("collapse isomorphic stars")
-    for is_edge_star in [False, True]:
+    # for is_edge_star in [False, True]:
+    for is_edge_star in [True]:
         logging.info("... %s" % ("edge stars" if is_edge_star else "skel_stars"))
         cands = iso_candidates_iter(conn, is_edge_star)
         for candidates in helper.grouper_nofill(groupsize, cands):
-            r = pool.imap_unordered(collapse_isomorphisms, itertools.izip(candidates, itertools.repeat(is_edge_star)), 10)
-            # r = map(collapse_isomorphisms, itertools.izip(candidates, itertools.repeat(is_edge_star)))
+            # r = pool.imap_unordered(collapse_isomorphisms, itertools.izip(candidates, itertools.repeat(is_edge_star)), 10)
+            r = map(collapse_isomorphisms, itertools.izip(candidates, itertools.repeat(is_edge_star)))
             for result in r:
                 sets, frequencies = result
                 insert_equivalence_classes(c, sets, frequencies, is_edge_star)
