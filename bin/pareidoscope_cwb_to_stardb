@@ -241,7 +241,6 @@ def iso_candidates_iter(conn, is_edge_star):
 def collapse_isomorphisms(args):
     """"""
     candidates, is_edge_star = args
-    print candidates
     #starid, subgraph, center, stars, star_centers = candidate
     sets = {}
     frequencies = {}
