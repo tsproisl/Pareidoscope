@@ -102,6 +102,10 @@ if __name__ == "__main__":
     r1_stars = collections.Counter()
     o11_centers = collections.Counter()
     r1_centers = collections.Counter()
+    c1_stars = collections.Counter()
+    n_stars = collections.Counter()
+    c1_centers = collections.Counter()
+    n_centers = collections.Counter()
     o11_to_r1 = {}
     for occurrences in helper.grouper_nofill(groupsize, c.execute(q, t)):
         o11ids, r1ids = {}, {}
@@ -113,8 +117,6 @@ if __name__ == "__main__":
             q2 = "SELECT sse.classid FROM skel_star_elements AS sse JOIN skel_stars AS ss ON sse.elemid = ss.starid WHERE ss.subgraph=? AND ss.center=?"
             get_classid = lambda q, t: d.execute(q, t).fetchall()[0][0]
             for o11 in e:
-                print o11
-                print d.execute(q1, o11).fetchall()
                 if o11 not in o11ids:
                     o11ids[o11] = get_classid(q1, o11)
                 classid = o11ids[o11]
@@ -136,9 +138,15 @@ if __name__ == "__main__":
                         raise Exception("More than one skel_star for edge_star %s: %s" % (oid, ", ".join([o11_to_r1[oid], rids[0]])))
                 else:
                     o11_to_r1[oid] = rids[0]
-    print r1_stars
+    logging.info("get frequencies from database")
+    q1 = "SELECT stars, star_centers FROM edge_star_classes WHERE classid=?"
+    q2 = "SELECT stars, star_centers FROM skel_star_classes WHERE classid=?"
+    for c1 in o11_stars:
+        stars, star_centers = c.execute(q1, (c1,)).fetchone()
+        c1_stars[c1] += stars
+        c1_centers[c1] += star_centers
+    for n in r1_stars:
+        stars, star_centers = c.execute(q2, (n,)).fetchone()
+        n_stars[n] += stars
+        n_centers[n] += star_centers
     logging.info("calculate association strengths")
-    c1_stars = collections.Counter()
-    n_stars = collections.Counter()
-    c1_centers = collections.Counter()
-    n_centers = collections.Counter()
