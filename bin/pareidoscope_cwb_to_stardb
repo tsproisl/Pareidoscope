@@ -337,8 +337,8 @@ if __name__ == "__main__":
             r = map(collapse_isomorphisms, itertools.izip(candidates, itertools.repeat(is_edge_star)))
             for result in r:
                 print result
-                # sets, frequencies = result
-                # insert_equivalence_classes(c, sets, frequencies, is_edge_star)
+                sets, frequencies = result
+                insert_equivalence_classes(c, sets, frequencies, is_edge_star)
     conn.commit()
     conn.close()
     logging.info("done")
