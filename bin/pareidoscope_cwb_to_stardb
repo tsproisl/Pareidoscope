@@ -295,7 +295,7 @@ if __name__ == "__main__":
     parser.add_argument("CORPUS", type=argparse.FileType("r"), help="Corpus in CWB format")
     args = parser.parse_args()
 
-    # groupsize = 50 * 10 * multiprocessing.cpu_count()
+    groupsize = 50 * 10 * multiprocessing.cpu_count()
     # # raise exeception if args.db already exists
     # if os.path.exists(args.db):
     #     raise Exception("Database file already exists")
