@@ -248,7 +248,7 @@ def collapse_isomorphisms(args):
     done = [False for _ in candidates]
     subgraph = None
     if is_edge_star:
-        subgraph = [networkx.parse_edgelist(json.loads(c[1]), nodetype=int, create_using=networkx.DiGraph(), data=(("relation", str),)) for c in candidates]
+        subgraph = [networkx.parse_edgelist(json.loads(c[1]), nodetype=int, create_using=networkx.DiGraph(), data=(("relation", unicode),)) for c in candidates]
     else:
         subgraph = [networkx.parse_edgelist(json.loads(c[1]), nodetype=int, create_using=networkx.DiGraph()) for c in candidates]
     for i in range(len(candidates)):
@@ -300,7 +300,7 @@ if __name__ == "__main__":
     # if os.path.exists(args.db):
     #     raise Exception("Database file already exists")
     # conn, c = create_db(args.db)
-    # pool = multiprocessing.Pool(processes = multiprocessing.cpu_count())
+    pool = multiprocessing.Pool(processes = multiprocessing.cpu_count())
     # sents = cwb.sentences_iter(args.CORPUS, return_id=True)
     # results = {}
     # logging.info("tupleize and preprocess")
@@ -328,15 +328,13 @@ if __name__ == "__main__":
     # logging.info("collapse isomorphic stars")
     conn = sqlite3.connect(args.db)
     c = conn.cursor()
-    #for is_edge_star in [False, True]:
-    for is_edge_star in [True]:
+    for is_edge_star in [False, True]:
         logging.info("... %s" % ("edge stars" if is_edge_star else "skel_stars"))
         cands = iso_candidates_iter(conn, is_edge_star)
         for candidates in helper.grouper_nofill(groupsize, cands):
-            # r = pool.imap_unordered(collapse_isomorphisms, itertools.izip(candidates, itertools.repeat(is_edge_star)), 10)
-            r = map(collapse_isomorphisms, itertools.izip(candidates, itertools.repeat(is_edge_star)))
+            r = pool.imap_unordered(collapse_isomorphisms, itertools.izip(candidates, itertools.repeat(is_edge_star)), 10)
+            # r = map(collapse_isomorphisms, itertools.izip(candidates, itertools.repeat(is_edge_star)))
             for result in r:
-                print result
                 sets, frequencies = result
                 insert_equivalence_classes(c, sets, frequencies, is_edge_star)
     conn.commit()
