@@ -14,7 +14,7 @@ def get_contingency_table(o11, r1, c1, n):
         n:
 
     """
-    o, e = {}, {}
+    o, e = {1: {}, 2: {}}, {1: {}, 2: {}}
     r2 = n - r1
     c2 = n - c1
     o[1][1] = o11
