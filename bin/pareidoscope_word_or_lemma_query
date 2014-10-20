@@ -7,8 +7,9 @@ import itertools
 import json
 import logging
 import multiprocessing
-import sqlite3
+import operator
 import os
+import sqlite3
 
 import networkx
 from networkx.readwrite import json_graph
@@ -16,6 +17,7 @@ from networkx.readwrite import json_graph
 from pareidoscope import subgraph_enumeration
 from pareidoscope.utils import helper
 from pareidoscope.utils import nx_graph
+from pareidoscope.utils import statistics
 
 logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=logging.INFO)
 
@@ -150,3 +152,15 @@ if __name__ == "__main__":
         n_stars[n] += stars
         n_centers[n] += star_centers
     logging.info("calculate association strengths")
+    associations = {}
+    for o11_star in o11_stars:
+        o11 = o11_stars[o11_star]
+        c1 = c1_stars[o11_star]
+        r1_star = o11_to_r1[o11_star]
+        r1 = r1_stars[r1_star]
+        n = n_stars[r1_star]
+        o, e = statistics.get_contingency_table(o11, r1, c1, n)
+        associations[o11_star] = statistics.log_likelihood(o, e)
+    for star, assoc in sorted(associations.iteritems(), key=operator.itemgetter(1)):
+        print star, assoc
+
