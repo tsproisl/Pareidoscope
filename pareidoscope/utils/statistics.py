@@ -1,6 +1,8 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-for
 
+import math
+
 def get_contingency_table(o11, r1, c1, n):
     """Fill in the values for O11, O12, O21 and O22 and E11, E12, E21 and
     E22.
@@ -25,4 +27,21 @@ def get_contingency_table(o11, r1, c1, n):
     e[2][2] = r2 * c2 / float(n)
     return o, e
 
+
+def log_likelihood(o, e):
+    """Calculate the log-likelihood association measure
+
+    Args:
+        o:
+        e:
+
+    """
+    ll = 0
+    for r in o:
+        for c in o[r]:
+            if o[r][c] == 0:
+                continue
+            ll += o[r][c] * math.log(float(o[r][c]) / e[r][c])
+    ll *= 2
+    return ll
 
