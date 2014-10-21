@@ -14,63 +14,13 @@ import sqlite3
 import networkx
 from networkx.readwrite import json_graph
 
+from pareidoscope import star_extraction
 from pareidoscope import subgraph_enumeration
 from pareidoscope.utils import helper
 from pareidoscope.utils import nx_graph
 from pareidoscope.utils import statistics
 
 logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=logging.INFO)
-
-
-def extract_stars(args):
-    """Extract subgraphs from sentence
-    
-    Arguments:
-    - `sentid`:
-    - `position`:
-    - `graph`:
-    """
-    sentid, position, graph = args
-    edge_stars = collections.Counter()
-    skel_stars = collections.Counter()
-    edge_to_skel = {}
-    gs = json_graph.node_link_graph(json.loads(graph))
-    bfo_graph, bfo_to_raw = subgraph_enumeration.get_bfo(gs)
-    raw_to_bfo = {v: k for k, v in bfo_to_raw.iteritems()}
-    bfo_to_bfo = {v: v for v in bfo_graph.nodes()}
-    vertice = raw_to_bfo[position]
-    whole_star = bfo_graph.subgraph(set([vertice] + bfo_graph.predecessors(vertice) + bfo_graph.successors(vertice)))
-    for subgraph in subgraph_enumeration.enumerate_csg_minmax(whole_star, bfo_to_bfo, min_vertices=2, max_vertices=whole_star.__len__()):
-        # vertice must be in subgraph
-        if not subgraph.has_node(vertice):
-            continue
-        # vertice must be center of star
-        other_vertices = set(subgraph.nodes()) - set([vertice])
-        if len(other_vertices) == 0:
-            continue
-        if not all((subgraph.has_edge(vertice, x) or subgraph.has_edge(x, vertice) for x in other_vertices)):
-            continue
-        edge_star = subgraph.copy()
-        nx_graph.skeletize_inplace(edge_star, only_vertices=True)
-        edge_star, order = nx_graph.canonize(edge_star, order=True)
-        edge_center = order.index(vertice)
-        edge_t = tuple(networkx.generate_edgelist(edge_star, data=["relation"]))
-        edge_string = json.dumps(list(edge_t))
-        edge_stars[(edge_string, edge_center)] += 1
-        skel_star = subgraph.copy()
-        nx_graph.skeletize_inplace(skel_star)
-        skel_star, order = nx_graph.canonize(skel_star, order=True)
-        skel_center = order.index(vertice)
-        skel_t = tuple(networkx.generate_edgelist(skel_star))
-        skel_string = json.dumps(list(skel_t))
-        skel_stars[(skel_string, skel_center)] += 1
-        if (edge_string, edge_center) not in edge_to_skel:
-            edge_to_skel[(edge_string, edge_center)] = set([(skel_string, skel_center)])
-        else:
-            edge_to_skel[(edge_string, edge_center)].add((skel_string, skel_center))
-    return sentid, edge_stars, skel_stars, edge_to_skel
-
-
 
 
 
@@ -95,7 +45,7 @@ if __name__ == "__main__":
     logging.info("collect stars")
     form = "lemma" if args.lemma else "word"
     tag = "wc" if args.lemma else "pos"
-    q = "SELECT tokens.sentid, tokens.position, sentences.graph FROM tokens INNER JOIN types ON types.typeid = tokens.typeid INNER JOIN sentences ON sentences.sentid = tokens.sentid WHERE %s=?" % form
+    q = "SELECT tokens.sentid, sentences.graph, tokens.position FROM tokens INNER JOIN types ON types.typeid = tokens.typeid INNER JOIN sentences ON sentences.sentid = tokens.sentid WHERE %s=?" % form
     t = (args.FORM,)
     if args.TAG:
         q += " AND %s=?" % tag
@@ -112,22 +62,22 @@ if __name__ == "__main__":
     for occurrences in helper.grouper_nofill(groupsize, c.execute(q, t)):
         o11ids, r1ids = {}, {}
         d = conn.cursor()
-        r = pool.imap_unordered(extract_stars, occurrences, 10)
-        # r = map(extract_stars, occurrences)
+        r = pool.imap_unordered(star_extraction.extract_stars_for_position, occurrences, 10)
+        # r = map(star_extraction.extract_stars_for_position, occurrences)
         for sentid, e, s, m in r:
             q1 = "SELECT ese.classid FROM edge_star_elements AS ese JOIN edge_stars AS es ON ese.elemid = es.starid WHERE es.subgraph=? AND es.center=?"
             q2 = "SELECT sse.classid FROM skel_star_elements AS sse JOIN skel_stars AS ss ON sse.elemid = ss.starid WHERE ss.subgraph=? AND ss.center=?"
             get_classid = lambda q, t: d.execute(q, t).fetchall()[0][0]
             for o11 in e:
-                if o11 not in o11ids:
-                    o11ids[o11] = get_classid(q1, o11)
-                classid = o11ids[o11]
+                if o11[0:2] not in o11ids:
+                    o11ids[o11[0:2]] = get_classid(q1, o11[0:2])
+                classid = o11ids[o11[0:2]]
                 o11_stars[classid] += e[o11]
                 o11_centers[classid] += 1
             for r1 in s:
-                if r1 not in r1ids:
-                    r1ids[r1] = get_classid(q2, r1)
-                classid = r1ids[r1]
+                if r1[0:2] not in r1ids:
+                    r1ids[r1[0:2]] = get_classid(q2, r1[0:2])
+                classid = r1ids[r1[0:2]]
                 r1_stars[classid] += s[r1]
                 r1_centers[classid] += 1
             for o11 in m:
