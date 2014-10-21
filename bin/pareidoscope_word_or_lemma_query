@@ -23,6 +23,62 @@ from pareidoscope.utils import statistics
 logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=logging.INFO)
 
 
+def collect_frequencies(d, e, s, m, o11ids, r1ids, o11_stars, o11_centers, r1_stars, r1_centers, o11_to_r1):
+    """"""
+    q1 = "SELECT ese.classid FROM edge_star_elements AS ese JOIN edge_stars AS es ON ese.elemid = es.starid WHERE es.subgraph=? AND es.center=?"
+    q2 = "SELECT sse.classid FROM skel_star_elements AS sse JOIN skel_stars AS ss ON sse.elemid = ss.starid WHERE ss.subgraph=? AND ss.center=?"
+    get_classid = lambda q, t: d.execute(q, t).fetchall()[0][0]
+    for o11 in e:
+        if o11[0:2] not in o11ids:
+            o11ids[o11[0:2]] = get_classid(q1, o11[0:2])
+        classid = o11ids[o11[0:2]]
+        o11_stars[classid] += e[o11]
+        o11_centers[classid] += 1
+    for r1 in s:
+        if r1[0:2] not in r1ids:
+            r1ids[r1[0:2]] = get_classid(q2, r1[0:2])
+        classid = r1ids[r1[0:2]]
+        r1_stars[classid] += s[r1]
+        r1_centers[classid] += 1
+    for o11 in m:
+        oid = o11ids[o11]
+        rids = list(set([r1ids[r] for r in m[o11]]))
+        if len(rids) != 1:
+            raise Exception("More than one skel_star for edge_star %s: %s" % (oid, ", ".join(rids)))
+        if oid in o11_to_r1:
+            if o11_to_r1[oid] != rids[0]:
+                raise Exception("More than one skel_star for edge_star %s: %s" % (oid, ", ".join([o11_to_r1[oid], rids[0]])))
+        else:
+            o11_to_r1[oid] = rids[0]
+
+
+def get_frequencies_from_db(c, o11_stars, r1_stars, c1_stars, c1_centers, n_stars, n_centers):
+    """"""
+    q1 = "SELECT stars, star_centers FROM edge_star_classes WHERE classid=?"
+    q2 = "SELECT stars, star_centers FROM skel_star_classes WHERE classid=?"
+    for c1 in o11_stars:
+        stars, star_centers = c.execute(q1, (c1,)).fetchone()
+        c1_stars[c1] += stars
+        c1_centers[c1] += star_centers
+    for n in r1_stars:
+        stars, star_centers = c.execute(q2, (n,)).fetchone()
+        n_stars[n] += stars
+        n_centers[n] += star_centers
+
+
+def calculate_associations(o11_freqs, r1_freqs, c1_freqs, n_freqs, o11_to_r1, measure=statistics.log_likelihood):
+    """"""
+    associations = {}
+    for o11_star in o11_freqs:
+        o11 = o11_freqs[o11_star]
+        c1 = c1_freqs[o11_star]
+        r1_star = o11_to_r1[o11_star]
+        r1 = r1_freqs[r1_star]
+        n = n_freqs[r1_star]
+        o, e = statistics.get_contingency_table(o11, r1, c1, n)
+        associations[o11_star] = statistics.log_likelihood(o, e)
+    return associations
+    
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run a batch of queries against a corpus')
@@ -65,52 +121,12 @@ if __name__ == "__main__":
         r = pool.imap_unordered(star_extraction.extract_stars_for_position, occurrences, 10)
         # r = map(star_extraction.extract_stars_for_position, occurrences)
         for sentid, e, s, m in r:
-            q1 = "SELECT ese.classid FROM edge_star_elements AS ese JOIN edge_stars AS es ON ese.elemid = es.starid WHERE es.subgraph=? AND es.center=?"
-            q2 = "SELECT sse.classid FROM skel_star_elements AS sse JOIN skel_stars AS ss ON sse.elemid = ss.starid WHERE ss.subgraph=? AND ss.center=?"
-            get_classid = lambda q, t: d.execute(q, t).fetchall()[0][0]
-            for o11 in e:
-                if o11[0:2] not in o11ids:
-                    o11ids[o11[0:2]] = get_classid(q1, o11[0:2])
-                classid = o11ids[o11[0:2]]
-                o11_stars[classid] += e[o11]
-                o11_centers[classid] += 1
-            for r1 in s:
-                if r1[0:2] not in r1ids:
-                    r1ids[r1[0:2]] = get_classid(q2, r1[0:2])
-                classid = r1ids[r1[0:2]]
-                r1_stars[classid] += s[r1]
-                r1_centers[classid] += 1
-            for o11 in m:
-                oid = o11ids[o11]
-                rids = list(set([r1ids[r] for r in m[o11]]))
-                if len(rids) != 1:
-                    raise Exception("More than one skel_star for edge_star %s: %s" % (oid, ", ".join(rids)))
-                if oid in o11_to_r1:
-                    if o11_to_r1[oid] != rids[0]:
-                        raise Exception("More than one skel_star for edge_star %s: %s" % (oid, ", ".join([o11_to_r1[oid], rids[0]])))
-                else:
-                    o11_to_r1[oid] = rids[0]
+            collect_frequencies(d, e, s, m, o11ids, r1ids, o11_stars, o11_centers, r1_stars, r1_centers, o11_to_r1)
     logging.info("get frequencies from database")
-    q1 = "SELECT stars, star_centers FROM edge_star_classes WHERE classid=?"
-    q2 = "SELECT stars, star_centers FROM skel_star_classes WHERE classid=?"
-    for c1 in o11_stars:
-        stars, star_centers = c.execute(q1, (c1,)).fetchone()
-        c1_stars[c1] += stars
-        c1_centers[c1] += star_centers
-    for n in r1_stars:
-        stars, star_centers = c.execute(q2, (n,)).fetchone()
-        n_stars[n] += stars
-        n_centers[n] += star_centers
+    get_frequencies_from_db(c, o11_stars, r1_stars, c1_stars, c1_centers, n_stars, n_centers)
     logging.info("calculate association strengths")
-    associations = {}
-    for o11_star in o11_stars:
-        o11 = o11_stars[o11_star]
-        c1 = c1_stars[o11_star]
-        r1_star = o11_to_r1[o11_star]
-        r1 = r1_stars[r1_star]
-        n = n_stars[r1_star]
-        o, e = statistics.get_contingency_table(o11, r1, c1, n)
-        associations[o11_star] = statistics.log_likelihood(o, e)
-    for star, assoc in sorted(associations.iteritems(), key=operator.itemgetter(1)):
+    star_associations = calculate_associations(o11_stars, r1_stars, c1_stars, n_stars, o11_to_r1, statistics.log_likelihood)
+    center_associations = calculate_associations(o11_centers, r1_centers, c1_centers, n_centers, o11_to_r1, statistics.log_likelihood)
+    for star, assoc in sorted(center_associations.iteritems(), key=operator.itemgetter(1)):
         print star, assoc
 
