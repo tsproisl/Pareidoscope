@@ -16,6 +16,7 @@ import networkx
 from networkx.algorithms import isomorphism
 from networkx.readwrite import json_graph
 
+from pareidoscope import star_extraction
 from pareidoscope import subgraph_enumeration
 from pareidoscope.utils import cwb
 from pareidoscope.utils import helper
@@ -136,49 +137,6 @@ def insert_tokens(conn, c, results):
     conn.commit()
 
 
-def extract_stars(args):
-    """Extract subgraphs from sentence
-    
-    Arguments:
-    - `sentid`:
-    - `graph`:
-    """
-    sentid, graph = args
-    edge_stars = collections.Counter()
-    skel_stars = collections.Counter()
-    gs = json_graph.node_link_graph(json.loads(graph))
-    bfo_graph, bfo_to_raw = subgraph_enumeration.get_bfo(gs)
-    bfo_to_bfo = {v: v for v in bfo_graph.nodes()}
-    for vertice in bfo_graph.nodes():
-        whole_star = bfo_graph.subgraph(set([vertice] + bfo_graph.predecessors(vertice) + bfo_graph.successors(vertice)))
-        for subgraph in subgraph_enumeration.enumerate_csg_minmax(whole_star, bfo_to_bfo, min_vertices=2, max_vertices=whole_star.__len__()):
-            # vertice must be in subgraph
-            if not subgraph.has_node(vertice):
-                continue
-            # vertice must be center of star
-            other_vertices = set(subgraph.nodes()) - set([vertice])
-            if len(other_vertices) == 0:
-                continue
-            if not all((subgraph.has_edge(vertice, x) or subgraph.has_edge(x, vertice) for x in other_vertices)):
-                continue
-            length = subgraph.__len__()
-            degree_sequence = " ".join([str(_) for _ in sorted([subgraph.degree(_) for _ in subgraph.nodes()], reverse=True)])
-            sorted_edges = " ".join(sorted([l["relation"] for s, t, l in subgraph.edges(data=True)]))
-            edge_star = subgraph.copy()
-            nx_graph.skeletize_inplace(edge_star, only_vertices=True)
-            edge_star, order = nx_graph.canonize(edge_star, order=True)
-            edge_center = order.index(vertice)
-            edge_t = tuple(networkx.generate_edgelist(edge_star, data=["relation"]))
-            edge_stars[(edge_t, vertice, length, edge_center, degree_sequence, sorted_edges)] += 1
-            skel_star = subgraph.copy()
-            nx_graph.skeletize_inplace(skel_star)
-            skel_star, order = nx_graph.canonize(skel_star, order=True)
-            skel_center = order.index(vertice)
-            skel_t = tuple(networkx.generate_edgelist(skel_star))
-            skel_stars[(skel_t, vertice, length, skel_center, degree_sequence)] += 1
-    return sentid, edge_stars, skel_stars
-
-
 def _check_isomorphisms(star, graph, stars, varstr, candidates=[]):
     """Check if star is isomorphic to any known subgraph and if one of the
        isomorphisms maps the star centers to each other.
@@ -207,13 +165,11 @@ def insert_stars(c, result):
     """
     sentid, edge_stars, skel_stars = result
     for star, freq in edge_stars.iteritems():
-        graph_tuple, center, length, center, degree_sequence, sorted_edges = star
-        graph_string = json.dumps(list(graph_tuple), ensure_ascii=False)
+        graph_string, center, length, degree_sequence, sorted_edges = star
         c.execute("INSERT OR IGNORE INTO edge_stars (subgraph, center, length, degree_sequence, edge_list, stars, star_centers) VALUES (?, ?, ?, ?, ?, 0, 0)", (graph_string, center, length, degree_sequence, sorted_edges))
         c.execute("UPDATE edge_stars SET stars = stars + ?, star_centers = star_centers + ? WHERE subgraph = ?", (freq, 1, graph_string))
     for star, freq in skel_stars.iteritems():
-        graph_tuple, center, length, center, degree_sequence = star
-        graph_string = json.dumps(list(graph_tuple), ensure_ascii=False)
+        graph_string, center, length, degree_sequence = star
         c.execute("INSERT OR IGNORE INTO skel_stars (subgraph, center, length, degree_sequence, stars, star_centers) VALUES (?, ?, ?, ?, 0, 0)", (graph_string, center, length, degree_sequence))
         c.execute("UPDATE skel_stars SET stars = stars + ?, star_centers = star_centers + ? WHERE subgraph = ?", (freq, 1, graph_string))
 
@@ -317,8 +273,8 @@ if __name__ == "__main__":
     for offset in xrange(0, sent_count, groupsize):
         sentences = c.execute("SELECT sentid, graph FROM sentences LIMIT ? OFFSET ?", (groupsize, offset)).fetchall()
         logging.info("process sentences %d to %d", offset+1, offset+len(sentences))
-        r = pool.imap_unordered(extract_stars, sentences, 10)
-        # r = map(extract_stars, sentences)
+        r = pool.imap_unordered(star_extraction.extract_all_stars, sentences, 10)
+        # r = map(star_extraction.extract_all_stars, sentences)
         for result in r:
             insert_stars(c, result)
         conn.commit()
