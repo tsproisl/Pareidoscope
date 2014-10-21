@@ -66,7 +66,7 @@ def extract_stars_for_position(args):
     - `position`:
 
     """
-    sentid, position, graph = args
+    sentid, graph, position = args
     edge_stars = collections.Counter()
     skel_stars = collections.Counter()
     edge_to_skel = {}
