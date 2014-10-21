@@ -28,6 +28,51 @@ def get_contingency_table(o11, r1, c1, n):
     return o, e
 
 
+def poisson_stirling_log(o, e):
+    """Calculate the Poisson-Stirling measure
+
+    Args:
+        o:
+        e:
+
+    """
+    return o[1][1] * (math.log(o[1][1], 2) - math.log(e[1][1], 2) - 1)
+
+
+def z_score(o, e):
+    """Calculate the z-score measure
+
+    Args:
+        o:
+        e:
+
+    """
+    return (o[1][1] - e[1][1]) / math.sqrt(e[1][1])
+
+
+def t_score(o, e):
+    """Calculate the t-score measure
+
+    Args:
+        o:
+        e:
+
+    """
+    return (o[1][1] - e[1][1]) / math.sqrt(o[1][1])
+
+
+def chi_squared(o, e):
+    """Calculate the chi-squared measure
+
+    Args:
+        o:
+        e:
+
+    """
+    n = o[1][1] + o[1][2] + o[2][1] + o[2][2]
+    return (n * (o[1][1] - e[1][1]) ** 2) / (e[1][1] * e[2][2])
+
+
 def log_likelihood(o, e):
     """Calculate the log-likelihood measure
 
