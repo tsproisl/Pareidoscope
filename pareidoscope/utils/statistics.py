@@ -231,3 +231,14 @@ def jaccard(o, e):
 
     """
     return o[1][1] / (o[1][1] + o[1][2] + o[2][1])
+
+
+def cooccurrence_frequency(o, e):
+    """Return O11
+
+    Args:
+        o:
+        e:
+
+    """
+    return o[1][1]
