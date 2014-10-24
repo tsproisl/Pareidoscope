@@ -29,17 +29,17 @@ def collect_frequencies(d, e, s, m, o11ids, r1ids, o11_stars, o11_centers, r1_st
     q2 = "SELECT sse.classid FROM skel_star_elements AS sse JOIN skel_stars AS ss ON sse.elemid = ss.starid WHERE ss.subgraph=? AND ss.center=?"
     get_classid = lambda q, t: d.execute(q, t).fetchall()[0][0]
     for o11 in e:
-        if o11[0:2] not in o11ids:
-            o11ids[o11[0:2]] = get_classid(q1, o11[0:2])
-        classid = o11ids[o11[0:2]]
-        o11_stars[classid] += e[o11]
-        o11_centers[classid] += 1
+        if o11 not in o11ids:
+            o11ids[o11] = get_classid(q1, o11)
+        classid = o11ids[o11]
+        o11_stars[classid] += e[o11]["star_freq"]
+        o11_centers[classid] += len(e[o11]["center_set"])
     for r1 in s:
-        if r1[0:2] not in r1ids:
-            r1ids[r1[0:2]] = get_classid(q2, r1[0:2])
-        classid = r1ids[r1[0:2]]
-        r1_stars[classid] += s[r1]
-        r1_centers[classid] += 1
+        if r1 not in r1ids:
+            r1ids[r1] = get_classid(q2, r1)
+        classid = r1ids[r1]
+        r1_stars[classid] += s[r1]["star_freq"]
+        r1_centers[classid] += len(s[r1]["center_set"])
     for o11 in m:
         oid = o11ids[o11]
         rids = list(set([r1ids[r] for r in m[o11]]))

@@ -58,14 +58,14 @@ def create_db(filename):
     # tokens
     c.execute("CREATE TABLE tokens (typeid INTEGER, sentid INTEGER, position INTEGER, FOREIGN KEY (typeid) REFERENCES types, FOREIGN KEY (sentid) REFERENCES sentences, UNIQUE (typeid, sentid, position))")
     ## tables for stars
-    c.execute("CREATE TABLE edge_stars (starid INTEGER PRIMARY KEY AUTOINCREMENT, subgraph TEXT, center INTEGER, length INTEGER, degree_sequence TEXT, edge_list TEXT, stars INTEGER, star_centers INTEGER, UNIQUE (subgraph, center))")
+    c.execute("CREATE TABLE edge_stars (starid INTEGER PRIMARY KEY AUTOINCREMENT, subgraph TEXT, center INTEGER, length INTEGER, degree_sequence TEXT, edge_list TEXT, isomorphisms INTEGER, stars INTEGER, star_centers INTEGER, UNIQUE (subgraph, center))")
     c.execute("CREATE INDEX edegseq_idx ON edge_stars (degree_sequence)")
     c.execute("CREATE INDEX edge_list_idx ON edge_stars (edge_list)")
-    c.execute("CREATE TABLE skel_stars (starid INTEGER PRIMARY KEY AUTOINCREMENT, subgraph TEXT, center INTEGER, length INTEGER, degree_sequence TEXT, stars INTEGER, star_centers INTEGER, UNIQUE (subgraph, center))")
+    c.execute("CREATE TABLE skel_stars (starid INTEGER PRIMARY KEY AUTOINCREMENT, subgraph TEXT, center INTEGER, length INTEGER, degree_sequence TEXT, isomorphisms INTEGER, stars INTEGER, star_centers INTEGER, UNIQUE (subgraph, center))")
     c.execute("CREATE INDEX sdegseq_idx ON skel_stars (degree_sequence)")
     # equivalence classes of isomorphic stars
-    c.execute("CREATE TABLE edge_star_classes (classid INTEGER PRIMARY KEY AUTOINCREMENT, stars INTEGER, star_centers INTEGER)")
-    c.execute("CREATE TABLE skel_star_classes (classid INTEGER PRIMARY KEY AUTOINCREMENT, stars INTEGER, star_centers INTEGER)")
+    c.execute("CREATE TABLE edge_star_classes (classid INTEGER PRIMARY KEY AUTOINCREMENT, isomorphisms INTEGER, stars INTEGER, star_centers INTEGER)")
+    c.execute("CREATE TABLE skel_star_classes (classid INTEGER PRIMARY KEY AUTOINCREMENT, isomorphisms INTEGER, stars INTEGER, star_centers INTEGER)")
     c.execute("CREATE TABLE edge_star_elements (classid INTEGER, elemid INTEGER, FOREIGN KEY (classid) REFERENCES edge_star_classes, FOREIGN KEY (elemid) REFERENCES edge_stars (starid), UNIQUE (elemid, classid))")
     c.execute("CREATE TABLE skel_star_elements (classid INTEGER, elemid INTEGER, FOREIGN KEY (classid) REFERENCES skel_star_classes, FOREIGN KEY (elemid) REFERENCES skel_stars (starid), UNIQUE (elemid, classid))")
     return conn, c
@@ -151,8 +151,7 @@ def _check_isomorphisms(star, graph, stars, varstr, candidates=[]):
         if any(iso[star[1]] == isomorphic[1] for iso in dgm.isomorphisms_iter()):
             stars[varstr]["id"][star] = stars[varstr]["id"][isomorphic]
             logging.debug("%s is isomorphic to %s" % (star, isomorphic))
-            return
-    
+            return    
 
 
 def insert_stars(c, result):
@@ -164,14 +163,14 @@ def insert_stars(c, result):
 
     """
     sentid, edge_stars, skel_stars = result
-    for star, freq in edge_stars.iteritems():
-        graph_string, center, length, degree_sequence, sorted_edges = star
-        c.execute("INSERT OR IGNORE INTO edge_stars (subgraph, center, length, degree_sequence, edge_list, stars, star_centers) VALUES (?, ?, ?, ?, ?, 0, 0)", (graph_string, center, length, degree_sequence, sorted_edges))
-        c.execute("UPDATE edge_stars SET stars = stars + ?, star_centers = star_centers + ? WHERE subgraph = ?", (freq, 1, graph_string))
-    for star, freq in skel_stars.iteritems():
-        graph_string, center, length, degree_sequence = star
-        c.execute("INSERT OR IGNORE INTO skel_stars (subgraph, center, length, degree_sequence, stars, star_centers) VALUES (?, ?, ?, ?, 0, 0)", (graph_string, center, length, degree_sequence))
-        c.execute("UPDATE skel_stars SET stars = stars + ?, star_centers = star_centers + ? WHERE subgraph = ?", (freq, 1, graph_string))
+    for star in edge_stars:
+        graph_string, center = star
+        c.execute("INSERT OR IGNORE INTO edge_stars (subgraph, center, length, degree_sequence, edge_list, isomorphisms, stars, star_centers) VALUES (?, ?, ?, ?, ?, 0, 0, 0)", (graph_string, center, edge_stars[star]["length"], edge_stars[star]["degree_sequence"], edge_stars[star]["sorted_edges"]))
+        c.execute("UPDATE edge_stars SET isomorphisms = isomorphisms + ?, stars = stars + ?, star_centers = star_centers + ? WHERE subgraph = ?", (edge_stars[star]["iso_freq"], edge_stars[star]["star_freq"], len(edge_stars[star]["center_set"]), graph_string))
+    for star, star_freq in skel_stars.iteritems():
+        graph_string, center = star
+        c.execute("INSERT OR IGNORE INTO skel_stars (subgraph, center, length, degree_sequence, isomorphisms, stars, star_centers) VALUES (?, ?, ?, ?, 0, 0, 0)", (graph_string, center, skel_stars[star]["length"], skel_stars[star]["degree_sequence"]))
+        c.execute("UPDATE skel_stars SET isomorphisms = isomorphisms + ?, stars = stars + ?, star_centers = star_centers + ? WHERE subgraph = ?", (skel_stars[star]["iso_freq"], skel_stars[star]["star_freq"], len(skel_stars[star]["center_set"]), graph_string))
 
 
 def iso_candidates_iter(conn, is_edge_star):
@@ -185,10 +184,10 @@ def iso_candidates_iter(conn, is_edge_star):
     """
     c1 = conn.cursor()
     q1 = "SELECT DISTINCT degree_sequence FROM skel_stars"
-    q2 = "SELECT starid, subgraph, center, stars, star_centers FROM skel_stars WHERE degree_sequence=?"
+    q2 = "SELECT starid, subgraph, center, isomorphisms, stars, star_centers FROM skel_stars WHERE degree_sequence=?"
     if is_edge_star:
         q1 = "SELECT DISTINCT degree_sequence, edge_list FROM edge_stars"
-        q2 = "SELECT starid, subgraph, center, stars, star_centers FROM edge_stars WHERE degree_sequence=? AND edge_list=?"
+        q2 = "SELECT starid, subgraph, center, isomorphisms, stars, star_centers FROM edge_stars WHERE degree_sequence=? AND edge_list=?"
     for row in c1.execute(q1):
         c2 = conn.cursor()
         yield c2.execute(q2, row).fetchall()
@@ -210,7 +209,7 @@ def collapse_isomorphisms(args):
         if done[i]:
             continue
         sets[i] = set([candidates[i][0]])
-        frequencies[i] = {"stars": candidates[i][3], "star_centers": candidates[i][4]}
+        frequencies[i] = {"isomorphisms": candidates[i][3], "stars": candidates[i][4], "star_centers": candidates[i][5]}
         done[i] = True
         for j in range(len(candidates)):
             if done[j]:
@@ -218,8 +217,9 @@ def collapse_isomorphisms(args):
             dgm = isomorphism.DiGraphMatcher(subgraph[i], subgraph[j], edge_match=lambda x, y: x.get("relation", "") == y.get("relation", ""))
             if any(iso[int(candidates[i][2])] == int(candidates[j][2]) for iso in dgm.isomorphisms_iter()):
                 sets[i].add(candidates[j][0])
-                frequencies[i]["stars"] += candidates[j][3]
-                frequencies[i]["star_centers"] += candidates[j][4]
+                frequencies[i]["isomorphisms"] += candidates[j][3]
+                frequencies[i]["stars"] += candidates[j][4]
+                frequencies[i]["star_centers"] += candidates[j][5]
                 done[j] = True
                 logging.debug("%s is isomorphic to %s" % (candidates[i][1], candidates[j][1]))
     return sets, frequencies
@@ -229,16 +229,17 @@ def insert_equivalence_classes(c, sets, frequencies, is_edge_star):
     """Insert equivalence classes of isomorphic stars into the database.
 
     """
-    q1 = "INSERT INTO skel_star_classes (stars, star_centers) VALUES (?, ?)"
+    q1 = "INSERT INTO skel_star_classes (isomorphisms, stars, star_centers) VALUES (?, ?, ?)"
     q2 = "INSERT INTO skel_star_elements (classid, elemid) VALUES (?, ?)"
     if is_edge_star:
-        q1 = "INSERT INTO edge_star_classes (stars, star_centers) VALUES (?, ?)"
+        q1 = "INSERT INTO edge_star_classes (isomorphisms, stars, star_centers) VALUES (?, ?, ?)"
         q2 = "INSERT INTO edge_star_elements (classid, elemid) VALUES (?, ?)"
     for i in sorted(sets.keys()):
         s = sets[i]
+        isomorphisms = frequencies[i]["isomorphisms"]
         stars = frequencies[i]["stars"]
         star_centers = frequencies[i]["star_centers"]
-        c.execute(q1, (stars, star_centers))
+        c.execute(q1, (isomorphisms, stars, star_centers))
         classid = c.lastrowid
         c.executemany(q2, zip(itertools.repeat(classid), s))
 
