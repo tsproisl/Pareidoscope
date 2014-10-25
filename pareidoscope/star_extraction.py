@@ -43,11 +43,10 @@ def _extract_stars(graph, vertice, edge_stars, skel_stars, edge_to_skel={}):
         edge_t = tuple(networkx.generate_edgelist(edge_star, data=["relation"]))
         edge_string = json.dumps(list(edge_t), ensure_ascii=False)
         if (edge_string, edge_center) not in edge_stars:
-            edge_stars[(edge_string, edge_center)] = {"length": length, "degree_sequence": degree_sequence, "sorted_edges": sorted_edges, "iso_freq": 0, "star_freq": 1, "center_set": set([vertice])}
+            edge_stars[(edge_string, edge_center)] = {"length": length, "degree_sequence": degree_sequence, "sorted_edges": sorted_edges, "star_freq": 1, "center_set": set([vertice])}
         else:
             edge_stars[(edge_string, edge_center)]["star_freq"] += 1
             edge_stars[(edge_string, edge_center)]["center_set"].add(vertice)
-        edge_stars[(edge_string, edge_center)]["iso_freq"] += _count_isomorphisms(edge_star, subgraph, edge_center, vertice)
         skel_star = subgraph.copy()
         nx_graph.skeletize_inplace(skel_star)
         skel_star, order = nx_graph.canonize(skel_star, order=True)
@@ -55,11 +54,10 @@ def _extract_stars(graph, vertice, edge_stars, skel_stars, edge_to_skel={}):
         skel_t = tuple(networkx.generate_edgelist(skel_star))
         skel_string = json.dumps(list(skel_t), ensure_ascii=False)
         if (skel_string, skel_center) not in skel_stars:
-            skel_stars[(skel_string, skel_center)] = {"length": length, "degree_sequence": degree_sequence, "iso_freq": 0, "star_freq": 1, "center_set": set([vertice])}
+            skel_stars[(skel_string, skel_center)] = {"length": length, "degree_sequence": degree_sequence, "star_freq": 1, "center_set": set([vertice])}
         else:
             skel_stars[(skel_string, skel_center)]["star_freq"] += 1
             skel_stars[(skel_string, skel_center)]["center_set"].add(vertice)
-        skel_stars[(skel_string, skel_center)]["iso_freq"] += _count_isomorphisms(skel_star, subgraph, skel_center, vertice)
         if (edge_string, edge_center) not in edge_to_skel:
             edge_to_skel[(edge_string, edge_center)] = set([(skel_string, skel_center)])
         else:
@@ -67,7 +65,7 @@ def _extract_stars(graph, vertice, edge_stars, skel_stars, edge_to_skel={}):
     return
 
 
-def _count_isomorphisms(query, target, query_vertice, target_vertice):
+def count_isomorphisms(query, target, query_vertice, target_vertice):
     """Count isomorphisms which map query_vertice to target_vertice"""
     candidates = nx_graph.get_vertice_candidates(query, target)
     candidates[query_vertice] = set([target_vertice])
