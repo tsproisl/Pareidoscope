@@ -167,11 +167,11 @@ def insert_stars(c, result):
     for star in edge_stars:
         graph_string, center = star
         c.execute("INSERT OR IGNORE INTO edge_stars (subgraph, center, length, degree_sequence, edge_list, isomorphisms_per_star, stars, star_centers) VALUES (?, ?, ?, ?, ?, 0, 0, 0)", (graph_string, center, edge_stars[star]["length"], edge_stars[star]["degree_sequence"], edge_stars[star]["sorted_edges"]))
-        c.execute("UPDATE edge_stars SET stars = stars + ?, star_centers = star_centers + ? WHERE subgraph = ?", (edge_stars[star]["star_freq"], len(edge_stars[star]["center_set"]), graph_string))
+        c.execute("UPDATE edge_stars SET stars = stars + ?, star_centers = star_centers + ? WHERE subgraph = ? AND center = ?", (edge_stars[star]["star_freq"], len(edge_stars[star]["center_set"]), graph_string, center))
     for star, star_freq in skel_stars.iteritems():
         graph_string, center = star
         c.execute("INSERT OR IGNORE INTO skel_stars (subgraph, center, length, degree_sequence, isomorphisms_per_star, stars, star_centers) VALUES (?, ?, ?, ?, 0, 0, 0)", (graph_string, center, skel_stars[star]["length"], skel_stars[star]["degree_sequence"]))
-        c.execute("UPDATE skel_stars SET stars = stars + ?, star_centers = star_centers + ? WHERE subgraph = ?", (skel_stars[star]["star_freq"], len(skel_stars[star]["center_set"]), graph_string))
+        c.execute("UPDATE skel_stars SET stars = stars + ?, star_centers = star_centers + ? WHERE subgraph = ? AND center = ?", (skel_stars[star]["star_freq"], len(skel_stars[star]["center_set"]), graph_string, center))
 
 
 def iso_candidates_iter(conn, is_edge_star):
