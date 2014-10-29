@@ -57,15 +57,18 @@ def collect_frequencies(d, e, s, m, o11ids, r1ids, o11, r1, o11_to_r1):
             o11_to_r1[oid] = rids[0]
 
 
-def get_frequencies_from_db(c, o11, r1, c1, n):
+def get_frequencies_from_db(c, o11, r1, c1, n, lemma, tag):
     """"""
     q1 = "SELECT isomorphisms_per_star, stars, star_centers FROM edge_star_classes WHERE classid=?"
     q2 = "SELECT isomorphisms_per_star, stars, star_centers FROM skel_star_classes WHERE classid=?"
+    pos_or_wc = "wc" if lemma else "pos"
+    q3 = "SELECT sum(xes.star_centers) FROM %s_edge_stars AS xes JOIN edge_star_elements AS ese ON xes.starid=ese.elemid WHERE ese.classid=? AND xes. %s=?" % (pos_or_wc, pos_or_wc)
     for o in o11["stars"]:
         isomorphisms_per_star, stars, star_centers = c.execute(q1, (o,)).fetchone()
         c1["stars"][o] += stars
         c1["centers"][o] += star_centers
         c1["isomorphisms"][o] += isomorphisms_per_star * stars
+        c1["collostructional"][o] += c.execute(q3, (o, tag)).fetchall()[0][0]
     for r in r1["stars"]:
         isomorphisms_per_star, stars, star_centers = c.execute(q2, (r,)).fetchone()
         n["stars"][r] += stars
@@ -124,8 +127,6 @@ if __name__ == "__main__":
     o11["collostructional"] = o11["centers"]
     r1 = {"stars": collections.Counter(), "centers": collections.Counter(), "isomorphisms": collections.Counter(), "collostructional": 0}
     c1 = {"stars": collections.Counter(), "centers": collections.Counter(), "isomorphisms": collections.Counter(), "collostructional": collections.Counter()}
-    #TEST:
-    c1["collostructional"] = c1["centers"]
     n = {"stars": collections.Counter(), "centers": collections.Counter(), "isomorphisms": collections.Counter(), "collostructional": 0}
     o11_to_r1 = {}
     for occurrences in helper.grouper_nofill(groupsize, c.execute(q, t)):
@@ -136,7 +137,7 @@ if __name__ == "__main__":
         for sentid, e, s, m in r:
             collect_frequencies(d, e, s, m, o11ids, r1ids, o11, r1, o11_to_r1)
     logging.info("get frequencies from database")
-    get_frequencies_from_db(c, o11, r1, c1, n)
+    get_frequencies_from_db(c, o11, r1, c1, n, args.lemma, args.TAG)
     r1["collostructional"] = c.execute(q_r1, t).fetchall()[0][0]
     n["collostructional"] = c.execute(q_n, (args.TAG,)).fetchall()[0][0]
     logging.info("calculate association strengths")

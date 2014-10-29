@@ -63,6 +63,8 @@ def create_db(filename):
     c.execute("CREATE INDEX edge_list_idx ON edge_stars (edge_list)")
     c.execute("CREATE TABLE skel_stars (starid INTEGER PRIMARY KEY AUTOINCREMENT, subgraph TEXT, center INTEGER, length INTEGER, degree_sequence TEXT, isomorphisms_per_star INTEGER, stars INTEGER, star_centers INTEGER, UNIQUE (subgraph, center))")
     c.execute("CREATE INDEX sdegseq_idx ON skel_stars (degree_sequence)")
+    c.execute("CREATE TABLE pos_edge_stars (starid INTEGER, pos TEXT, stars INTEGER, star_centers INTEGER, FOREIGN KEY (starid) REFERENCES edge_stars (starid), UNIQUE (starid, pos))")
+    c.execute("CREATE TABLE wc_edge_stars (starid INTEGER, wc TEXT, stars INTEGER, star_centers INTEGER, FOREIGN KEY (starid) REFERENCES edge_stars (starid), UNIQUE (starid, wc))")
     # equivalence classes of isomorphic stars
     c.execute("CREATE TABLE edge_star_classes (classid INTEGER PRIMARY KEY AUTOINCREMENT, isomorphisms_per_star INTEGER, stars INTEGER, star_centers INTEGER)")
     c.execute("CREATE TABLE skel_star_classes (classid INTEGER PRIMARY KEY AUTOINCREMENT, isomorphisms_per_star INTEGER, stars INTEGER, star_centers INTEGER)")
@@ -97,7 +99,8 @@ def tupleize(stuple):
         # indeps = tuple(sorted(list(indeps)))
         # outdeps = set([gs.edge[s][t]["relation"] for s, t in gs.out_edges(v)])
         # outdeps = tuple(sorted(list(outdeps)))
-        t = (word, pos, lemma, wc, root, indegree, outdegree, indeps, outdeps)
+        # t = (word, pos, lemma, wc, root, indegree, outdegree, indeps, outdeps)
+        t = (word, pos, lemma, wc, root, indegree, outdegree)
         result["tokens"][v] = t
     return result, sensible
 
@@ -165,9 +168,15 @@ def insert_stars(c, result):
     """
     sentid, edge_stars, skel_stars = result
     for star in edge_stars:
-        graph_string, center = star
+        graph_string, center, pos, wc = star
         c.execute("INSERT OR IGNORE INTO edge_stars (subgraph, center, length, degree_sequence, edge_list, isomorphisms_per_star, stars, star_centers) VALUES (?, ?, ?, ?, ?, 0, 0, 0)", (graph_string, center, edge_stars[star]["length"], edge_stars[star]["degree_sequence"], edge_stars[star]["sorted_edges"]))
-        c.execute("UPDATE edge_stars SET stars = stars + ?, star_centers = star_centers + ? WHERE subgraph = ? AND center = ?", (edge_stars[star]["star_freq"], len(edge_stars[star]["center_set"]), graph_string, center))
+        # c.execute("UPDATE edge_stars SET stars = stars + ?, star_centers = star_centers + ? WHERE subgraph = ? AND center = ?", (edge_stars[star]["star_freq"], len(edge_stars[star]["center_set"]), graph_string, center))
+        starid = c.execute("SELECT starid FROM edge_stars WHERE subgraph = ? AND center = ?", (graph_string, center)).fetchall()[0][0]
+        c.execute("UPDATE edge_stars SET stars = stars + ?, star_centers = star_centers + ? WHERE starid = ?", (edge_stars[star]["star_freq"], len(edge_stars[star]["center_set"]), starid))
+        c.execute("INSERT OR IGNORE INTO pos_edge_stars (starid, pos, stars, star_centers) VALUES (?, ?, 0, 0)", (starid, pos))
+        c.execute("INSERT OR IGNORE INTO wc_edge_stars (starid, wc, stars, star_centers) VALUES (?, ?, 0, 0)", (starid, wc))
+        c.execute("UPDATE pos_edge_stars SET stars = stars + ?, star_centers = star_centers + ? WHERE starid = ? AND pos = ?", (edge_stars[star]["star_freq"], len(edge_stars[star]["center_set"]), starid, pos))
+        c.execute("UPDATE wc_edge_stars SET stars = stars + ?, star_centers = star_centers + ? WHERE starid = ? AND wc = ?", (edge_stars[star]["star_freq"], len(edge_stars[star]["center_set"]), starid, wc))
     for star, star_freq in skel_stars.iteritems():
         graph_string, center = star
         c.execute("INSERT OR IGNORE INTO skel_stars (subgraph, center, length, degree_sequence, isomorphisms_per_star, stars, star_centers) VALUES (?, ?, ?, ?, 0, 0, 0)", (graph_string, center, skel_stars[star]["length"], skel_stars[star]["degree_sequence"]))

@@ -12,7 +12,7 @@ from pareidoscope import subgraph_isomorphism
 from pareidoscope.utils import nx_graph
 
 
-def _extract_stars(graph, vertice, edge_stars, skel_stars, edge_to_skel={}):
+def _extract_stars(graph, vertice, edge_stars, skel_stars, edge_to_skel={}, include_pos=False):
     """Extract star-like subgraphs from sentence for a given center
     vertice
 
@@ -22,6 +22,8 @@ def _extract_stars(graph, vertice, edge_stars, skel_stars, edge_to_skel={}):
 
     """
     identity_mapping = {v: v for v in graph.nodes()}
+    pos = graph.node[vertice]["pos"]
+    wc = graph.node[vertice]["wc"]
     whole_star = graph.subgraph(set([vertice] + graph.predecessors(vertice) + graph.successors(vertice)))
     for subgraph in subgraph_enumeration.enumerate_csg_minmax(whole_star, identity_mapping, min_vertices=2, max_vertices=whole_star.__len__()):
         # vertice must be in subgraph
@@ -42,11 +44,12 @@ def _extract_stars(graph, vertice, edge_stars, skel_stars, edge_to_skel={}):
         edge_center = order.index(vertice)
         edge_t = tuple(networkx.generate_edgelist(edge_star, data=["relation"]))
         edge_string = json.dumps(list(edge_t), ensure_ascii=False)
-        if (edge_string, edge_center) not in edge_stars:
-            edge_stars[(edge_string, edge_center)] = {"length": length, "degree_sequence": degree_sequence, "sorted_edges": sorted_edges, "star_freq": 1, "center_set": set([vertice])}
+        edge_star_key = (edge_string, edge_center, pos, wc) if include_pos else (edge_string, edge_center)
+        if edge_star_key not in edge_stars:
+            edge_stars[edge_star_key] = {"length": length, "degree_sequence": degree_sequence, "sorted_edges": sorted_edges, "star_freq": 1, "center_set": set([vertice])}
         else:
-            edge_stars[(edge_string, edge_center)]["star_freq"] += 1
-            edge_stars[(edge_string, edge_center)]["center_set"].add(vertice)
+            edge_stars[edge_star_key]["star_freq"] += 1
+            edge_stars[edge_star_key]["center_set"].add(vertice)
         skel_star = subgraph.copy()
         nx_graph.skeletize_inplace(skel_star)
         skel_star, order = nx_graph.canonize(skel_star, order=True)
@@ -90,7 +93,7 @@ def extract_stars_for_position(args):
     bfo_graph, bfo_to_raw = subgraph_enumeration.get_bfo(gs)
     raw_to_bfo = {v: k for k, v in bfo_to_raw.iteritems()}
     vertice = raw_to_bfo[position]
-    _extract_stars(bfo_graph, vertice, edge_stars, skel_stars, edge_to_skel)
+    _extract_stars(bfo_graph, vertice, edge_stars, skel_stars, edge_to_skel, include_pos=False)
     return sentid, edge_stars, skel_stars, edge_to_skel
 
 
@@ -108,5 +111,5 @@ def extract_all_stars(args):
     gs = json_graph.node_link_graph(json.loads(graph))
     bfo_graph, bfo_to_raw = subgraph_enumeration.get_bfo(gs)
     for vertice in bfo_graph.nodes():
-        _extract_stars(bfo_graph, vertice, edge_stars, skel_stars)
+        _extract_stars(bfo_graph, vertice, edge_stars, skel_stars, include_pos=True)
     return sentid, edge_stars, skel_stars
