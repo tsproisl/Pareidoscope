@@ -65,6 +65,12 @@ def _extract_stars(graph, vertice, edge_stars, skel_stars, edge_to_skel={}, incl
             edge_to_skel[(edge_string, edge_center)] = set([(skel_string, skel_center)])
         else:
             edge_to_skel[(edge_string, edge_center)].add((skel_string, skel_center))
+    for e in edge_stars:
+        edge_stars[e]["center_freq"] = len(edge_stars[e]["center_set"])
+        edge_stars[e].pop("center_set")
+    for s in skel_stars:
+        skel_stars[s]["center_freq"] = len(skel_stars[s]["center_set"])
+        skel_stars[s].pop("center_set")
     return
 
 
