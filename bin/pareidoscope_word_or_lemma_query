@@ -36,14 +36,14 @@ def collect_frequencies(d, e, s, m, o11ids, r1ids, o11, r1, o11_to_r1):
             o11ids[o] = get_classid_and_iso_per_star(q1, o)
         classid = o11ids[o][0]
         o11["stars"][classid] += e[o]["star_freq"]
-        o11["centers"][classid] += len(e[o]["center_set"])
+        o11["centers"][classid] += e[o]["center_freq"]
         o11["isomorphisms"][classid] += o11ids[o][1] * e[o]["star_freq"]
     for r in s:
         if r not in r1ids:
             r1ids[r] = get_classid_and_iso_per_star(q2, r)
         classid = r1ids[r][0]
         r1["stars"][classid] += s[r]["star_freq"]
-        r1["centers"][classid] += len(s[r]["center_set"])
+        r1["centers"][classid] += s[r]["center_freq"]
         r1["isomorphisms"][classid] += r1ids[r][1] * s[r]["star_freq"]
     for o in m:
         oid = o11ids[o][0]
