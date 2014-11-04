@@ -170,17 +170,16 @@ def insert_stars(c, result):
     for star in edge_stars:
         graph_string, center, pos, wc = star
         c.execute("INSERT OR IGNORE INTO edge_stars (subgraph, center, length, degree_sequence, edge_list, isomorphisms_per_star, stars, star_centers) VALUES (?, ?, ?, ?, ?, 0, 0, 0)", (graph_string, center, edge_stars[star]["length"], edge_stars[star]["degree_sequence"], edge_stars[star]["sorted_edges"]))
-        # c.execute("UPDATE edge_stars SET stars = stars + ?, star_centers = star_centers + ? WHERE subgraph = ? AND center = ?", (edge_stars[star]["star_freq"], len(edge_stars[star]["center_set"]), graph_string, center))
         starid = c.execute("SELECT starid FROM edge_stars WHERE subgraph = ? AND center = ?", (graph_string, center)).fetchall()[0][0]
-        c.execute("UPDATE edge_stars SET stars = stars + ?, star_centers = star_centers + ? WHERE starid = ?", (edge_stars[star]["star_freq"], len(edge_stars[star]["center_set"]), starid))
+        c.execute("UPDATE edge_stars SET stars = stars + ?, star_centers = star_centers + ? WHERE starid = ?", (edge_stars[star]["star_freq"], edge_stars[star]["center_freq"], starid))
         c.execute("INSERT OR IGNORE INTO pos_edge_stars (starid, pos, stars, star_centers) VALUES (?, ?, 0, 0)", (starid, pos))
         c.execute("INSERT OR IGNORE INTO wc_edge_stars (starid, wc, stars, star_centers) VALUES (?, ?, 0, 0)", (starid, wc))
-        c.execute("UPDATE pos_edge_stars SET stars = stars + ?, star_centers = star_centers + ? WHERE starid = ? AND pos = ?", (edge_stars[star]["star_freq"], len(edge_stars[star]["center_set"]), starid, pos))
-        c.execute("UPDATE wc_edge_stars SET stars = stars + ?, star_centers = star_centers + ? WHERE starid = ? AND wc = ?", (edge_stars[star]["star_freq"], len(edge_stars[star]["center_set"]), starid, wc))
+        c.execute("UPDATE pos_edge_stars SET stars = stars + ?, star_centers = star_centers + ? WHERE starid = ? AND pos = ?", (edge_stars[star]["star_freq"], edge_stars[star]["center_freq"], starid, pos))
+        c.execute("UPDATE wc_edge_stars SET stars = stars + ?, star_centers = star_centers + ? WHERE starid = ? AND wc = ?", (edge_stars[star]["star_freq"], edge_stars[star]["center_freq"], starid, wc))
     for star, star_freq in skel_stars.iteritems():
         graph_string, center = star
         c.execute("INSERT OR IGNORE INTO skel_stars (subgraph, center, length, degree_sequence, isomorphisms_per_star, stars, star_centers) VALUES (?, ?, ?, ?, 0, 0, 0)", (graph_string, center, skel_stars[star]["length"], skel_stars[star]["degree_sequence"]))
-        c.execute("UPDATE skel_stars SET stars = stars + ?, star_centers = star_centers + ? WHERE subgraph = ? AND center = ?", (skel_stars[star]["star_freq"], len(skel_stars[star]["center_set"]), graph_string, center))
+        c.execute("UPDATE skel_stars SET stars = stars + ?, star_centers = star_centers + ? WHERE subgraph = ? AND center = ?", (skel_stars[star]["star_freq"], skel_stars[star]["center_freq"], graph_string, center))
 
 
 def iso_candidates_iter(conn, is_edge_star):
