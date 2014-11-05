@@ -142,8 +142,8 @@ if __name__ == "__main__":
     r1["collostructional"] = c.execute(q_r1, t).fetchall()[0][0]
     n["collostructional"] = c.execute(q_n, (args.TAG,)).fetchall()[0][0]
     logging.info("calculate association strengths and correlations")
-    tscore_associations = calculate_associations(o11, r1, c1, n, o11_to_r1, statistics.t_score)
     dice_associations = calculate_associations(o11, r1, c1, n, o11_to_r1, statistics.dice)
+    tscore_associations = calculate_associations(o11, r1, c1, n, o11_to_r1, statistics.t_score)
     ll_associations = calculate_associations(o11, r1, c1, n, o11_to_r1, statistics.log_likelihood)
     print scipy.stats.spearmanr([[v["collostructional"], v["centers"], v["stars"], v["isomorphisms"]] for v in dice_associations.itervalues()])[0]
     print scipy.stats.spearmanr([[v["collostructional"], v["centers"], v["stars"], v["isomorphisms"]] for v in tscore_associations.itervalues()])[0]
