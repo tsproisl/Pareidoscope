@@ -65,13 +65,17 @@ def _extract_stars(graph, vertice, edge_stars, skel_stars, edge_to_skel={}, incl
             edge_to_skel[(edge_string, edge_center)] = set([(skel_string, skel_center)])
         else:
             edge_to_skel[(edge_string, edge_center)].add((skel_string, skel_center))
+    return
+
+
+def _center_sets_to_center_freqs(edge_stars, skel_stars):
+    """Change center_set to center_freq in both dictionaries"""
     for e in edge_stars:
         edge_stars[e]["center_freq"] = len(edge_stars[e]["center_set"])
         edge_stars[e].pop("center_set")
     for s in skel_stars:
         skel_stars[s]["center_freq"] = len(skel_stars[s]["center_set"])
         skel_stars[s].pop("center_set")
-    return
 
 
 def count_isomorphisms(query, target, query_vertice, target_vertice):
@@ -100,6 +104,7 @@ def extract_stars_for_position(args):
     raw_to_bfo = {v: k for k, v in bfo_to_raw.iteritems()}
     vertice = raw_to_bfo[position]
     _extract_stars(bfo_graph, vertice, edge_stars, skel_stars, edge_to_skel, include_pos=False)
+    _center_sets_to_center_freqs(edge_stars, skel_stars)
     return sentid, edge_stars, skel_stars, edge_to_skel
 
 
@@ -118,4 +123,5 @@ def extract_all_stars(args):
     bfo_graph, bfo_to_raw = subgraph_enumeration.get_bfo(gs)
     for vertice in bfo_graph.nodes():
         _extract_stars(bfo_graph, vertice, edge_stars, skel_stars, include_pos=True)
+    _center_sets_to_center_freqs(edge_stars, skel_stars)
     return sentid, edge_stars, skel_stars
