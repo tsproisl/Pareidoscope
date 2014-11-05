@@ -152,3 +152,17 @@ if __name__ == "__main__":
     # for star, assoc in sorted(associations.iteritems(), key=lambda t: t[1]["centers"]):
     #     print star, assoc
 
+
+# * Tables
+
+# - forms
+# formid, form, tag, islemma
+
+# - stars
+# starid, star
+
+# - associations
+# formid, starid, counting-method, dice, t-score, log-likelihood, o11, r1, c1, n
+
+# - correlations
+# formid, counting-method-1, counting-method-2, rho-dice, rho-t-score, rho-log-likelihood
