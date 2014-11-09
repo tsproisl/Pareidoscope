@@ -130,6 +130,7 @@ def insert_results_into_database(db, form, tag, islemma, dice_associations, tsco
     conn, c = connect_to_results_db(results_db)
     c.execute("INSERT OR IGNORE INTO forms (form, tag, islemma) VALUES (?, ?, ?)", (form, tag, islemma))
     formid = c.execute("SELECT formid FROM forms WHERE form=? AND tag=? AND islemma=?", (form, tag, islemma)).fetchall()[0][0]
+    # c.executemany("INSERT OR IGNORE INTO associations (formid, starid, counting-method, dice, t-score, log-likelihood, o11, r1, c1, n) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
     pass
 
 
