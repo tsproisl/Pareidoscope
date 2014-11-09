@@ -97,6 +97,20 @@ def calculate_associations(o11, r1, c1, n, o11_to_r1, measure=statistics.log_lik
             o, e = statistics.get_contingency_table(f_o11, f_r1, f_c1, f_n)
             associations[o11_star][count_method] = measure(o, e)
     return associations
+
+
+def connect_to_results_db(filename):
+    """"""
+    conn = sqlite3.connect(filename)
+    c = conn.cursor()
+    c.execute("PRAGMA page_size=4096")
+    c.execute("PRAGMA cache_size=100000")
+    c.execute("CREATE TABLE IF NOT EXISTS forms (formid INTEGER PRIMARY KEY AUTOINCREMENT, form TEXT, tag TEXT, islemma BOOLEAN, UNIQUE (form, tag, islemma))")
+    c.execute("CREATE TABLE IF NOT EXISTS stars (starid INTEGER PRIMARY KEY, star TEXT, center INTEGER, UNIQUE (star, center))")
+    c.execute("CREATE TABLE IF NOT EXISTS associations (formid INTEGER, starid INTEGER, counting-method TEXT, dice REAL, t-score REAL, log-likelihood REAL, o11 INTEGER, r1 INTEGER, c1 INTEGER, n INTEGER, UNIQUE(formid, starid, counting-method), FOREIGN KEY (formid) REFERENCES forms, FOREIGN KEY (starid) REFERENCES stars")
+    c.execute("CREATE TABLE IF NOT EXISTS correlations (formid INTEGER, counting-method-1 TEXT, counting-method-2 TEXT, rho-dice REAL, rho-t-score REAL, rho-log-likelihood REAL, UNIQUE (formid, counting-method-1, counting-method-2), FOREIGN KEY (formid) REFERENCES forms)")
+    return conn, c
+
     
 
 if __name__ == "__main__":
@@ -153,16 +167,3 @@ if __name__ == "__main__":
     #     print star, assoc
 
 
-# * Tables
-
-# - forms
-# formid, form, tag, islemma
-
-# - stars
-# starid, star
-
-# - associations
-# formid, starid, counting-method, dice, t-score, log-likelihood, o11, r1, c1, n
-
-# - correlations
-# formid, counting-method-1, counting-method-2, rho-dice, rho-t-score, rho-log-likelihood
