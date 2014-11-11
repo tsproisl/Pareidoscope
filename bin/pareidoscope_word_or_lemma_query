@@ -118,20 +118,27 @@ def connect_to_results_db(filename):
     c.execute("PRAGMA cache_size=100000")
     c.execute("CREATE TABLE IF NOT EXISTS forms (formid INTEGER PRIMARY KEY AUTOINCREMENT, form TEXT, tag TEXT, islemma BOOLEAN, UNIQUE (form, tag, islemma))")
     # c.execute("CREATE TABLE IF NOT EXISTS stars (starid INTEGER PRIMARY KEY, star TEXT, center INTEGER, UNIQUE (star, center))")
-    # c.execute("CREATE TABLE IF NOT EXISTS associations (formid INTEGER, starid INTEGER, counting-method TEXT, dice REAL, t-score REAL, log-likelihood REAL, o11 INTEGER, r1 INTEGER, c1 INTEGER, n INTEGER, UNIQUE(formid, starid, counting-method), FOREIGN KEY (formid) REFERENCES forms, FOREIGN KEY (starid) REFERENCES stars")
-    c.execute("CREATE TABLE IF NOT EXISTS associations (formid INTEGER, starid INTEGER, counting-method TEXT, dice REAL, t-score REAL, log-likelihood REAL, o11 INTEGER, r1 INTEGER, c1 INTEGER, n INTEGER, UNIQUE(formid, starid, counting-method), FOREIGN KEY (formid) REFERENCES forms")
-    c.execute("CREATE TABLE IF NOT EXISTS correlations (formid INTEGER, counting-method-1 TEXT, counting-method-2 TEXT, rho-dice REAL, rho-t-score REAL, rho-log-likelihood REAL, UNIQUE (formid, counting-method-1, counting-method-2), FOREIGN KEY (formid) REFERENCES forms)")
+    # c.execute("CREATE TABLE IF NOT EXISTS associations (formid INTEGER, starid INTEGER, counting_method TEXT, dice REAL, t_score REAL, log_likelihood REAL, o11 INTEGER, r1 INTEGER, c1 INTEGER, n INTEGER, UNIQUE(formid, starid, counting_method), FOREIGN KEY (formid) REFERENCES forms, FOREIGN KEY (starid) REFERENCES stars")
+    c.execute("CREATE TABLE IF NOT EXISTS associations (formid INTEGER, starid INTEGER, counting_method TEXT, dice REAL, t_score REAL, log_likelihood REAL, o11 INTEGER, r1 INTEGER, c1 INTEGER, n INTEGER, UNIQUE(formid, starid, counting_method), FOREIGN KEY (formid) REFERENCES forms)")
+    c.execute("CREATE TABLE IF NOT EXISTS correlations (formid INTEGER, counting_method_1 TEXT, counting_method_2 TEXT, rho_dice REAL, rho_t_score REAL, rho_log_likelihood REAL, UNIQUE (formid, counting_method_1, counting_method_2), FOREIGN KEY (formid) REFERENCES forms)")
     return conn, c
 
 
-def insert_results_into_database(db, form, tag, islemma, dice_associations, tscore_associations, ll_associations, dice_correlations, tscore_correlations, ll_correlations):
+def insert_results_into_database(db, form, tag, islemma, o11, r1, c1, n, o11_to_r1, dice_associations, tscore_associations, ll_associations, dice_correlations, tscore_correlations, ll_correlations):
     """"""
     results_db = os.path.splitext(db)[0] + "_results.db"
     conn, c = connect_to_results_db(results_db)
     c.execute("INSERT OR IGNORE INTO forms (form, tag, islemma) VALUES (?, ?, ?)", (form, tag, islemma))
     formid = c.execute("SELECT formid FROM forms WHERE form=? AND tag=? AND islemma=?", (form, tag, islemma)).fetchall()[0][0]
-    # c.executemany("INSERT OR IGNORE INTO associations (formid, starid, counting-method, dice, t-score, log-likelihood, o11, r1, c1, n) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-    pass
+    # star method measure
+    counting_methods = ["collostructional", "centers", "stars", "isomorphisms"]
+    get_freq = lambda freq, cm, starid: freq[cm] if cm == "collostructional" else freq[cm][starid]
+    association_tuples = ((formid, starid, counting_method, dice_associations[starid][counting_method], tscore_associations[starid][counting_method], ll_associations[starid][counting_method], o11[counting_method][starid], get_freq(r1, counting_method, o11_to_r1[starid]), c1[counting_method][starid], get_freq(n, counting_method, o11_to_r1[starid])) for starid in ll_associations.iterkeys() for counting_method in counting_methods)
+    c.executemany("INSERT OR IGNORE INTO associations (formid, starid, counting_method, dice, t_score, log_likelihood, o11, r1, c1, n) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", association_tuples)
+    correlation_tuples = ((formid, cm1, cm2, dice_correlations[i][j], tscore_correlations[i][j], ll_correlations[i][j]) for i, cm1 in enumerate(counting_methods) for j, cm2 in enumerate(counting_methods))
+    c.executemany("INSERT OR IGNORE INTO correlations (formid, counting_method_1, counting_method_2, rho_dice, rho_t_score, rho_log_likelihood) VALUES (?, ?, ?, ?, ?, ?)", correlation_tuples)
+    conn.commit()
+    conn.close()
 
 
 
@@ -153,34 +160,37 @@ if __name__ == "__main__":
     c.execute("PRAGMA cache_size=100000")
     # conn.create_function("REGEXP", 2, database.regexp)
     
-    logging.info("collect stars")
+    logging.info("check for search term")
     form = "lemma" if args.lemma else "word"
     tag = "wc" if args.lemma else "pos"
     q = "SELECT tokens.sentid, sentences.graph, tokens.position FROM tokens INNER JOIN types ON types.typeid = tokens.typeid INNER JOIN sentences ON sentences.sentid = tokens.sentid WHERE %s=? AND %s=?" % (form, tag)
     q_r1 = "SELECT count(*) FROM tokens INNER JOIN types ON types.typeid = tokens.typeid WHERE %s=? AND %s=?" % (form, tag)
     q_n = "SELECT count(*) FROM tokens INNER JOIN types ON types.typeid = tokens.typeid WHERE %s=?" % tag
     t = (args.FORM, args.TAG)
-    o11 = {"stars": collections.Counter(), "centers": collections.Counter(), "isomorphisms": collections.Counter()}
-    o11["collostructional"] = o11["centers"]
-    r1 = {"stars": collections.Counter(), "centers": collections.Counter(), "isomorphisms": collections.Counter(), "collostructional": 0}
-    c1 = {"stars": collections.Counter(), "centers": collections.Counter(), "isomorphisms": collections.Counter(), "collostructional": collections.Counter()}
-    n = {"stars": collections.Counter(), "centers": collections.Counter(), "isomorphisms": collections.Counter(), "collostructional": 0}
-    o11_to_r1 = {}
-    for occurrences in helper.grouper_nofill(groupsize, c.execute(q, t)):
-        o11ids, r1ids = {}, {}
-        d = conn.cursor()
-        r = pool.imap_unordered(star_extraction.extract_stars_for_position, occurrences, 10)
-        # r = map(star_extraction.extract_stars_for_position, occurrences)
-        for sentid, e, s, m in r:
-            collect_frequencies(d, e, s, m, o11ids, r1ids, o11, r1, o11_to_r1)
-    logging.info("get frequencies from database")
-    get_frequencies_from_db(c, o11, r1, c1, n, args.lemma, args.TAG)
-    r1["collostructional"] = c.execute(q_r1, t).fetchall()[0][0]
-    n["collostructional"] = c.execute(q_n, (args.TAG,)).fetchall()[0][0]
-    logging.info("calculate association strengths and correlations")
-    dice_associations, tscore_associations, ll_associations, dice_correlations, tscore_correlations, ll_correlations = calculate_association_strengths_and_correlations(o11, r1, c1, n, o11_to_r1)
-    logging.info("insert results into database")
-    insert_results_into_database(args.db, args.FORM, args.TAG, args.lemma, dice_associations, tscore_associations, ll_associations, dice_correlations, tscore_correlations, ll_correlations)
+    q_type = "SELECT typeid FROM types WHERE %s=? AND %s=?" % (form, tag)
+    if len(c.execute(q_type, t).fetchall()) > 0:
+        logging.info("collect stars")
+        o11 = {"stars": collections.Counter(), "centers": collections.Counter(), "isomorphisms": collections.Counter()}
+        o11["collostructional"] = o11["centers"]
+        r1 = {"stars": collections.Counter(), "centers": collections.Counter(), "isomorphisms": collections.Counter(), "collostructional": 0}
+        c1 = {"stars": collections.Counter(), "centers": collections.Counter(), "isomorphisms": collections.Counter(), "collostructional": collections.Counter()}
+        n = {"stars": collections.Counter(), "centers": collections.Counter(), "isomorphisms": collections.Counter(), "collostructional": 0}
+        o11_to_r1 = {}
+        for occurrences in helper.grouper_nofill(groupsize, c.execute(q, t)):
+            o11ids, r1ids = {}, {}
+            d = conn.cursor()
+            r = pool.imap_unordered(star_extraction.extract_stars_for_position, occurrences, 10)
+            # r = map(star_extraction.extract_stars_for_position, occurrences)
+            for sentid, e, s, m in r:
+                collect_frequencies(d, e, s, m, o11ids, r1ids, o11, r1, o11_to_r1)
+        logging.info("get frequencies from database")
+        get_frequencies_from_db(c, o11, r1, c1, n, args.lemma, args.TAG)
+        r1["collostructional"] = c.execute(q_r1, t).fetchall()[0][0]
+        n["collostructional"] = c.execute(q_n, (args.TAG,)).fetchall()[0][0]
+        logging.info("calculate association strengths and correlations")
+        dice_associations, tscore_associations, ll_associations, dice_correlations, tscore_correlations, ll_correlations = calculate_association_strengths_and_correlations(o11, r1, c1, n, o11_to_r1)
+        logging.info("insert results into database")
+        insert_results_into_database(args.db, args.FORM, args.TAG, args.lemma, o11, r1, c1, n, o11_to_r1, dice_associations, tscore_associations, ll_associations, dice_correlations, tscore_correlations, ll_correlations)
     logging.info("done")
     # for star, assoc in sorted(associations.iteritems(), key=lambda t: t[1]["centers"]):
     #     print star, assoc
