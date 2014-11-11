@@ -13,6 +13,7 @@ import sqlite3
 
 import networkx
 from networkx.readwrite import json_graph
+import numpy
 import scipy.stats
 
 from pareidoscope import star_extraction
@@ -104,9 +105,14 @@ def calculate_association_strengths_and_correlations(o11, r1, c1, n, o11_to_r1):
     dice_associations = calculate_associations(o11, r1, c1, n, o11_to_r1, statistics.dice)
     tscore_associations = calculate_associations(o11, r1, c1, n, o11_to_r1, statistics.t_score)
     ll_associations = calculate_associations(o11, r1, c1, n, o11_to_r1, statistics.log_likelihood)
-    dice_correlations = scipy.stats.spearmanr([[v["collostructional"], v["centers"], v["stars"], v["isomorphisms"]] for v in dice_associations.itervalues()])[0]
-    tscore_correlations = scipy.stats.spearmanr([[v["collostructional"], v["centers"], v["stars"], v["isomorphisms"]] for v in tscore_associations.itervalues()])[0]
-    ll_correlations = scipy.stats.spearmanr([[v["collostructional"], v["centers"], v["stars"], v["isomorphisms"]] for v in ll_associations.itervalues()])[0]
+    if len(dice_associations) > 1:
+        dice_correlations = scipy.stats.spearmanr([[v["collostructional"], v["centers"], v["stars"], v["isomorphisms"]] for v in dice_associations.itervalues()])[0]
+        tscore_correlations = scipy.stats.spearmanr([[v["collostructional"], v["centers"], v["stars"], v["isomorphisms"]] for v in tscore_associations.itervalues()])[0]
+        ll_correlations = scipy.stats.spearmanr([[v["collostructional"], v["centers"], v["stars"], v["isomorphisms"]] for v in ll_associations.itervalues()])[0]
+    else:
+        dice_correlations = numpy.ones((4,4))
+        tscore_correlations = numpy.ones((4,4))
+        ll_correlations = numpy.ones((4,4))
     return dice_associations, tscore_associations, ll_associations, dice_correlations, tscore_correlations, ll_correlations
     
 
