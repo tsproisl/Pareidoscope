@@ -76,14 +76,14 @@ def is_sensible_graph(nx_graph):
     other_vertices.remove(root)
     if not all([networkx.has_path(nx_graph, root, v) for v in other_vertices]):
         return False
-    # do the vertices have sensible outdegrees <= 10?
-    if any([nx_graph.out_degree(v) > 10 for v in nx_graph.nodes()]):
-        return False
+    # # do the vertices have sensible outdegrees <= 10?
+    # if any([nx_graph.out_degree(v) > 10 for v in nx_graph.nodes()]):
+    #     return False
     # is the graph overly dense, i.e. is there a vertice with an
     # extended star (neighbors + edges between them) with more than 18
     # edges?
-    # if any([nx_graph.subgraph(set([v] + nx_graph.predecessors(v) + nx_graph.successors(v))).number_of_edges() > 18 for v in nx_graph.nodes()]):
-    #     return False
+    if any([nx_graph.subgraph(set([v] + nx_graph.predecessors(v) + nx_graph.successors(v))).number_of_edges() > 18 for v in nx_graph.nodes()]):
+        return False
     return True
 
 
