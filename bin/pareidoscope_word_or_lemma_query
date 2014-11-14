@@ -122,7 +122,7 @@ def connect_to_results_db(filename):
     c = conn.cursor()
     c.execute("PRAGMA page_size=4096")
     c.execute("PRAGMA cache_size=100000")
-    c.execute("CREATE TABLE IF NOT EXISTS forms (formid INTEGER PRIMARY KEY AUTOINCREMENT, form TEXT, tag TEXT, islemma BOOLEAN, UNIQUE (form, tag, islemma))")
+    c.execute("CREATE TABLE IF NOT EXISTS forms (formid INTEGER PRIMARY KEY AUTOINCREMENT, form TEXT, tag TEXT, islemma BOOLEAN, frequency INTEGER, UNIQUE (form, tag, islemma))")
     # c.execute("CREATE TABLE IF NOT EXISTS stars (starid INTEGER PRIMARY KEY, star TEXT, center INTEGER, UNIQUE (star, center))")
     # c.execute("CREATE TABLE IF NOT EXISTS associations (formid INTEGER, starid INTEGER, counting_method TEXT, dice REAL, t_score REAL, log_likelihood REAL, o11 INTEGER, r1 INTEGER, c1 INTEGER, n INTEGER, UNIQUE(formid, starid, counting_method), FOREIGN KEY (formid) REFERENCES forms, FOREIGN KEY (starid) REFERENCES stars")
     c.execute("CREATE TABLE IF NOT EXISTS associations (formid INTEGER, starid INTEGER, counting_method TEXT, dice REAL, t_score REAL, log_likelihood REAL, o11 INTEGER, r1 INTEGER, c1 INTEGER, n INTEGER, UNIQUE(formid, starid, counting_method), FOREIGN KEY (formid) REFERENCES forms)")
@@ -130,11 +130,11 @@ def connect_to_results_db(filename):
     return conn, c
 
 
-def insert_results_into_database(db, form, tag, islemma, o11, r1, c1, n, o11_to_r1, dice_associations, tscore_associations, ll_associations, dice_correlations, tscore_correlations, ll_correlations):
+def insert_results_into_database(db, form, tag, islemma, freq, o11, r1, c1, n, o11_to_r1, dice_associations, tscore_associations, ll_associations, dice_correlations, tscore_correlations, ll_correlations):
     """"""
     results_db = os.path.splitext(db)[0] + "_results.db"
     conn, c = connect_to_results_db(results_db)
-    c.execute("INSERT OR IGNORE INTO forms (form, tag, islemma) VALUES (?, ?, ?)", (form, tag, islemma))
+    c.execute("INSERT OR IGNORE INTO forms (form, tag, islemma, frequency) VALUES (?, ?, ?, ?)", (form, tag, islemma, freq))
     formid = c.execute("SELECT formid FROM forms WHERE form=? AND tag=? AND islemma=?", (form, tag, islemma)).fetchall()[0][0]
     # star method measure
     counting_methods = ["collostructional", "centers", "stars", "isomorphisms"]
@@ -172,8 +172,10 @@ if __name__ == "__main__":
     q = "SELECT tokens.sentid, sentences.graph, tokens.position FROM tokens INNER JOIN types ON types.typeid = tokens.typeid INNER JOIN sentences ON sentences.sentid = tokens.sentid WHERE %s=? AND %s=?" % (form, tag)
     q_r1 = "SELECT count(*) FROM tokens INNER JOIN types ON types.typeid = tokens.typeid WHERE %s=? AND %s=?" % (form, tag)
     q_n = "SELECT count(*) FROM tokens INNER JOIN types ON types.typeid = tokens.typeid WHERE %s=?" % tag
-    t = (args.FORM, args.TAG)
+    q_freq = "SELECT count(*) from tokens INNER JOIN types ON tokens.typeid=types.typeid WHERE %s=? AND %s=?" % (form, tag)
     q_type = "SELECT typeid FROM types WHERE %s=? AND %s=?" % (form, tag)
+    t = (args.FORM, args.TAG)
+    freq = c.execute(q_freq, t).fetchall()[0][0]
     if len(c.execute(q_type, t).fetchall()) > 0:
         logging.info("collect stars")
         o11 = {"stars": collections.Counter(), "centers": collections.Counter(), "isomorphisms": collections.Counter()}
@@ -196,7 +198,7 @@ if __name__ == "__main__":
         logging.info("calculate association strengths and correlations")
         dice_associations, tscore_associations, ll_associations, dice_correlations, tscore_correlations, ll_correlations = calculate_association_strengths_and_correlations(o11, r1, c1, n, o11_to_r1)
         logging.info("insert results into database")
-        insert_results_into_database(args.db, args.FORM, args.TAG, args.lemma, o11, r1, c1, n, o11_to_r1, dice_associations, tscore_associations, ll_associations, dice_correlations, tscore_correlations, ll_correlations)
+        insert_results_into_database(args.db, args.FORM, args.TAG, args.lemma, freq, o11, r1, c1, n, o11_to_r1, dice_associations, tscore_associations, ll_associations, dice_correlations, tscore_correlations, ll_correlations)
     logging.info("done")
     # for star, assoc in sorted(associations.iteritems(), key=lambda t: t[1]["centers"]):
     #     print star, assoc
