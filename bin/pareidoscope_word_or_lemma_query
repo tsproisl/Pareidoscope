@@ -175,8 +175,8 @@ if __name__ == "__main__":
     q_freq = "SELECT count(*) from tokens INNER JOIN types ON tokens.typeid=types.typeid WHERE %s=? AND %s=?" % (form, tag)
     q_type = "SELECT typeid FROM types WHERE %s=? AND %s=?" % (form, tag)
     t = (args.FORM, args.TAG)
-    freq = c.execute(q_freq, t).fetchall()[0][0]
     if len(c.execute(q_type, t).fetchall()) > 0:
+        freq = c.execute(q_freq, t).fetchall()[0][0]
         logging.info("collect stars")
         o11 = {"stars": collections.Counter(), "centers": collections.Counter(), "isomorphisms": collections.Counter()}
         o11["collostructional"] = o11["centers"]
