@@ -56,7 +56,8 @@ def create_nx_digraph_from_cwb(cwb, origid=None):
 
 def is_sensible_graph(nx_graph):
     """Check if graph is a sensible syntactic representation of a
-    sentence, i.e. rooted, connected, sensible density, …
+    sentence, i.e. rooted, connected, sensible outdegree, sensible
+    density, …
     
     Arguments:
     - `nx_graph`:
@@ -77,8 +78,8 @@ def is_sensible_graph(nx_graph):
     if not all([networkx.has_path(nx_graph, root, v) for v in other_vertices]):
         return False
     # # do the vertices have sensible outdegrees <= 10?
-    # if any([nx_graph.out_degree(v) > 10 for v in nx_graph.nodes()]):
-    #     return False
+    if any([nx_graph.out_degree(v) > 10 for v in nx_graph.nodes()]):
+        return False
     # is the graph overly dense, i.e. is there a vertice with an
     # extended star (neighbors + edges between them) with more than 18
     # edges?
