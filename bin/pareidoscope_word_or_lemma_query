@@ -64,7 +64,7 @@ def get_frequencies_from_db(c, o11, r1, c1, n, lemma, tag):
     q1 = "SELECT isomorphisms_per_star, stars, star_centers FROM edge_star_classes WHERE classid=?"
     q2 = "SELECT isomorphisms_per_star, stars, star_centers FROM skel_star_classes WHERE classid=?"
     pos_or_wc = "wc" if lemma else "pos"
-    q3 = "SELECT sum(xes.star_centers) FROM %s_edge_stars AS xes JOIN edge_star_elements AS ese ON xes.starid=ese.elemid WHERE ese.classid=? AND xes. %s=?" % (pos_or_wc, pos_or_wc)
+    q3 = "SELECT sum(xes.star_centers) FROM %s_edge_stars AS xes JOIN edge_star_elements AS ese ON xes.starid=ese.elemid WHERE ese.classid=? AND xes.%s=?" % (pos_or_wc, pos_or_wc)
     for o in o11["stars"]:
         isomorphisms_per_star, stars, star_centers = c.execute(q1, (o,)).fetchone()
         c1["stars"][o] += stars
