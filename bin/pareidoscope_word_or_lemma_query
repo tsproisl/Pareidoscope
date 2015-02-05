@@ -103,17 +103,20 @@ def calculate_associations(o11, r1, c1, n, o11_to_r1, measure=statistics.log_lik
 def calculate_association_strengths_and_correlations(o11, r1, c1, n, o11_to_r1):
     """"""
     dice_associations = calculate_associations(o11, r1, c1, n, o11_to_r1, statistics.dice)
+    gmean_associations = calculate_associations(o11, r1, c1, n, o11_to_r1, statistics.gmean)
     tscore_associations = calculate_associations(o11, r1, c1, n, o11_to_r1, statistics.t_score)
     ll_associations = calculate_associations(o11, r1, c1, n, o11_to_r1, statistics.log_likelihood)
     if len(dice_associations) > 1:
         dice_correlations = scipy.stats.spearmanr([[v["collostructional"], v["centers"], v["stars"], v["isomorphisms"]] for v in dice_associations.itervalues()])[0]
+        gmean_correlations = scipy.stats.spearmanr([[v["collostructional"], v["centers"], v["stars"], v["isomorphisms"]] for v in gmean_associations.itervalues()])[0]
         tscore_correlations = scipy.stats.spearmanr([[v["collostructional"], v["centers"], v["stars"], v["isomorphisms"]] for v in tscore_associations.itervalues()])[0]
         ll_correlations = scipy.stats.spearmanr([[v["collostructional"], v["centers"], v["stars"], v["isomorphisms"]] for v in ll_associations.itervalues()])[0]
     else:
         dice_correlations = numpy.ones((4,4))
+        gmean_correlations = numpy.ones((4,4))
         tscore_correlations = numpy.ones((4,4))
         ll_correlations = numpy.ones((4,4))
-    return dice_associations, tscore_associations, ll_associations, dice_correlations, tscore_correlations, ll_correlations
+    return dice_associations, gmean_associations, tscore_associations, ll_associations, dice_correlations, gmean_correlations, tscore_correlations, ll_correlations
     
 
 def connect_to_results_db(filename):
@@ -125,12 +128,12 @@ def connect_to_results_db(filename):
     c.execute("CREATE TABLE IF NOT EXISTS forms (formid INTEGER PRIMARY KEY AUTOINCREMENT, form TEXT, tag TEXT, islemma BOOLEAN, frequency INTEGER, UNIQUE (form, tag, islemma))")
     # c.execute("CREATE TABLE IF NOT EXISTS stars (starid INTEGER PRIMARY KEY, star TEXT, center INTEGER, UNIQUE (star, center))")
     # c.execute("CREATE TABLE IF NOT EXISTS associations (formid INTEGER, starid INTEGER, counting_method TEXT, dice REAL, t_score REAL, log_likelihood REAL, o11 INTEGER, r1 INTEGER, c1 INTEGER, n INTEGER, UNIQUE(formid, starid, counting_method), FOREIGN KEY (formid) REFERENCES forms, FOREIGN KEY (starid) REFERENCES stars")
-    c.execute("CREATE TABLE IF NOT EXISTS associations (formid INTEGER, starid INTEGER, counting_method TEXT, dice REAL, t_score REAL, log_likelihood REAL, o11 INTEGER, r1 INTEGER, c1 INTEGER, n INTEGER, UNIQUE(formid, starid, counting_method), FOREIGN KEY (formid) REFERENCES forms)")
-    c.execute("CREATE TABLE IF NOT EXISTS correlations (formid INTEGER, counting_method_1 TEXT, counting_method_2 TEXT, rho_dice REAL, rho_t_score REAL, rho_log_likelihood REAL, UNIQUE (formid, counting_method_1, counting_method_2), FOREIGN KEY (formid) REFERENCES forms)")
+    c.execute("CREATE TABLE IF NOT EXISTS associations (formid INTEGER, starid INTEGER, counting_method TEXT, dice REAL, gmean REAL, t_score REAL, log_likelihood REAL, o11 INTEGER, r1 INTEGER, c1 INTEGER, n INTEGER, UNIQUE(formid, starid, counting_method), FOREIGN KEY (formid) REFERENCES forms)")
+    c.execute("CREATE TABLE IF NOT EXISTS correlations (formid INTEGER, counting_method_1 TEXT, counting_method_2 TEXT, rho_dice REAL, rho_gmean REAL, rho_t_score REAL, rho_log_likelihood REAL, UNIQUE (formid, counting_method_1, counting_method_2), FOREIGN KEY (formid) REFERENCES forms)")
     return conn, c
 
 
-def insert_results_into_database(db, form, tag, islemma, freq, o11, r1, c1, n, o11_to_r1, dice_associations, tscore_associations, ll_associations, dice_correlations, tscore_correlations, ll_correlations):
+def insert_results_into_database(db, form, tag, islemma, freq, o11, r1, c1, n, o11_to_r1, dice_associations, gmean_associations, tscore_associations, ll_associations, dice_correlations, gmean_correlations, tscore_correlations, ll_correlations):
     """"""
     results_db = os.path.splitext(db)[0] + "_results.db"
     conn, c = connect_to_results_db(results_db)
@@ -139,10 +142,10 @@ def insert_results_into_database(db, form, tag, islemma, freq, o11, r1, c1, n, o
     # star method measure
     counting_methods = ["collostructional", "centers", "stars", "isomorphisms"]
     get_freq = lambda freq, cm, starid: freq[cm] if cm == "collostructional" else freq[cm][starid]
-    association_tuples = ((formid, starid, counting_method, dice_associations[starid][counting_method], tscore_associations[starid][counting_method], ll_associations[starid][counting_method], o11[counting_method][starid], get_freq(r1, counting_method, o11_to_r1[starid]), c1[counting_method][starid], get_freq(n, counting_method, o11_to_r1[starid])) for starid in ll_associations.iterkeys() for counting_method in counting_methods)
-    c.executemany("INSERT OR IGNORE INTO associations (formid, starid, counting_method, dice, t_score, log_likelihood, o11, r1, c1, n) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", association_tuples)
-    correlation_tuples = ((formid, cm1, cm2, dice_correlations[i][j], tscore_correlations[i][j], ll_correlations[i][j]) for i, cm1 in enumerate(counting_methods) for j, cm2 in enumerate(counting_methods))
-    c.executemany("INSERT OR IGNORE INTO correlations (formid, counting_method_1, counting_method_2, rho_dice, rho_t_score, rho_log_likelihood) VALUES (?, ?, ?, ?, ?, ?)", correlation_tuples)
+    association_tuples = ((formid, starid, counting_method, dice_associations[starid][counting_method], gmean_associations[starid][counting_method], tscore_associations[starid][counting_method], ll_associations[starid][counting_method], o11[counting_method][starid], get_freq(r1, counting_method, o11_to_r1[starid]), c1[counting_method][starid], get_freq(n, counting_method, o11_to_r1[starid])) for starid in ll_associations.iterkeys() for counting_method in counting_methods)
+    c.executemany("INSERT OR IGNORE INTO associations (formid, starid, counting_method, dice, gmean, t_score, log_likelihood, o11, r1, c1, n) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", association_tuples)
+    correlation_tuples = ((formid, cm1, cm2, dice_correlations[i][j], gmean_correlations[i][j], tscore_correlations[i][j], ll_correlations[i][j]) for i, cm1 in enumerate(counting_methods) for j, cm2 in enumerate(counting_methods))
+    c.executemany("INSERT OR IGNORE INTO correlations (formid, counting_method_1, counting_method_2, rho_dice, rho_gmean, rho_t_score, rho_log_likelihood) VALUES (?, ?, ?, ?, ?, ?, ?)", correlation_tuples)
     conn.commit()
     conn.close()
 
@@ -196,7 +199,7 @@ if __name__ == "__main__":
         r1["collostructional"] = c.execute(q_r1, t).fetchall()[0][0]
         n["collostructional"] = c.execute(q_n, (args.TAG,)).fetchall()[0][0]
         logging.info("calculate association strengths and correlations")
-        dice_associations, tscore_associations, ll_associations, dice_correlations, tscore_correlations, ll_correlations = calculate_association_strengths_and_correlations(o11, r1, c1, n, o11_to_r1)
+        dice_associations, gmean_associations, tscore_associations, ll_associations, dice_correlations, gmean_correlations, tscore_correlations, ll_correlations = calculate_association_strengths_and_correlations(o11, r1, c1, n, o11_to_r1)
         logging.info("insert results into database")
         insert_results_into_database(args.db, args.FORM, args.TAG, args.lemma, freq, o11, r1, c1, n, o11_to_r1, dice_associations, tscore_associations, ll_associations, dice_correlations, tscore_correlations, ll_correlations)
     logging.info("done")
