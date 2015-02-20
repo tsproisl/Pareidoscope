@@ -1,0 +1,127 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+import argparse
+import itertools
+import json
+import logging
+import multiprocessing
+import os
+
+from networkx.readwrite import json_graph
+
+from pareidoscope import subgraph_enumeration
+from pareidoscope import subgraph_isomorphism
+from pareidoscope.utils import cwb
+from pareidoscope.utils import helper
+from pareidoscope.utils import nx_graph
+
+# logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=logging.INFO)
+logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=logging.DEBUG)
+
+
+# collexemes can be wordforms or lemmata
+
+
+
+def arguments():
+    """"""
+    parser = argparse.ArgumentParser(description="Do a collexeme analysis for the given linguistic structure, i.e. find associated lemmata for a specified slot in the structure")
+    parser.add_argument("-c", "--corpus", type=argparse.FileType("r"), required=True, help="Corpus in CWB format")
+    parser.add_argument("--db", type=os.path.abspath, required=True, help="SQLite3 database")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("-w", "--wordforms", help="Find collexeme wordforms", action='store_true')
+    group.add_argument("-l", "--lemmata", help="Find collexeme lemmata", action='store_true')
+    parser.add_argument("QUERY", type=str, help="Query for a linguistic structure")
+    parser.add_argument("INDEX", type=int, help="Index of the collexeme slot")
+    args = parser.parse_args()
+    return args
+
+
+def collect_frequencies(args):
+    """Collect all necessary frequencies"""
+    s, query, query_skeleton, choke_point, collexeme_index, lemma = args
+    sentence, sid = s
+    # * frequencies we need
+    # ** collostructional
+    # - lemma in graph (centers)
+    # - lemma (-> db)
+    # - word class in graph
+    # - word class (-> db)
+    # ** other
+    # - lemma in graph
+    # - lemma in skeleton
+    # - graph
+    # - skeleton
+    gs = nx_graph.create_nx_digraph_from_cwb(sentence)
+    sensible = nx_graph.is_sensible_graph(gs)
+    n = {"collostructional": 0, "choke_points": 0, "subgraphs": 0, "isomorphisms": 0}
+    c1 = {"collostructional": 0, "choke_points": 0, "subgraphs": 0, "isomorphisms": 0}
+    r1 = {"collostructional": {}, "choke_points": {}, "subgraphs": {}, "isomorphisms": {}}
+    o11 = {"collostructional": {}, "choke_points": {}, "subgraphs": {}, "isomorphisms": {}}
+    choke_point_query_set = set()
+    choke_point_skel_set = set()
+    isomorphisms_query_set = set()
+    isomorphisms_skel_set = set()
+    sur_attribute = "word"
+    if lemma:
+        sur_attribute = "lemma"
+    if sensible:
+        # for subgraph in subgraph_enumeration.get_subgraphs_nx(query, gs):
+        #     print(json.dumps(json_graph.node_link_data(subgraph), ensure_ascii=False))
+        for isomorphism in subgraph_isomorphism.get_subgraph_isomorphisms_nx(query_skeleton, gs):
+            n["isomorphisms"] += 1
+            choke_point_skel_set.add(isomorphism[choke_point])
+            isomorphisms_skel_set.add(frozenset(isomorphism))
+            collexeme = gs.node[isomorphism[collexeme_index]][sur_attribute]
+            if collexeme not in r1["isomorphisms"]:
+                r1["isomorphisms"][collexeme] = 0
+            r1["isomorphisms"][collexeme] += 1
+        n["choke_points"] += len(choke_point_skel_set)
+        n["subgraphs"] += len(isomorphisms_skel_set)
+        for collexeme in r1["isomorphisms"].keys():
+            print collexeme
+        for isomorphism in subgraph_isomorphism.get_subgraph_isomorphisms_nx(query, gs):
+            c1["isomorphisms"] += 1
+            choke_point_query_set.add(isomorphism[choke_point])
+            isomorphisms_query_set.add(frozenset(isomorphism))
+            collexeme = gs.node[isomorphism[collexeme_index]][sur_attribute]
+            if collexeme not in o11["isomorphisms"]:
+                o11["isomorphisms"][collexeme] = 0
+            o11["isomorphisms"][collexeme] += 1
+        c1["choke_points"] += len(choke_point_query_set)
+        c1["subgraphs"] += len(isomorphisms_query_set)
+
+
+def main():
+    """"""
+    args = arguments()
+    query, order = nx_graph.canonize(nx_graph.create_nx_digraph(json.loads(args.QUERY.strip())), order=True)
+    query_skeleton = nx_graph.skeletize(query)
+    logging.debug("query graph: %s" % json.dumps(json_graph.node_link_data(query), ensure_ascii=False))
+    logging.debug("query skeleton: %s" % json.dumps(json_graph.node_link_data(query_skeleton), ensure_ascii=False))
+    choke_point = nx_graph.get_choke_point(query)
+    logging.debug("choke point: %s" % choke_point)
+    collexeme_index = order.index(args.INDEX)
+    logging.debug("collexeme index: %s" % collexeme_index)
+    lemma = args.lemmata
+    logging.debug("collexeme as lemma: %s" % lemma)
+
+    groupsize = 50 * 10 * multiprocessing.cpu_count()
+
+    pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
+    sents = cwb.sentences_iter(args.corpus, return_id=True)
+
+    logging.info("collect frequencies")
+    for sentences in helper.grouper_nofill(groupsize, sents):
+        r = pool.imap_unordered(collect_frequencies, itertools.izip(sentences, itertools.repeat(query), itertools.repeat(query_skeleton), itertools.repeat(choke_point), itertools.repeat(collexeme_index), itertools.repeat(lemma)), chunksize=10)
+        #r = map(collect_frequencies, itertools.izip(sentences, itertools.repeat(query), itertools.repeat(query_skeleton), itertools.repeat(choke_point)))
+        # for result, sensible in r:
+        #     if sensible:
+        #         preprocess_results(conn, c, result, results)
+    logging.info("done")
+
+
+
+if __name__ == "__main__":
+    main()
