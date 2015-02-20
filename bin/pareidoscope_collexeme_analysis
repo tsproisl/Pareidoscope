@@ -75,22 +75,38 @@ def collect_frequencies(args):
             isomorphisms_skel_set.add(frozenset(isomorphism))
             collexeme = gs.node[isomorphism[collexeme_index]][sur_attribute]
             if collexeme not in r1["isomorphisms"]:
+                r1["collostructional"][collexeme] = 0
+                r1["choke_points"][collexeme] = 0
+                r1["subgraphs"][collexeme] = 0
                 r1["isomorphisms"][collexeme] = 0
             r1["isomorphisms"][collexeme] += 1
         n["choke_points"] += len(choke_point_skel_set)
         n["subgraphs"] += len(isomorphisms_skel_set)
         for collexeme in r1["isomorphisms"].keys():
-            print collexeme
+            lexical_skel = query_skeleton.copy()
+            lexical_skel.node[collexeme_index][sur_attribute] = collexeme
+            r1["subgraphs"][collexeme] += sum(1 for _ in subgraph_enumeration.get_subgraphs_nx(lexical_skel, gs))
+            r1["choke_points"][collexeme] += sum(1 for _ in subgraph_enumeration.get_choke_point_matches(lexical_skel, gs, choke_point))
         for isomorphism in subgraph_isomorphism.get_subgraph_isomorphisms_nx(query, gs):
             c1["isomorphisms"] += 1
             choke_point_query_set.add(isomorphism[choke_point])
             isomorphisms_query_set.add(frozenset(isomorphism))
             collexeme = gs.node[isomorphism[collexeme_index]][sur_attribute]
             if collexeme not in o11["isomorphisms"]:
+                o11["collostructional"][collexeme] = 0
+                o11["choke_points"][collexeme] = 0
+                o11["subgraphs"][collexeme] = 0
                 o11["isomorphisms"][collexeme] = 0
             o11["isomorphisms"][collexeme] += 1
         c1["choke_points"] += len(choke_point_query_set)
         c1["subgraphs"] += len(isomorphisms_query_set)
+        for collexeme in o11["isomorphisms"].keys():
+            lexical_query = query.copy()
+            lexical_query.node[collexeme_index][sur_attribute] = collexeme
+            o11["subgraphs"][collexeme] += sum(1 for _ in subgraph_enumeration.get_subgraphs_nx(lexical_query, gs))
+            o11["choke_points"][collexeme] += sum(1 for _ in subgraph_enumeration.get_choke_point_matches(lexical_query, gs, choke_point))
+        o11["collostructional"] = o11["choke_points"]
+    return o11, r1, c1, n
 
 
 def main():
