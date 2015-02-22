@@ -34,13 +34,14 @@ def arguments():
     group.add_argument("-l", "--lemmata", help="Find collexeme lemmata", action='store_true')
     parser.add_argument("QUERY", type=str, help="Query for a linguistic structure")
     parser.add_argument("INDEX", type=int, help="Index of the collexeme slot")
+    parser.add_argument("WC", type=str, help="Word class of the collexeme slot")
     args = parser.parse_args()
     return args
 
 
 def collect_frequencies(args):
     """Collect all necessary frequencies"""
-    s, query, query_skeleton, choke_point, collexeme_index, lemma = args
+    s, query, query_skeleton, choke_point, collexeme_index, lemma, wc = args
     sentence, sid = s
     # * frequencies we need
     # ** collostructional
@@ -67,8 +68,6 @@ def collect_frequencies(args):
     if lemma:
         sur_attribute = "lemma"
     if sensible:
-        # for subgraph in subgraph_enumeration.get_subgraphs_nx(query, gs):
-        #     print(json.dumps(json_graph.node_link_data(subgraph), ensure_ascii=False))
         for isomorphism in subgraph_isomorphism.get_subgraph_isomorphisms_nx(query_skeleton, gs):
             n["isomorphisms"] += 1
             choke_point_skel_set.add(isomorphism[choke_point])
@@ -87,6 +86,7 @@ def collect_frequencies(args):
             lexical_skel.node[collexeme_index][sur_attribute] = collexeme
             r1["subgraphs"][collexeme] += sum(1 for _ in subgraph_enumeration.get_subgraphs_nx(lexical_skel, gs))
             r1["choke_points"][collexeme] += sum(1 for _ in subgraph_enumeration.get_choke_point_matches(lexical_skel, gs, choke_point))
+            r1["collostructional"] = sum(1 for v, d in gs.nodes(data=True) if d["wc"] == wc and d[sur_attribute] == collexeme)
         for isomorphism in subgraph_isomorphism.get_subgraph_isomorphisms_nx(query, gs):
             c1["isomorphisms"] += 1
             choke_point_query_set.add(isomorphism[choke_point])
@@ -106,6 +106,10 @@ def collect_frequencies(args):
             o11["subgraphs"][collexeme] += sum(1 for _ in subgraph_enumeration.get_subgraphs_nx(lexical_query, gs))
             o11["choke_points"][collexeme] += sum(1 for _ in subgraph_enumeration.get_choke_point_matches(lexical_query, gs, choke_point))
         o11["collostructional"] = o11["choke_points"]
+        wc_query = query.copy()
+        wc_query.node[collexeme_index]["wc"] = wc
+        c1["collostructional"] = sum(1 for _ in subgraph_enumeration.get_choke_point_matches(wc_query, gs, choke_point))
+        n["collostructional"] = sum(1 for v, d in gs.nodes(data=True) if d["wc"] == wc)
     return o11, r1, c1, n
 
 
@@ -122,6 +126,9 @@ def main():
     logging.debug("collexeme index: %s" % collexeme_index)
     lemma = args.lemmata
     logging.debug("collexeme as lemma: %s" % lemma)
+    wc = args.WC
+    logging.debug("collexeme word class: %s" % wc)
+    query.node[collexeme_index]["wc"] = wc
 
     groupsize = 50 * 10 * multiprocessing.cpu_count()
 
@@ -130,11 +137,12 @@ def main():
 
     logging.info("collect frequencies")
     for sentences in helper.grouper_nofill(groupsize, sents):
-        r = pool.imap_unordered(collect_frequencies, itertools.izip(sentences, itertools.repeat(query), itertools.repeat(query_skeleton), itertools.repeat(choke_point), itertools.repeat(collexeme_index), itertools.repeat(lemma)), chunksize=10)
-        #r = map(collect_frequencies, itertools.izip(sentences, itertools.repeat(query), itertools.repeat(query_skeleton), itertools.repeat(choke_point)))
+        #r = pool.imap_unordered(collect_frequencies, itertools.izip(sentences, itertools.repeat(query), itertools.repeat(query_skeleton), itertools.repeat(choke_point), itertools.repeat(collexeme_index), itertools.repeat(lemma), itertools.repeat(wc)), chunksize=10)
+        r = map(collect_frequencies, itertools.izip(sentences, itertools.repeat(query), itertools.repeat(query_skeleton), itertools.repeat(choke_point), itertools.repeat(collexeme_index), itertools.repeat(lemma), itertools.repeat(wc)))
         # for result, sensible in r:
         #     if sensible:
         #         preprocess_results(conn, c, result, results)
+        print(list(r))
     logging.info("done")
 
 
