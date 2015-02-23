@@ -124,7 +124,7 @@ def dictionary_match(query_dictionary, target_dictionary):
     - `query_dictionary`:
     - `target_dictionary`:
     """
-    return all([label in target_dictionary and (re.search(r"^" + query_dictionary[label] + r"$", target_dictionary[label]) or query_dictionary[label] == target_dictionary[label]) for label in query_dictionary])
+    return all([label in target_dictionary and (query_dictionary[label] == target_dictionary[label] or re.search(r"^" + query_dictionary[label] + r"$", target_dictionary[label])) for label in query_dictionary])
     # return all([label in target_dictionary and (query_dictionary[label] == ".+" or query_dictionary[label] == ".*" or query_dictionary[label] == target_dictionary[label]) for label in query_dictionary])
 
 
