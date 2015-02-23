@@ -131,7 +131,7 @@ def calculate_associations(o11, r1, c1, n, measure=statistics.log_likelihood):
 def calculate_association_strengths_and_correlations(o11, r1, c1, n):
     """"""
     dice_associations = calculate_associations(o11, r1, c1, n, statistics.dice)
-    gmean_associations = calculate_associations(o11, r1, c1, n, statistics.gmean)
+    gmean_associations = calculate_associations(o11, r1, c1, n, statistics.geometric_mean)
     tscore_associations = calculate_associations(o11, r1, c1, n, statistics.t_score)
     ll_associations = calculate_associations(o11, r1, c1, n, statistics.log_likelihood)
     if len(dice_associations) > 1:
