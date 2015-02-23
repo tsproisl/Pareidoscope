@@ -10,6 +10,7 @@ import os
 
 from networkx.readwrite import json_graph
 
+from pareidoscope import frequency
 from pareidoscope import subgraph_enumeration
 from pareidoscope import subgraph_isomorphism
 from pareidoscope.utils import cwb
@@ -56,10 +57,10 @@ def collect_frequencies(args):
     # - skeleton
     gs = nx_graph.create_nx_digraph_from_cwb(sentence)
     sensible = nx_graph.is_sensible_graph(gs)
-    n = {"collostructional": 0, "choke_points": 0, "subgraphs": 0, "isomorphisms": 0}
-    c1 = {"collostructional": 0, "choke_points": 0, "subgraphs": 0, "isomorphisms": 0}
-    r1 = {"collostructional": {}, "choke_points": {}, "subgraphs": {}, "isomorphisms": {}}
     o11 = {"collostructional": {}, "choke_points": {}, "subgraphs": {}, "isomorphisms": {}}
+    r1 = {"collostructional": {}, "choke_points": {}, "subgraphs": {}, "isomorphisms": {}}
+    c1 = {"collostructional": 0, "choke_points": 0, "subgraphs": 0, "isomorphisms": 0}
+    n = {"collostructional": 0, "choke_points": 0, "subgraphs": 0, "isomorphisms": 0}
     choke_point_query_set = set()
     choke_point_skel_set = set()
     isomorphisms_query_set = set()
@@ -135,14 +136,21 @@ def main():
     pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
     sents = cwb.sentences_iter(args.corpus, return_id=True)
 
+    o11 = {"collostructional": {}, "choke_points": {}, "subgraphs": {}, "isomorphisms": {}}
+    r1 = {"collostructional": {}, "choke_points": {}, "subgraphs": {}, "isomorphisms": {}}
+    c1 = {"collostructional": 0, "choke_points": 0, "subgraphs": 0, "isomorphisms": 0}
+    n = {"collostructional": 0, "choke_points": 0, "subgraphs": 0, "isomorphisms": 0}
+
     logging.info("collect frequencies")
     for sentences in helper.grouper_nofill(groupsize, sents):
         #r = pool.imap_unordered(collect_frequencies, itertools.izip(sentences, itertools.repeat(query), itertools.repeat(query_skeleton), itertools.repeat(choke_point), itertools.repeat(collexeme_index), itertools.repeat(lemma), itertools.repeat(wc)), chunksize=10)
         r = map(collect_frequencies, itertools.izip(sentences, itertools.repeat(query), itertools.repeat(query_skeleton), itertools.repeat(choke_point), itertools.repeat(collexeme_index), itertools.repeat(lemma), itertools.repeat(wc)))
-        # for result, sensible in r:
-        #     if sensible:
-        #         preprocess_results(conn, c, result, results)
-        print(list(r))
+        for o11_local, r1_local, c1_local, n_local in r:
+            frequency.merge_nested_result(o11_local, o11)
+            frequency.merge_nested_result(r1_local, r1)
+            frequency.merge_result(c1_local, c1)
+            frequency.merge_result(n_local, n)
+    print(o11, r1, c1, n)
     logging.info("done")
 
 

@@ -46,3 +46,19 @@ def merge_result(result, results):
         if k not in results:
             results[k] = 0
         results[k] += result[k]
+
+
+def merge_nested_result(result, results):
+    """Merge result with results
+    
+    Arguments:
+    - `result`:
+    - `results`:
+    """
+    for outer_key in result:
+        if outer_key not in results:
+            results[outer_key] = {}
+        for inner_key, value in result[outer_key].iteritems():
+            if inner_key not in results[outer_key]:
+                results[outer_key][inner_key] = 0
+            results[outer_key][inner_key] += value
