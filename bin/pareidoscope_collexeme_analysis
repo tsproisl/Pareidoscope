@@ -12,6 +12,7 @@ import re
 from networkx.readwrite import json_graph
 
 from pareidoscope import frequency
+from pareidoscope import statistics
 from pareidoscope import subgraph_enumeration
 from pareidoscope import subgraph_isomorphism
 from pareidoscope.utils import cwb
@@ -30,7 +31,7 @@ def arguments():
     """"""
     parser = argparse.ArgumentParser(description="Do a collexeme analysis for the given linguistic structure, i.e. find associated lemmata for a specified slot in the structure")
     parser.add_argument("-c", "--corpus", type=argparse.FileType("r"), required=True, help="Corpus in CWB format")
-    parser.add_argument("--db", type=os.path.abspath, required=True, help="SQLite3 database")
+    parser.add_argument("--db", type=os.path.abspath, required=True, help="SQLite3 database for results")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("-w", "--wordforms", help="Find collexeme wordforms", action='store_true')
     group.add_argument("-l", "--lemmata", help="Find collexeme lemmata", action='store_true')
@@ -115,12 +116,75 @@ def collect_frequencies(args):
     return o11, r1, c1, n
 
 
+def calculate_associations(o11, r1, c1, n, measure=statistics.log_likelihood):
+    """"""
+    associations = {}
+    for count_method in o11.keys():
+        f_c1 = c1[count_method]
+        f_n = n[count_method]
+        for collexeme in o11[count_method]:
+            if collexeme not in associations:
+                associations[collexeme] = {}
+            f_o11 = o11[count_method][collexeme]
+            f_r1 = r1[count_method][collexeme]
+            o, e = statistics.get_contingency_table(f_o11, f_r1, f_c1, f_n)
+            associations[collexeme][count_method] = measure(o, e)
+    return associations
+
+
+def calculate_association_strengths_and_correlations(o11, r1, c1, n):
+    """"""
+    dice_associations = calculate_associations(o11, r1, c1, n, statistics.dice)
+    gmean_associations = calculate_associations(o11, r1, c1, n, statistics.gmean)
+    tscore_associations = calculate_associations(o11, r1, c1, n, statistics.t_score)
+    ll_associations = calculate_associations(o11, r1, c1, n, statistics.log_likelihood)
+    if len(dice_associations) > 1:
+        dice_correlations = scipy.stats.spearmanr([[v["collostructional"], v["choke_points"], v["subgraphs"], v["isomorphisms"]] for v in dice_associations.itervalues()])[0]
+        gmean_correlations = scipy.stats.spearmanr([[v["collostructional"], v["choke_points"], v["subgraphs"], v["isomorphisms"]] for v in gmean_associations.itervalues()])[0]
+        tscore_correlations = scipy.stats.spearmanr([[v["collostructional"], v["choke_points"], v["subgraphs"], v["isomorphisms"]] for v in tscore_associations.itervalues()])[0]
+        ll_correlations = scipy.stats.spearmanr([[v["collostructional"], v["choke_points"], v["subgraphs"], v["isomorphisms"]] for v in ll_associations.itervalues()])[0]
+    else:
+        dice_correlations = numpy.ones((4,4))
+        gmean_correlations = numpy.ones((4,4))
+        tscore_correlations = numpy.ones((4,4))
+        ll_correlations = numpy.ones((4,4))
+    return dice_associations, gmean_associations, tscore_associations, ll_associations, dice_correlations, gmean_correlations, tscore_correlations, ll_correlations
+
+
+def connect_to_results_db(filename):
+    """"""
+    conn = sqlite3.connect(filename)
+    c = conn.cursor()
+    c.execute("PRAGMA page_size=4096")
+    c.execute("PRAGMA cache_size=100000")
+    c.execute("CREATE TABLE IF NOT EXISTS queries (queryid INTEGER PRIMARY KEY AUTOINCREMENT, query TEXT, islemma BOOLEAN, collexeme_index INTEGER, wordclass TEXT, UNIQUE (query, islemma, collexeme_index, wordclass))")
+    c.execute("CREATE TABLE IF NOT EXISTS associations (queryid INTEGER, collexeme TEXT, counting_method TEXT, dice REAL, gmean REAL, t_score REAL, log_likelihood REAL, o11 INTEGER, r1 INTEGER, c1 INTEGER, n INTEGER, UNIQUE(queryid, collexeme, counting_method), FOREIGN KEY (queryid) REFERENCES queries)")
+    c.execute("CREATE TABLE IF NOT EXISTS correlations (queryid INTEGER, counting_method_1 TEXT, counting_method_2 TEXT, rho_dice REAL, rho_gmean REAL, rho_t_score REAL, rho_log_likelihood REAL, UNIQUE (queryid, counting_method_1, counting_method_2), FOREIGN KEY (queryid) REFERENCES queries)")
+    return conn, c
+
+
+def insert_results_into_database(db_filename, query, islemma, collexeme_index, wordclass, o11, r1, c1, n, dice_associations, gmean_associations, tscore_associations, ll_associations, dice_correlations, gmean_correlations, tscore_correlations, ll_correlations):
+    """"""
+    conn, c = connect_to_results_db(db_filename)
+    c.execute("INSERT OR IGNORE INTO queries (query, islemma, collexeme_index, wordclass) VALUES (?, ?, ?, ?)", (query, islemma, collexeme_index, wordclass))
+    queryid = c.execute("SELECT queryid FROM queries WHERE query=? AND islemma=? AND collexeme_index=? AND wordclass=?", (query, islemma, collexeme_index, wordclass)).fetchall()[0][0]
+    counting_methods = ["collostructional", "choke_points", "subgraphs", "isomorphisms"]
+    get_freq = lambda freq, cm, starid: freq[cm] if cm == "collostructional" else freq[cm][starid]
+    association_tuples = ((queryid, collexeme, counting_method, dice_associations[collexeme][counting_method], gmean_associations[collexeme][counting_method], tscore_associations[collexeme][counting_method], ll_associations[collexeme][counting_method], o11[counting_method][collexeme], r1[counting_method][collexeme], c1[counting_method], n[counting_method])) for collexeme in ll_associations.iterkeys() for counting_method in counting_methods)
+    c.executemany("INSERT OR IGNORE INTO associations (queryid, collexeme, counting_method, dice, gmean, t_score, log_likelihood, o11, r1, c1, n) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", association_tuples)
+    correlation_tuples = ((queryid, cm1, cm2, dice_correlations[i][j], gmean_correlations[i][j], tscore_correlations[i][j], ll_correlations[i][j]) for i, cm1 in enumerate(counting_methods) for j, cm2 in enumerate(counting_methods))
+    c.executemany("INSERT OR IGNORE INTO correlations (queryid, counting_method_1, counting_method_2, rho_dice, rho_gmean, rho_t_score, rho_log_likelihood) VALUES (?, ?, ?, ?, ?, ?, ?)", correlation_tuples)
+    conn.commit()
+    conn.close()
+
+
 def main():
     """"""
     args = arguments()
     query, order = nx_graph.canonize(nx_graph.create_nx_digraph(json.loads(args.QUERY.strip())), order=True)
     query_skeleton = nx_graph.skeletize(query)
-    logging.debug("query graph: %s" % json.dumps(json_graph.node_link_data(query), ensure_ascii=False))
+    query_str = json.dumps(json_graph.node_link_data(query), ensure_ascii=False)
+    logging.debug("query graph: %s" % query_str)
     logging.debug("query skeleton: %s" % json.dumps(json_graph.node_link_data(query_skeleton), ensure_ascii=False))
     choke_point = nx_graph.get_choke_point(query)
     logging.debug("choke point: %s" % choke_point)
@@ -151,7 +215,10 @@ def main():
             frequency.merge_nested_result(r1_local, r1)
             frequency.merge_result(c1_local, c1)
             frequency.merge_result(n_local, n)
-    print(o11, r1, c1, n)
+    logging.info("calculate association strengths and correlations")
+    dice_associations, gmean_associations, tscore_associations, ll_associations, dice_correlations, gmean_correlations, tscore_correlations, ll_correlations = calculate_association_strengths_and_correlations(o11, r1, c1, n)
+    logging.info("insert into database")
+    insert_results_into_database(args.db, query_str, lemma, collexeme_index, wc, o11, r1, c1, n, dice_associations, gmean_associations, tscore_associations, ll_associations, dice_correlations, gmean_correlations, tscore_correlations, ll_correlations)
     logging.info("done")
 
 
