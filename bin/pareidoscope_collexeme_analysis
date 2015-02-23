@@ -12,12 +12,12 @@ import re
 from networkx.readwrite import json_graph
 
 from pareidoscope import frequency
-from pareidoscope import statistics
 from pareidoscope import subgraph_enumeration
 from pareidoscope import subgraph_isomorphism
 from pareidoscope.utils import cwb
 from pareidoscope.utils import helper
 from pareidoscope.utils import nx_graph
+from pareidoscope.utils import statistics
 
 # logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=logging.INFO)
 logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=logging.DEBUG)
