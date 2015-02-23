@@ -7,6 +7,7 @@ import json
 import logging
 import multiprocessing
 import os
+import re
 
 from networkx.readwrite import json_graph
 
@@ -84,7 +85,7 @@ def collect_frequencies(args):
         n["subgraphs"] += len(isomorphisms_skel_set)
         for collexeme in r1["isomorphisms"].keys():
             lexical_skel = query_skeleton.copy()
-            lexical_skel.node[collexeme_index][sur_attribute] = collexeme
+            lexical_skel.node[collexeme_index][sur_attribute] = re.escape(collexeme)
             r1["subgraphs"][collexeme] += sum(1 for _ in subgraph_enumeration.get_subgraphs_nx(lexical_skel, gs))
             r1["choke_points"][collexeme] += sum(1 for _ in subgraph_enumeration.get_choke_point_matches(lexical_skel, gs, choke_point))
             r1["collostructional"][collexeme] = sum(1 for v, d in gs.nodes(data=True) if d["wc"] == wc and d[sur_attribute] == collexeme)
@@ -103,7 +104,7 @@ def collect_frequencies(args):
         c1["subgraphs"] += len(isomorphisms_query_set)
         for collexeme in o11["isomorphisms"].keys():
             lexical_query = query.copy()
-            lexical_query.node[collexeme_index][sur_attribute] = collexeme
+            lexical_query.node[collexeme_index][sur_attribute] = re.escape(collexeme)
             o11["subgraphs"][collexeme] += sum(1 for _ in subgraph_enumeration.get_subgraphs_nx(lexical_query, gs))
             o11["choke_points"][collexeme] += sum(1 for _ in subgraph_enumeration.get_choke_point_matches(lexical_query, gs, choke_point))
         o11["collostructional"] = o11["choke_points"]
