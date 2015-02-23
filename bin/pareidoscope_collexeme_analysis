@@ -23,10 +23,6 @@ from pareidoscope.utils import statistics
 logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=logging.DEBUG)
 
 
-# collexemes can be wordforms or lemmata
-
-
-
 def arguments():
     """"""
     parser = argparse.ArgumentParser(description="Do a collexeme analysis for the given linguistic structure, i.e. find associated lemmata for a specified slot in the structure")
