@@ -87,7 +87,7 @@ def collect_frequencies(args):
             lexical_skel.node[collexeme_index][sur_attribute] = collexeme
             r1["subgraphs"][collexeme] += sum(1 for _ in subgraph_enumeration.get_subgraphs_nx(lexical_skel, gs))
             r1["choke_points"][collexeme] += sum(1 for _ in subgraph_enumeration.get_choke_point_matches(lexical_skel, gs, choke_point))
-            r1["collostructional"] = sum(1 for v, d in gs.nodes(data=True) if d["wc"] == wc and d[sur_attribute] == collexeme)
+            r1["collostructional"][collexeme] = sum(1 for v, d in gs.nodes(data=True) if d["wc"] == wc and d[sur_attribute] == collexeme)
         for isomorphism in subgraph_isomorphism.get_subgraph_isomorphisms_nx(query, gs):
             c1["isomorphisms"] += 1
             choke_point_query_set.add(isomorphism[choke_point])
@@ -143,8 +143,8 @@ def main():
 
     logging.info("collect frequencies")
     for sentences in helper.grouper_nofill(groupsize, sents):
-        #r = pool.imap_unordered(collect_frequencies, itertools.izip(sentences, itertools.repeat(query), itertools.repeat(query_skeleton), itertools.repeat(choke_point), itertools.repeat(collexeme_index), itertools.repeat(lemma), itertools.repeat(wc)), chunksize=10)
-        r = map(collect_frequencies, itertools.izip(sentences, itertools.repeat(query), itertools.repeat(query_skeleton), itertools.repeat(choke_point), itertools.repeat(collexeme_index), itertools.repeat(lemma), itertools.repeat(wc)))
+        r = pool.imap_unordered(collect_frequencies, itertools.izip(sentences, itertools.repeat(query), itertools.repeat(query_skeleton), itertools.repeat(choke_point), itertools.repeat(collexeme_index), itertools.repeat(lemma), itertools.repeat(wc)), chunksize=10)
+        #r = map(collect_frequencies, itertools.izip(sentences, itertools.repeat(query), itertools.repeat(query_skeleton), itertools.repeat(choke_point), itertools.repeat(collexeme_index), itertools.repeat(lemma), itertools.repeat(wc)))
         for o11_local, r1_local, c1_local, n_local in r:
             frequency.merge_nested_result(o11_local, o11)
             frequency.merge_nested_result(r1_local, r1)
