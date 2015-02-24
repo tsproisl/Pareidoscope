@@ -10,6 +10,8 @@ import os
 import re
 
 from networkx.readwrite import json_graph
+import numpy
+import scipy.stats
 
 from pareidoscope import frequency
 from pareidoscope import subgraph_enumeration
