@@ -8,6 +8,7 @@ import logging
 import multiprocessing
 import os
 import re
+import sqlite3
 
 from networkx.readwrite import json_graph
 import numpy
