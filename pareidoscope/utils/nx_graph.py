@@ -45,6 +45,9 @@ def create_nx_digraph_from_cwb(cwb, origid=None):
                 match = re.search(relpattern, rel)
                 relation = match.group("relation")
                 offset = int(match.group("offset"))
+                # ignore dependency relations for punctuation
+                if relation == "punct":
+                    continue
                 if offset != 0:
                     dg.add_edge(i+offset, i, {"relation": relation})
     # remove unconnected vertices, e.g. punctuation in the SD model
