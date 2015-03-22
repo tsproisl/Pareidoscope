@@ -84,6 +84,52 @@
 	<xsl:when test="POS='MD' or POS='VB' or POS='VBD' or POS='VBG' or POS='VBN' or POS='VBP' or POS='VBZ'">
 	  <xsl:text>VERB</xsl:text>
 	</xsl:when>
+	<xsl:otherwise>
+	  <xsl:text>UNKNOWN</xsl:text>
+	</xsl:otherwise>
+      </xsl:choose>
+      <xsl:value-of select="$tab"/>
+      <!-- universal pos tags v. 1.03 -->
+      <xsl:choose>
+	<xsl:when test="POS='``' or POS='!' or POS='#' or POS='$' or POS=&quot;''&quot; or POS='(' or POS=')' or POS=',' or POS='-LRB-' or POS='-RRB-' or POS='.' or POS=':' or POS='?'">
+	  <xsl:text>.</xsl:text>
+	</xsl:when>
+	<xsl:when test="POS='JJ' or POS='JJR' or POS='JJRJR' or POS='JJS' or POS='JJ|RB' or POS='JJ|VBG'">
+	  <xsl:text>ADJ</xsl:text>
+	</xsl:when>
+	<xsl:when test="POS='IN' or POS='IN|RP'">
+	  <xsl:text>ADP</xsl:text>
+	</xsl:when>
+	<xsl:when test="POS='RB' or POS='RBR' or POS='RBS' or POS='RB|RP' or POS='RB|VBG' or POS='WRB'">
+	  <xsl:text>ADV</xsl:text>
+	</xsl:when>
+	<xsl:when test="POS='CC'">
+	  <xsl:text>CONJ</xsl:text>
+	</xsl:when>
+	<xsl:when test="POS='DT' or POS='EX' or POS='PDT' or POS='WDT'">
+	  <xsl:text>DET</xsl:text>
+	</xsl:when>
+	<xsl:when test="POS='NN' or POS='NNP' or POS='NNPS' or POS='NNS' or POS='NN|NNS' or POS='NN|SYM' or POS='NN|VBG' or POS='NP'">
+	  <xsl:text>NOUN</xsl:text>
+	</xsl:when>
+	<xsl:when test="POS='CD'">
+	  <xsl:text>NUM</xsl:text>
+	</xsl:when>
+	<xsl:when test="POS='PRP' or POS='PRP$' or POS='PRP|VBP' or POS='WP' or POS='WP$'">
+	  <xsl:text>PRON</xsl:text>
+	</xsl:when>
+	<xsl:when test="POS='POS' or POS='PRT' or POS='RP' or POS='TO'">
+	  <xsl:text>PRT</xsl:text>
+	</xsl:when>
+	<xsl:when test="POS='MD' or POS='VB' or POS='VBD' or POS='VBD|VBN' or POS='VBG' or POS='VBG|NN' or POS='VBN' or POS='VBP' or POS='VBP|TO' or POS='VBZ' or POS='VP'">
+	  <xsl:text>VERB</xsl:text>
+	</xsl:when>
+	<xsl:when test="POS='CD|RB' or POS='FW' or POS='LS' or POS='RN' or POS='SYM' or POS='UH' or POS='WH'">
+	  <xsl:text>X</xsl:text>
+	</xsl:when>
+	<xsl:otherwise>
+	  <xsl:text>UNKNOWN</xsl:text>
+	</xsl:otherwise>
       </xsl:choose>
       <xsl:value-of select="$tab"/>
       <!-- incoming dependencies -->
