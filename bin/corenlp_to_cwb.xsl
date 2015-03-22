@@ -89,6 +89,43 @@
 	</xsl:otherwise>
       </xsl:choose>
       <xsl:value-of select="$tab"/>
+      <!-- incoming dependencies -->
+      <xsl:text>|</xsl:text>
+      <xsl:for-each select="../../dependencies[@type='collapsed-ccprocessed-dependencies']/dep/dependent[@idx=$tokenid]">
+	<xsl:if test="../governor/@idx > 0">
+	  <xsl:value-of select="../@type"/>
+	  <xsl:text>(</xsl:text>
+	  <xsl:value-of select="(../governor/@idx - $tokenid)"/>
+	  <xsl:value-of select="substring(&quot;''''''''''''''''''''''''''''''''''''''''''''''''''&quot;, 1, ../governor/@copy)"/>
+	  <xsl:text>,0</xsl:text>
+	  <!-- <xsl:value-of select="(@idx - $tokenid)"/> -->
+	  <xsl:value-of select="substring(&quot;''''''''''''''''''''''''''''''''''''''''''''''''''&quot;, 1, @copy)"/>
+	  <xsl:text>)</xsl:text>
+	  <xsl:text>|</xsl:text>
+	</xsl:if>
+      </xsl:for-each>
+      <xsl:value-of select="$tab"/>
+      <!-- outgoing dependencies -->
+      <xsl:text>|</xsl:text>
+      <xsl:for-each select="../../dependencies[@type='collapsed-ccprocessed-dependencies']/dep/governor[@idx=$tokenid]">
+	<xsl:value-of select="../@type"/>
+	<xsl:text>(0</xsl:text>
+	<!-- <xsl:value-of select="(@idx - $tokenid)"/> -->
+	<xsl:value-of select="substring(&quot;''''''''''''''''''''''''''''''''''''''''''''''''''&quot;, 1, @copy)"/>
+	<xsl:text>,</xsl:text>
+	<xsl:value-of select="(../dependent/@idx - $tokenid)"/>
+	<xsl:value-of select="substring(&quot;''''''''''''''''''''''''''''''''''''''''''''''''''&quot;, 1, ../dependent/@copy)"/>
+	<xsl:text>)</xsl:text>
+	<xsl:text>|</xsl:text>
+      </xsl:for-each>
+      <xsl:value-of select="$tab"/>
+      <!-- root -->
+      <xsl:for-each select="../../dependencies[@type='collapsed-ccprocessed-dependencies']/dep/dependent[@idx=$tokenid]">
+	<xsl:if test="../governor/@idx = 0">
+	  <xsl:text>root</xsl:text>
+	</xsl:if>
+      </xsl:for-each>
+      <xsl:value-of select="$tab"/>
       <!-- universal pos tags v. 1.03 -->
       <xsl:choose>
 	<xsl:when test="POS='``' or POS='!' or POS='#' or POS='$' or POS=&quot;''&quot; or POS='(' or POS=')' or POS=',' or POS='-LRB-' or POS='-RRB-' or POS='.' or POS=':' or POS='?'">
@@ -131,43 +168,6 @@
 	  <xsl:text>UNKNOWN</xsl:text>
 	</xsl:otherwise>
       </xsl:choose>
-      <xsl:value-of select="$tab"/>
-      <!-- incoming dependencies -->
-      <xsl:text>|</xsl:text>
-      <xsl:for-each select="../../dependencies[@type='collapsed-ccprocessed-dependencies']/dep/dependent[@idx=$tokenid]">
-	<xsl:if test="../governor/@idx > 0">
-	  <xsl:value-of select="../@type"/>
-	  <xsl:text>(</xsl:text>
-	  <xsl:value-of select="(../governor/@idx - $tokenid)"/>
-	  <xsl:value-of select="substring(&quot;''''''''''''''''''''''''''''''''''''''''''''''''''&quot;, 1, ../governor/@copy)"/>
-	  <xsl:text>,0</xsl:text>
-	  <!-- <xsl:value-of select="(@idx - $tokenid)"/> -->
-	  <xsl:value-of select="substring(&quot;''''''''''''''''''''''''''''''''''''''''''''''''''&quot;, 1, @copy)"/>
-	  <xsl:text>)</xsl:text>
-	  <xsl:text>|</xsl:text>
-	</xsl:if>
-      </xsl:for-each>
-      <xsl:value-of select="$tab"/>
-      <!-- outgoing dependencies -->
-      <xsl:text>|</xsl:text>
-      <xsl:for-each select="../../dependencies[@type='collapsed-ccprocessed-dependencies']/dep/governor[@idx=$tokenid]">
-	<xsl:value-of select="../@type"/>
-	<xsl:text>(0</xsl:text>
-	<!-- <xsl:value-of select="(@idx - $tokenid)"/> -->
-	<xsl:value-of select="substring(&quot;''''''''''''''''''''''''''''''''''''''''''''''''''&quot;, 1, @copy)"/>
-	<xsl:text>,</xsl:text>
-	<xsl:value-of select="(../dependent/@idx - $tokenid)"/>
-	<xsl:value-of select="substring(&quot;''''''''''''''''''''''''''''''''''''''''''''''''''&quot;, 1, ../dependent/@copy)"/>
-	<xsl:text>)</xsl:text>
-	<xsl:text>|</xsl:text>
-      </xsl:for-each>
-      <xsl:value-of select="$tab"/>
-      <!-- root -->
-      <xsl:for-each select="../../dependencies[@type='collapsed-ccprocessed-dependencies']/dep/dependent[@idx=$tokenid]">
-	<xsl:if test="../governor/@idx = 0">
-	  <xsl:text>root</xsl:text>
-	</xsl:if>
-      </xsl:for-each>
       <xsl:value-of select="$newline"/>
     </xsl:for-each>
   </xsl:template>
