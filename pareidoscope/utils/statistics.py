@@ -242,3 +242,29 @@ def cooccurrence_frequency(o, e):
 
     """
     return o[1][1]
+
+
+def delta_p_column(o, e):
+    """Calculate the column-wise delta P measure, i.e. the difference of
+    column proportions (= Liddell).
+
+    Args:
+        o:
+        e:
+
+    """
+    return liddell(o, e)
+
+
+def delta_p_row(o, e):
+    """Calculate the row-wise delta P measure, i.e. the difference of row
+    proportions.
+
+    Args:
+        o:
+        e:
+
+    """
+    r1 = o[1][1] + o[1][2]
+    r2 = o[2][1] + o[2][2]
+    return (o[1][1] * o[2][2] - o[1][2] * o[2][1]) / (r1 * r2)
