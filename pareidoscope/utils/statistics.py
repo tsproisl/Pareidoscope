@@ -268,3 +268,15 @@ def delta_p_row(o, e):
     r1 = o[1][1] + o[1][2]
     r2 = o[2][1] + o[2][2]
     return (o[1][1] * o[2][2] - o[1][2] * o[2][1]) / (r1 * r2)
+
+
+def max_delta_p(o, e):
+    """Return the maximum of the column-wise and the row-wise delta P
+    measure.
+
+    Args:
+        o:
+        e:
+
+    """
+    return max(delta_p_row(o, e), delta_p_column(o, e))
