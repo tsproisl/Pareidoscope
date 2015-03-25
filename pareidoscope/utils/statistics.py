@@ -73,6 +73,21 @@ def chi_squared(o, e):
     return (n * (o[1][1] - e[1][1]) ** 2) / (e[1][1] * e[2][2])
 
 
+def one_sided_chi_squared(o, e):
+    """Calculate the one-sided chi-squared measure
+
+    Args:
+        o:
+        e:
+
+    """
+
+    if o[1][1] < e[1][1]:
+        return -1.0 * chi_squared(o, e)
+    else:
+        return chi_squared(o, e)
+        
+
 def log_likelihood(o, e):
     """Calculate the log-likelihood measure
 
@@ -90,6 +105,20 @@ def log_likelihood(o, e):
     ll *= 2
     return ll
 
+
+def one_sided_log_likelihood(o, e):
+    """Calculate the one-sided log-likelihood measure
+
+    Args:
+        o:
+        e:
+
+    """
+    if o[1][1] < e[1][1]:
+        return -1.0 * log_likelihood(o, e)
+    else:
+        return log_likelihood(o, e)
+    
 
 def mutual_information(o, e):
     """Calculate the mutual information measure
