@@ -115,7 +115,7 @@ def collect_frequencies(args):
     return o11, r1, c1, n
 
 
-def calculate_associations(o11, r1, c1, n, measure=statistics.log_likelihood):
+def calculate_associations(o11, r1, c1, n, measure=statistics.one_sided_log_likelihood):
     """"""
     associations = {}
     for count_method in o11.keys():
@@ -136,7 +136,7 @@ def calculate_association_strengths_and_correlations(o11, r1, c1, n):
     dice_associations = calculate_associations(o11, r1, c1, n, statistics.dice)
     gmean_associations = calculate_associations(o11, r1, c1, n, statistics.geometric_mean)
     tscore_associations = calculate_associations(o11, r1, c1, n, statistics.t_score)
-    ll_associations = calculate_associations(o11, r1, c1, n, statistics.log_likelihood)
+    ll_associations = calculate_associations(o11, r1, c1, n, statistics.one_sided_log_likelihood)
     if len(dice_associations) > 1:
         dice_correlations = scipy.stats.spearmanr([[v["collostructional"], v["choke_points"], v["subgraphs"], v["isomorphisms"]] for v in dice_associations.itervalues()])[0]
         gmean_correlations = scipy.stats.spearmanr([[v["collostructional"], v["choke_points"], v["subgraphs"], v["isomorphisms"]] for v in gmean_associations.itervalues()])[0]
