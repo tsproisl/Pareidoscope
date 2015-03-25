@@ -78,7 +78,7 @@ def get_frequencies_from_db(c, o11, r1, c1, n, lemma, tag):
         n["isomorphisms"][r] += isomorphisms_per_star * stars
 
 
-def calculate_associations(o11, r1, c1, n, o11_to_r1, measure=statistics.log_likelihood):
+def calculate_associations(o11, r1, c1, n, o11_to_r1, measure=statistics.one_sided_log_likelihood):
     """"""
     associations = {}
     for count_method in o11.keys():
@@ -105,7 +105,7 @@ def calculate_association_strengths_and_correlations(o11, r1, c1, n, o11_to_r1):
     dice_associations = calculate_associations(o11, r1, c1, n, o11_to_r1, statistics.dice)
     gmean_associations = calculate_associations(o11, r1, c1, n, o11_to_r1, statistics.gmean)
     tscore_associations = calculate_associations(o11, r1, c1, n, o11_to_r1, statistics.t_score)
-    ll_associations = calculate_associations(o11, r1, c1, n, o11_to_r1, statistics.log_likelihood)
+    ll_associations = calculate_associations(o11, r1, c1, n, o11_to_r1, statistics.one_sided_log_likelihood)
     if len(dice_associations) > 1:
         dice_correlations = scipy.stats.spearmanr([[v["collostructional"], v["centers"], v["stars"], v["isomorphisms"]] for v in dice_associations.itervalues()])[0]
         gmean_correlations = scipy.stats.spearmanr([[v["collostructional"], v["centers"], v["stars"], v["isomorphisms"]] for v in gmean_associations.itervalues()])[0]
