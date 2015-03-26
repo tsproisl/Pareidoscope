@@ -38,8 +38,7 @@ def _extract_stars(graph, vertice, edge_stars, skel_stars, edge_to_skel={}, incl
         length = subgraph.__len__()
         degree_sequence = " ".join([str(_) for _ in sorted([subgraph.degree(_) for _ in subgraph.nodes()], reverse=True)])
         sorted_edges = " ".join(sorted([l["relation"] for s, t, l in subgraph.edges(data=True)]))
-        edge_star = subgraph.copy()
-        nx_graph.skeletize_inplace(edge_star, only_vertices=True)
+        edge_star = nx_graph.skeletize(subgraph, only_vertices=True)
         edge_star, order = nx_graph.canonize(edge_star, order=True)
         edge_center = order.index(vertice)
         edge_t = tuple(networkx.generate_edgelist(edge_star, data=["relation"]))
@@ -50,8 +49,7 @@ def _extract_stars(graph, vertice, edge_stars, skel_stars, edge_to_skel={}, incl
         else:
             edge_stars[edge_star_key]["star_freq"] += 1
             edge_stars[edge_star_key]["center_set"].add(vertice)
-        skel_star = subgraph.copy()
-        nx_graph.skeletize_inplace(skel_star)
+        skel_star = nx_graph.skeletize(subgraph)
         skel_star, order = nx_graph.canonize(skel_star, order=True)
         skel_center = order.index(vertice)
         skel_t = tuple(networkx.generate_edgelist(skel_star))
