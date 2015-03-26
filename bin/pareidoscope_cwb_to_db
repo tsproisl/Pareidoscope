@@ -151,7 +151,7 @@ def extract_subgraphs(args):
     gs = json_graph.node_link_graph(json.loads(graph))
     bfo_graph, bfo_to_raw = subgraph_enumeration.get_bfo(gs)
     for subgraph in subgraph_enumeration.enumerate_csg_minmax(bfo_graph, bfo_to_raw):
-        nx_graph.skeletize_inplace(subgraph)
+        subgraph = nx_graph.skeletize(subgraph)
         subgraph, order = nx_graph.canonize(subgraph, order=True)
         t = tuple(networkx.generate_adjlist(subgraph))
         result.append([t, sentid, order])
