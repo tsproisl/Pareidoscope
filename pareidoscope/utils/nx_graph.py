@@ -389,13 +389,13 @@ def skeletize(nx_graph, only_vertices=False):
     - `nx_graph`:
 
     """
-    copy = nx_graph.copy()
-    for v in copy.nodes():
-        copy.node[v] = {}
-    if not only_vertices:
-        for s, t in copy.edges():
-            copy.edge[s][t] = {}
-    return networkx.DiGraph(copy)
+    skeleton = networkx.DiGraph()
+    for s, t, l in nx_graph.edges(data=True):
+        if only_vertices:
+            skeleton.add_edge(s, t)
+        else:
+            skeleton.add_edge(s, t, {k: v for k, v in l.iteritems()})
+    return skeleton
 
 
 def get_choke_point(nx_graph):
