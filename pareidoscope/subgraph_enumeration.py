@@ -259,8 +259,10 @@ def enumerate_connected_subgraphs_recursive(graph, subgraph, prohibited_edges, n
                 # add edges
                 for s, t in ec + nec:
                     local_subgraph.add_edge(s, t, graph.edge[s][t])
-                    local_subgraph.node[s] = graph.node[s]
-                    local_subgraph.node[t] = graph.node[t]
+                    for k, v in graph.node[s].iteritems():
+                        local_subgraph.node[s][k] = v
+                    for k, v in graph.node[t].iteritems():
+                        local_subgraph.node[t][k] = v
                 nr_of_subgraph_vertices = local_subgraph.number_of_nodes()
                 nr_of_subgraph_edges = local_subgraph.number_of_edges()
                 if nr_of_subgraph_edges != subgraph_edges + len(ec + nec):
@@ -363,8 +365,10 @@ def enumerate_csg_minmax_recursive(graph, subgraph, prohibited_edges, graph_to_r
                 # add edges
                 for s, t in ec + nec:
                     local_subgraph.add_edge(s, t, graph.edge[s][t])
-                    local_subgraph.node[s] = graph.node[s]
-                    local_subgraph.node[t] = graph.node[t]
+                    for k, v in graph.node[s].iteritems():
+                        local_subgraph.node[s][k] = v
+                    for k, v in graph.node[t].iteritems():
+                        local_subgraph.node[t][k] = v
                 nr_of_subgraph_vertices = local_subgraph.number_of_nodes()
                 nr_of_subgraph_edges = local_subgraph.number_of_edges()
                 if nr_of_subgraph_edges != subgraph_edges + len(ec + nec):

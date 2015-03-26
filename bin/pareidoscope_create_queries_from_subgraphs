@@ -75,12 +75,14 @@ def split_graph(graph):
         n.edge[s][t]["relation"] = ".+"
     r1 = n.copy()
     for vertice in a.nodes():
-        r1.node[vertice] = a.node[vertice]
+        for k, v in a.node[vertice].iteritems():
+            r1.node[vertice][k] = v
     for s, t in a.edges():
         r1.edge[s][t]["relation"] = a.edge[s][t]["relation"]
     c1 = n.copy()
     for vertice in b.nodes():
-        c1.node[vertice] = b.node[vertice]
+        for k, v in b.node[vertice].iteritems():
+            c1.node[vertice][k] = v
     for s, t in b.edges():
         c1.edge[s][t]["relation"] = b.edge[s][t]["relation"]
     return a, b, r1, c1, n
