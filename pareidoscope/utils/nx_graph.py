@@ -382,7 +382,7 @@ def canonize(nx_graph, order=False):
         return canonized
 
 
-def skeletize(nx_graph):
+def skeletize(nx_graph, only_vertices=False):
     """Return skeleton copy of nx_graph
     
     Arguments:
@@ -392,23 +392,10 @@ def skeletize(nx_graph):
     copy = nx_graph.copy()
     for v in copy.nodes():
         copy.node[v] = {}
-    for s, t in copy.edges():
-        copy.edge[s][t] = {}
-    return copy
-
-
-def skeletize_inplace(nx_graph, only_vertices=False):
-    """Turn nx_graph into a skeleton
-    
-    Arguments:
-    - `nx_graph`:
-
-    """
-    for v in nx_graph.nodes():
-        nx_graph.node[v] = {}
     if not only_vertices:
-        for s, t in nx_graph.edges():
-            nx_graph.edge[s][t] = {}
+        for s, t in copy.edges():
+            copy.edge[s][t] = {}
+    return networkx.DiGraph(copy)
 
 
 def get_choke_point(nx_graph):
