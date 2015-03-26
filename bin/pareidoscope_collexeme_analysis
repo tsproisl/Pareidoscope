@@ -183,8 +183,9 @@ def main():
     query, order = nx_graph.canonize(nx_graph.create_nx_digraph(json.loads(args.QUERY.strip())), order=True)
     query_skeleton = nx_graph.skeletize(query)
     query_str = json.dumps(json_graph.node_link_data(query), ensure_ascii=False)
+    query_skel_str = json.dumps(json_graph.node_link_data(query_skeleton), ensure_ascii=False)
     logging.debug("query graph: %s" % query_str)
-    logging.debug("query skeleton: %s" % json.dumps(json_graph.node_link_data(query_skeleton), ensure_ascii=False))
+    logging.debug("query skeleton: %s" % query_skel_str)
     choke_point = nx_graph.get_choke_point(query)
     logging.debug("choke point: %s" % choke_point)
     collexeme_index = order.index(args.INDEX)
@@ -208,7 +209,7 @@ def main():
     logging.info("collect frequencies")
     for sentences in helper.grouper_nofill(groupsize, sents):
         r = pool.imap_unordered(collect_frequencies, itertools.izip(sentences, itertools.repeat(query), itertools.repeat(query_skeleton), itertools.repeat(choke_point), itertools.repeat(collexeme_index), itertools.repeat(lemma), itertools.repeat(wc)), chunksize=10)
-        #r = map(collect_frequencies, itertools.izip(sentences, itertools.repeat(query), itertools.repeat(query_skeleton), itertools.repeat(choke_point), itertools.repeat(collexeme_index), itertools.repeat(lemma), itertools.repeat(wc)))
+        # r = map(collect_frequencies, itertools.izip(sentences, itertools.repeat(query), itertools.repeat(query_skeleton), itertools.repeat(choke_point), itertools.repeat(collexeme_index), itertools.repeat(lemma), itertools.repeat(wc)))
         for o11_local, r1_local, c1_local, n_local in r:
             frequency.merge_nested_result(o11_local, o11)
             frequency.merge_nested_result(r1_local, r1)
