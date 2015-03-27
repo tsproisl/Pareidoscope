@@ -152,10 +152,13 @@ def calculate_association_strengths_and_correlations(o11, r1, c1, n):
 
 def connect_to_results_db(filename):
     """"""
+    dirname = os.path.dirname(filename)
     conn = sqlite3.connect(filename)
     c = conn.cursor()
     c.execute("PRAGMA page_size=4096")
     c.execute("PRAGMA cache_size=100000")
+    c.execute("PRAGMA temp_store=1")
+    c.execute("PRAGMA temp_store_directory='%s'" % dirname)
     c.execute("CREATE TABLE IF NOT EXISTS queries (queryid INTEGER PRIMARY KEY AUTOINCREMENT, query TEXT, islemma BOOLEAN, collexeme_index INTEGER, wordclass TEXT, UNIQUE (query, islemma, collexeme_index, wordclass))")
     c.execute("CREATE TABLE IF NOT EXISTS associations (queryid INTEGER, collexeme TEXT, counting_method TEXT, dice REAL, gmean REAL, t_score REAL, log_likelihood REAL, o11 INTEGER, r1 INTEGER, c1 INTEGER, n INTEGER, UNIQUE(queryid, collexeme, counting_method), FOREIGN KEY (queryid) REFERENCES queries)")
     c.execute("CREATE TABLE IF NOT EXISTS correlations (queryid INTEGER, counting_method_1 TEXT, counting_method_2 TEXT, rho_dice REAL, rho_gmean REAL, rho_t_score REAL, rho_log_likelihood REAL, UNIQUE (queryid, counting_method_1, counting_method_2), FOREIGN KEY (queryid) REFERENCES queries)")
