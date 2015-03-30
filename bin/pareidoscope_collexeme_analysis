@@ -70,13 +70,17 @@ def collect_frequencies(args):
     if lemma:
         sur_attribute = "lemma"
     if sensible:
+        for v, d in gs.nodes(data=True):
+            if d["wc"] == wc:
+                if d[sur_attribute] not in r1["collostructional"]:
+                    r1["collostructional"][d[sur_attribute]] = 0
+                r1["collostructional"][d[sur_attribute]] += 1
         for isomorphism in subgraph_isomorphism.get_subgraph_isomorphisms_nx(query_skeleton, gs):
             n["isomorphisms"] += 1
             choke_point_skel_set.add(isomorphism[choke_point])
             isomorphisms_skel_set.add(frozenset(isomorphism))
             collexeme = gs.node[isomorphism[collexeme_index]][sur_attribute]
             if collexeme not in r1["isomorphisms"]:
-                r1["collostructional"][collexeme] = 0
                 r1["choke_points"][collexeme] = 0
                 r1["subgraphs"][collexeme] = 0
                 r1["isomorphisms"][collexeme] = 0
@@ -88,7 +92,6 @@ def collect_frequencies(args):
             lexical_skel.node[collexeme_index][sur_attribute] = re.escape(collexeme)
             r1["subgraphs"][collexeme] += sum(1 for _ in subgraph_enumeration.get_subgraphs_nx(lexical_skel, gs))
             r1["choke_points"][collexeme] += sum(1 for _ in subgraph_enumeration.get_choke_point_matches(lexical_skel, gs, choke_point))
-            r1["collostructional"][collexeme] = sum(1 for v, d in gs.nodes(data=True) if d["wc"] == wc and d[sur_attribute] == collexeme)
         for isomorphism in subgraph_isomorphism.get_subgraph_isomorphisms_nx(query, gs):
             c1["isomorphisms"] += 1
             choke_point_query_set.add(isomorphism[choke_point])
