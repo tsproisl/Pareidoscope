@@ -2,14 +2,10 @@
 # -*- coding: utf-8 -*-
 
 import argparse
-import collections
-import itertools
 import json
 import logging
-import multiprocessing
 import os
 import sqlite3
-import sys
 
 import networkx
 from networkx.readwrite import json_graph
@@ -24,7 +20,7 @@ def arguments():
     """"""
     parser = argparse.ArgumentParser(description="Convert a corpus in CWB format into a corresponding SQLite database")
     parser.add_argument("--db", type=os.path.abspath, required=True, help="SQLite3 database for results")
-    parser.add_argument("CORPUS", type=argparse.FileType("r"), required=True, help="Corpus in CWB format")
+    parser.add_argument("CORPUS", type=argparse.FileType("r"), help="Corpus in CWB format")
     args = parser.parse_args()
     return args
 
@@ -63,7 +59,7 @@ def insert_sentence(c, origid, gs):
         pos = gs.node[vertice]["pos"]
         lemma = gs.node[vertice]["lemma"]
         wc = gs.node[vertice]["wc"]
-        root = gs.node[vertice]["root"] == "root"
+        root = "root" in gs.node[vertice] and gs.node[vertice]["root"] == "root"
         c.execute("INSERT INTO tokens (sentence_id, position, word, pos, lemma, wc, indegree, outdegree, root) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (sid, vertice, word, pos, lemma, wc, gs.in_degree(vertice), gs.out_degree(vertice), root))
         token_id[vertice] = c.execute("SELECT token_id FROM tokens WHERE sentence_id = ? AND position = ?", (sid, vertice)).fetchall()[0][0]
     for s, t, l in gs.edges(data=True):
@@ -75,7 +71,7 @@ def main():
     args = arguments()
     conn, c = connect_to_db(args.db)
     sents = cwb.sentences_iter(args.CORPUS, return_id=True)
-    for sentence, origid:
+    for sentence, origid in sents:
         gs = nx_graph.create_nx_digraph_from_cwb(sentence)
         sensible = nx_graph.is_sensible_graph(gs)
         if sensible:
