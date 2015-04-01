@@ -70,12 +70,16 @@ def main():
     """"""
     args = arguments()
     conn, c = connect_to_db(args.db)
+    # sents = cwb.sentences_iter(args.CORPUS, return_id=False)
+    # for origid, sentence in enumerate(sents):
     sents = cwb.sentences_iter(args.CORPUS, return_id=True)
     for sentence, origid in sents:
         gs = nx_graph.create_nx_digraph_from_cwb(sentence)
         sensible = nx_graph.is_sensible_graph(gs)
         if sensible:
             insert_sentence(c, origid, gs)
+    conn.commit()
+    conn.close()
 
 
 
