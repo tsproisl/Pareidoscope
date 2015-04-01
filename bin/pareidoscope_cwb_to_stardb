@@ -265,7 +265,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     groupsize = 50 * 10 * multiprocessing.cpu_count()
-    raise exeception if args.db already exists
+    # raise exeception if args.db already exists
     if os.path.exists(args.db):
         raise Exception("Database file already exists")
     conn, c = create_db(args.db)
