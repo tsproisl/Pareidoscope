@@ -201,7 +201,7 @@ if __name__ == "__main__":
         logging.info("calculate association strengths and correlations")
         dice_associations, gmean_associations, tscore_associations, ll_associations, dice_correlations, gmean_correlations, tscore_correlations, ll_correlations = calculate_association_strengths_and_correlations(o11, r1, c1, n, o11_to_r1)
         logging.info("insert results into database")
-        insert_results_into_database(args.db, args.FORM, args.TAG, args.lemma, freq, o11, r1, c1, n, o11_to_r1, dice_associations, tscore_associations, ll_associations, dice_correlations, tscore_correlations, ll_correlations)
+        insert_results_into_database(args.db, args.FORM, args.TAG, args.lemma, freq, o11, r1, c1, n, o11_to_r1, dice_associations, gmean_associations, tscore_associations, ll_associations, dice_correlations, gmean_correlations, tscore_correlations, ll_correlations)
     logging.info("done")
     # for star, assoc in sorted(associations.iteritems(), key=lambda t: t[1]["centers"]):
     #     print star, assoc
