@@ -4,10 +4,75 @@
 import json
 import operator
 import re
+import sqlite3
 
 import networkx
 
 from pareidoscope.utils import nx_graph
+
+
+def connect_to_database(filename):
+    """Connect to database and return connection and cursor."""
+    conn = sqlite3.connect(filename)
+    c = conn.cursor()
+    c.execute("PRAGMA page_size=4096")
+    c.execute("PRAGMA cache_size=100000")
+    c.execute("SELECT load_extension('/usr/lib/sqlite3/pcre.so')")
+    return conn, c
+
+
+def create_sql_query(query_graph):
+    """Create an SQL query for the given query_graph."""
+    sql_query = "SELECT s.sentence_id, s.graph, "
+    where = []
+    arguments = []
+    sql_query += ", ".join(["tok_%s.position" % v for v in query_graph.nodes()])
+    sql_query += " FROM sentences AS s"
+    for vertice in query_graph.nodes():
+        sql_query += " INNER JOIN tokens AS tok_%s ON s.sentence_id = tok_%s.sentence_id" % (vertice, vertice)
+    for s, t, l in query_graph.edges(data=True):
+        sql_query += " INNER JOIN dependencies AS dep_%s_%s ON (dep_%s_%s.governor_id = tok_%s.token_id) AND (dep_%s_%s.dependent_id = tok_%s.token_id)" % (s, t, s, t, s, s, t, t)
+    sql_query += " WHERE "
+    pos_lexical = set(["word", "pos", "lemma", "wc", "root"])
+    neg_lexical = set(["not_%s" % pl for pl in pos_lexical])
+    for vertice in query_graph.nodes():
+        indegree = query_graph.in_degree(vertice)
+        outdegree = query_graph.out_degree(vertice)
+        if indegree > 0:
+            where.append("tok_%s.indegree >= %d" % (vertice, indegree))
+        if outdegree > 0:
+            where.append("tok_%s.outdegree >= %d" % (vertice, outdegree))
+        for k, v in query_graph.node[vertice].iteritems():
+            if k in pos_lexical:
+                where.append("tok_%s.%s = ?" % (vertice, k))
+                if k == "root":
+                    arguments.append(v == "root")
+                else:
+                    arguments.append(v)
+            elif k in neg_lexical:
+                where.append("tok_%s.%s != ?" % (vertice, k))
+                if k == "root":
+                    arguments.append(v == "root")
+                else:
+                    arguments.append(v)
+            elif k == "not_indep":
+                for rel_item in v:
+                    for rel in rel_item.split("|"):                
+                        where.append("? NOT IN (SELECT relation FROM dependencies WHERE dependent_id = tok_%s.token_id)" % vertice)
+                        arguments.append(rel)
+            elif k == "not_outdep":
+                for rel_item in v:
+                    for rel in rel_item.split("|"):                
+                        where.append("? NOT IN (SELECT relation FROM dependencies WHERE governor_id = tok_%s.token_id)" % vertice)
+                        arguments.append(rel)
+            else:
+                raise Exception("Unsupported key: %s" % k)
+    for s, t, l in query_graph.edges(data=True):
+        if "relation" in l:
+            where.append("dep_%s_%s.relation = ?" % (s, t))
+            arguments.append(l["relation"])
+    sql_query += " AND ".join(where)
+    return sql_query, tuple(arguments)
 
 
 def get_candidates(c, graph):
