@@ -14,10 +14,11 @@ from pareidoscope.utils import nx_graph
 def connect_to_database(filename):
     """Connect to database and return connection and cursor."""
     conn = sqlite3.connect(filename)
+    conn.enable_load_extension(True)
+    conn.load_extension("/usr/lib/sqlite3/pcre.so")
     c = conn.cursor()
     c.execute("PRAGMA page_size=4096")
     c.execute("PRAGMA cache_size=100000")
-    c.execute("SELECT load_extension('/usr/lib/sqlite3/pcre.so')")
     return conn, c
 
 
