@@ -229,7 +229,7 @@ def main():
             frequency.merge_nested_result(r1_local, r1)
             frequency.merge_result(c1_local, c1)
             frequency.merge_result(n_local, n)
-    for collexeme in o11[choke_points]:
+    for collexeme in o11["choke_points"]:
         r1["collostructional"][collexeme] = c.execute("SELECT count(*) FROM tokens WHERE %s=?" % word_or_lemma, (wc,)).fetchall()[0][0]
     logging.info("calculate association strengths and correlations")
     dice_associations, gmean_associations, tscore_associations, ll_associations, dice_correlations, gmean_correlations, tscore_correlations, ll_correlations = calculate_association_strengths_and_correlations(o11, r1, c1, n)
