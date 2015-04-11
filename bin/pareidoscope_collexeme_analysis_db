@@ -194,6 +194,7 @@ def main():
     collexeme_index = order.index(args.INDEX)
     logging.debug("collexeme index: %s" % collexeme_index)
     lemma = args.lemmata
+    word_or_lemma = "word"
     if lemma:
         word_or_lemma = "lemma"
     logging.debug("collexeme as lemma: %s" % lemma)
@@ -204,7 +205,6 @@ def main():
     logging.debug("SQL query: %s" % query_sql)
     query_skel_sql, args_skel_sql = database.create_sql_query(query_skeleton)
     logging.debug("SQL skeleton query: %s" % query_skel_sql)
-    word_or_lemma = "word"
 
     groupsize = 50 * 10 * multiprocessing.cpu_count()
 
