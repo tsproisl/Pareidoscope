@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# -*- coding: utf-8 -*-for
+# -*- coding: utf-8 -*-
 
 import math
 
