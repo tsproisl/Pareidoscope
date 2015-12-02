@@ -17,28 +17,28 @@ if script_directory not in sys.path:
 import nx_graph
 
 
-def get_random_near_tree(nr_of_vertices, vertice_label_distri, edge_label_distri, max_outdegree = 0):
+def get_random_near_tree(nr_of_vertices, vertex_label_distri, edge_label_distri, max_outdegree = 0):
     """Create a random near tree with nr_of_vertices vertices. The
-    vertice and edge labels are determined by vertice_label_distri and
+    vertex and edge labels are determined by vertex_label_distri and
     edge_label_distri.
     
     Arguments:
     - `nr_of_vertices`:
-    - `vertice_label_distri`:
+    - `vertex_label_distri`:
     - `edge_label_distri`:
     - `max_outdegree`:
     """
     pass
 
 
-def get_random_tree(nr_of_vertices, vertice_label_distri, edge_label_distri, degree_distri, max_outdegree=0, no_root=False, underspec=0.0):
-    """Create a random tree with nr_of_vertices vertices. The vertice
-    and edge labels are determined by vertice_label_distri and
+def get_random_tree(nr_of_vertices, vertex_label_distri, edge_label_distri, degree_distri, max_outdegree=0, no_root=False, underspec=0.0):
+    """Create a random tree with nr_of_vertices vertices. The vertex
+    and edge labels are determined by vertex_label_distri and
     edge_label_distri.
     
     Arguments:
     - `nr_of_vertices`:
-    - `vertice_label_distri`:
+    - `vertex_label_distri`:
     - `edge_label_distri`:
     - `degree_distri`:
     - `max_outdegree`:
@@ -54,7 +54,7 @@ def get_random_tree(nr_of_vertices, vertice_label_distri, edge_label_distri, deg
         directed_tree.add_edges_from(networkx.bfs_edges(undirected_tree, root))
     if not no_root:
         directed_tree.node[root]["root"] = "root"
-    add_vertice_labels(directed_tree, vertice_label_distri, underspec)
+    add_vertex_labels(directed_tree, vertex_label_distri, underspec)
     add_edge_labels(directed_tree, edge_label_distri, underspec)
     return directed_tree
 
@@ -110,26 +110,26 @@ def create_tree_skeleton(nr_of_vertices, degree_distri, max_outdegree):
     return undirected_tree
 
 
-def add_vertice_labels(tree, vertice_label_distri, underspec):
-    """Add vertice labels to tree according to vertice_label_distri.
+def add_vertex_labels(tree, vertex_label_distri, underspec):
+    """Add vertex labels to tree according to vertex_label_distri.
     
     Arguments:
     - `tree`:
-    - `vertice_label_distri`:
+    - `vertex_label_distri`:
     """
-    for vertice in tree.nodes():
+    for vertex in tree.nodes():
         if random.random() < underspec:
-            tree.node[vertice]["word"] = ".+"
+            tree.node[vertex]["word"] = ".+"
         else:
-            tree.node[vertice]["word"] = random.choice(vertice_label_distri)
+            tree.node[vertex]["word"] = random.choice(vertex_label_distri)
 
 
 def add_edge_labels(tree, edge_label_distri, underspec):
-    """Add vertice labels to tree according to vertice_label_distri.
+    """Add vertex labels to tree according to vertex_label_distri.
     
     Arguments:
     - `tree`:
-    - `vertice_label_distri`:
+    - `vertex_label_distri`:
     """
     for s, t in tree.edges():
         if random.random() < underspec:
@@ -238,7 +238,7 @@ def split_tree(tree):
     s_bunch = set(tree.nodes()) - t_bunch
     a = tree.subgraph(s_bunch)
     b = tree.subgraph(t_bunch)
-    # give edge to either source or target vertice
+    # give edge to either source or target vertex
     if random.choice(["source", "target"]) == "source":
         a.add_node(t, {"word": ".+"})
         a.add_edge(s, t, {"relation": tree[s][t]["relation"]})
@@ -246,18 +246,18 @@ def split_tree(tree):
         b.add_node(s, {"word": ".+"})
         b.add_edge(s, t, {"relation": tree[s][t]["relation"]})
     n = tree.copy()
-    for vertice in n.nodes():
-        n.node[vertice]["word"] = ".+"
+    for vertex in n.nodes():
+        n.node[vertex]["word"] = ".+"
     for s, t in n.edges():
         n.edge[s][t]["relation"] = ".+"
     r1 = n.copy()
-    for vertice in a.nodes():
-        r1.node[vertice]["word"] = a.node[vertice]["word"]
+    for vertex in a.nodes():
+        r1.node[vertex]["word"] = a.node[vertex]["word"]
     for s, t in a.edges():
         r1.edge[s][t]["relation"] = a.edge[s][t]["relation"]
     c1 = n.copy()
-    for vertice in b.nodes():
-        c1.node[vertice]["word"] = b.node[vertice]["word"]
+    for vertex in b.nodes():
+        c1.node[vertex]["word"] = b.node[vertex]["word"]
     for s, t in b.edges():
         c1.edge[s][t]["relation"] = b.edge[s][t]["relation"]
     return a, b, r1, c1, n

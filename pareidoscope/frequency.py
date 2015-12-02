@@ -25,10 +25,10 @@ def get_frequencies(args):
     candidates = None
     if sensible:
         isomorphisms, subgraphs, roots, graphs = 0, 0, 0, 0
-        if subgraph_enumeration.subsumes_nx(query, gs, vertice_candidates=candidates):
+        if subgraph_enumeration.subsumes_nx(query, gs, vertex_candidates=candidates):
             graphs = 1
-            isomorphisms = sum(1 for _ in subgraph_isomorphism.get_subgraph_isomorphisms_nx(query, gs, vertice_candidates=candidates))
-            subgraphs = sum(1 for _ in subgraph_enumeration.get_subgraphs_nx(query, gs, vertice_candidates=candidates))
+            isomorphisms = sum(1 for _ in subgraph_isomorphism.get_subgraph_isomorphisms_nx(query, gs, vertex_candidates=candidates))
+            subgraphs = sum(1 for _ in subgraph_enumeration.get_subgraphs_nx(query, gs, vertex_candidates=candidates))
             if root is not None:
                 roots = sum(1 for _ in subgraph_enumeration.get_root_matches(query, gs, root))
         result = {"isomorphisms": isomorphisms, "subgraphs": subgraphs, "roots": roots, "graphs": graphs}

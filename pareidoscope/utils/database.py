@@ -30,29 +30,29 @@ def create_sql_query(query_graph):
     arguments = []
     sql_query += ", ".join(["tok_%s.position" % v for v in query_graph.nodes()])
     sql_query += " FROM sentences AS s"
-    for vertice in query_graph.nodes():
-        sql_query += " INNER JOIN tokens AS tok_%s ON s.sentence_id = tok_%s.sentence_id" % (vertice, vertice)
+    for vertex in query_graph.nodes():
+        sql_query += " INNER JOIN tokens AS tok_%s ON s.sentence_id = tok_%s.sentence_id" % (vertex, vertex)
     for s, t, l in query_graph.edges(data=True):
         sql_query += " INNER JOIN dependencies AS dep_%s_%s ON (dep_%s_%s.governor_id = tok_%s.token_id) AND (dep_%s_%s.dependent_id = tok_%s.token_id)" % (s, t, s, t, s, s, t, t)
     sql_query += " WHERE "
     pos_lexical = set(["word", "pos", "lemma", "wc", "root"])
     neg_lexical = set(["not_%s" % pl for pl in pos_lexical])
-    for vertice in query_graph.nodes():
-        indegree = query_graph.in_degree(vertice)
-        outdegree = query_graph.out_degree(vertice)
+    for vertex in query_graph.nodes():
+        indegree = query_graph.in_degree(vertex)
+        outdegree = query_graph.out_degree(vertex)
         if indegree > 0:
-            where.append("tok_%s.indegree >= %d" % (vertice, indegree))
+            where.append("tok_%s.indegree >= %d" % (vertex, indegree))
         if outdegree > 0:
-            where.append("tok_%s.outdegree >= %d" % (vertice, outdegree))
-        for k, v in query_graph.node[vertice].iteritems():
+            where.append("tok_%s.outdegree >= %d" % (vertex, outdegree))
+        for k, v in query_graph.node[vertex].iteritems():
             if k in pos_lexical:
-                where.append("tok_%s.%s = ?" % (vertice, k))
+                where.append("tok_%s.%s = ?" % (vertex, k))
                 if k == "root":
                     arguments.append(v == "root")
                 else:
                     arguments.append(v)
             elif k in neg_lexical:
-                where.append("tok_%s.%s != ?" % (vertice, k))
+                where.append("tok_%s.%s != ?" % (vertex, k))
                 if k == "root":
                     arguments.append(v == "root")
                 else:
@@ -60,12 +60,12 @@ def create_sql_query(query_graph):
             elif k == "not_indep":
                 for rel_item in v:
                     for rel in rel_item.split("|"):                
-                        where.append("? NOT IN (SELECT relation FROM dependencies WHERE dependent_id = tok_%s.token_id)" % vertice)
+                        where.append("? NOT IN (SELECT relation FROM dependencies WHERE dependent_id = tok_%s.token_id)" % vertex)
                         arguments.append(rel)
             elif k == "not_outdep":
                 for rel_item in v:
                     for rel in rel_item.split("|"):                
-                        where.append("? NOT IN (SELECT relation FROM dependencies WHERE governor_id = tok_%s.token_id)" % vertice)
+                        where.append("? NOT IN (SELECT relation FROM dependencies WHERE governor_id = tok_%s.token_id)" % vertex)
                         arguments.append(rel)
             else:
                 raise Exception("Unsupported key: %s" % k)
@@ -78,7 +78,7 @@ def create_sql_query(query_graph):
 
 
 def get_candidates(c, graph):
-    """Get candidate tokens for each vertice in the graph from the
+    """Get candidate tokens for each vertex in the graph from the
     database.
     
     Arguments:
@@ -219,7 +219,7 @@ def regexp(expression, item):
 
 
 def get_structure_candidates(c, graph):
-    """Get candidate tokens for each vertice in the graph from the
+    """Get candidate tokens for each vertex in the graph from the
     database.
     
     Arguments:

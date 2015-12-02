@@ -66,15 +66,15 @@ def is_sensible_graph(nx_graph):
     - `nx_graph`:
 
     """
-    # is there a vertice explicitly labeled as "root"?
+    # is there a vertex explicitly labeled as "root"?
     roots = [v for v, l in nx_graph.nodes(data=True) if "root" in l]
     if len(roots) != 1:
         return False
     # is the graph connected?
     if not networkx.is_weakly_connected(nx_graph):
         return False
-    # is the "root" vertice really a root, i.e. is there a path to
-    # every other vertice?
+    # is the "root" vertex really a root, i.e. is there a path to
+    # every other vertex?
     root = roots[0]
     other_vertices = set(nx_graph.nodes())
     other_vertices.remove(root)
@@ -83,7 +83,7 @@ def is_sensible_graph(nx_graph):
     # # do the vertices have sensible outdegrees <= 10?
     if any([nx_graph.out_degree(v) > 10 for v in nx_graph.nodes()]):
         return False
-    # is the graph overly dense, i.e. is there a vertice with an
+    # is the graph overly dense, i.e. is there a vertex with an
     # extended star (neighbors + edges between them) with more than 18
     # edges?
     if any([nx_graph.subgraph(set([v] + nx_graph.predecessors(v) + nx_graph.successors(v))).number_of_edges() > 18 for v in nx_graph.nodes()]):
@@ -91,8 +91,8 @@ def is_sensible_graph(nx_graph):
     return True
 
 
-def get_vertice_candidates(query_graph, target_graph):
-    """For each vertice in query_graph return a list of possibly
+def get_vertex_candidates(query_graph, target_graph):
+    """For each vertex in query_graph return a list of possibly
     corresponding vertices from target_graph.
     
     Arguments:
@@ -101,13 +101,13 @@ def get_vertice_candidates(query_graph, target_graph):
     """
     mapping = {v: i for i, v in enumerate(sorted(query_graph.nodes()))}
     candidates = [[] for i in range(query_graph.number_of_nodes())]
-    for vertice in query_graph.nodes():
-        vm = mapping[vertice]
-        if len(query_graph.node[vertice]) == 0:
+    for vertex in query_graph.nodes():
+        vm = mapping[vertex]
+        if len(query_graph.node[vertex]) == 0:
             candidates[vm] = target_graph.nodes()
         else:
-            candidates[vm] = [tv for tv in target_graph.nodes() if dictionary_match(query_graph.node[vertice], target_graph.node[tv])]
-        candidates[vm] = set([tv for tv in candidates[vm] if edge_match(query_graph, vertice, target_graph, tv)])
+            candidates[vm] = [tv for tv in target_graph.nodes() if dictionary_match(query_graph.node[vertex], target_graph.node[tv])]
+        candidates[vm] = set([tv for tv in candidates[vm] if edge_match(query_graph, vertex, target_graph, tv)])
     # verify adjacency
     for source, target, label in query_graph.edges(data=True):
         sm = mapping[source]
@@ -118,8 +118,8 @@ def get_vertice_candidates(query_graph, target_graph):
 
 
 def dictionary_match(query_dictionary, target_dictionary):
-    """Does target_vertice match query_vertice? I.e. are all keys from
-    query_vertice in target_vertice and if yes, are their values
+    """Does target_vertex match query_vertex? I.e. are all keys from
+    query_vertex in target_vertex and if yes, are their values
     equal?
     
     Arguments:
@@ -130,9 +130,9 @@ def dictionary_match(query_dictionary, target_dictionary):
     # return all([label in target_dictionary and (query_dictionary[label] == ".+" or query_dictionary[label] == ".*" or query_dictionary[label] == target_dictionary[label]) for label in query_dictionary])
 
 
-def edge_match(query_graph, query_vertice, target_graph, target_vertice):
-    """Does vertice with target_index from target_graph have the same
-    outgoing and incoming edges as vertice query_index from
+def edge_match(query_graph, query_vertex, target_graph, target_vertex):
+    """Does vertex with target_index from target_graph have the same
+    outgoing and incoming edges as vertex query_index from
     query_graph?
     
     Arguments:
@@ -141,10 +141,10 @@ def edge_match(query_graph, query_vertice, target_graph, target_vertice):
     - `target_graph`:
     - `target_index`:
     """
-    query_outgoing = query_graph.out_edges(nbunch = [query_vertice], data = True)
-    query_incoming = query_graph.in_edges(nbunch = [query_vertice], data = True)
-    target_outgoing = target_graph.out_edges(nbunch = [target_vertice], data = True)
-    target_incoming = target_graph.in_edges(nbunch = [target_vertice], data = True)
+    query_outgoing = query_graph.out_edges(nbunch = [query_vertex], data = True)
+    query_incoming = query_graph.in_edges(nbunch = [query_vertex], data = True)
+    target_outgoing = target_graph.out_edges(nbunch = [target_vertex], data = True)
+    target_incoming = target_graph.in_edges(nbunch = [target_vertex], data = True)
     if len(query_outgoing) > len(target_outgoing):
         return False
     if len(query_incoming) > len(target_incoming):
@@ -202,20 +202,20 @@ def export_to_cwb_format(nx_graph):
     return output
 
 
-def export_to_chemical_format(graph, vertice_dict, edge_dict):
+def export_to_chemical_format(graph, vertex_dict, edge_dict):
     """Export to chemical format for use with Gaston
     (http://www.liacs.nl/~snijssen/gaston/index.html).
     
     Arguments:
     - `graph`:
-    - `vertice_dict`:
+    - `vertex_dict`:
     - `edge_dict`:
 
     """
     export = ["t # "]
     vmax = None
     try:
-        vmax = max(vertice_dict.values())
+        vmax = max(vertex_dict.values())
     except ValueError:
         vmax = 0
     for v in sorted(graph.nodes()):
@@ -224,10 +224,10 @@ def export_to_chemical_format(graph, vertice_dict, edge_dict):
         lemma = graph.node[v].get("lemma", word)
         wc = graph.node[v].get("wc", "X")
         t = (word, pos, lemma, wc)
-        if t not in vertice_dict:
+        if t not in vertex_dict:
             vmax += 1
-            vertice_dict[t] = vmax
-        export.append("v %d %d" % (v, vertice_dict[t]))
+            vertex_dict[t] = vmax
+        export.append("v %d %d" % (v, vertex_dict[t]))
         emax = None
     try:
         emax = max(edge_dict.values())
@@ -244,7 +244,7 @@ def export_to_chemical_format(graph, vertice_dict, edge_dict):
 
 def is_purely_structural(nx_graph):
     """Is query_graph purely structural, i.e. does it contain no
-    restrictions on vertice and edge labels?
+    restrictions on vertex and edge labels?
     
     Arguments:
     - `query_graph`:
@@ -264,45 +264,45 @@ def _is_unrestricted(dictionary):
     return all([val == ".+" or val == ".*" for val in dictionary.values()])
 
 
-def _get_vertice_tuple(nx_graph, vertice):
-    """Return a tuple for the vertice that can be used for sorting
+def _get_vertex_tuple(nx_graph, vertex):
+    """Return a tuple for the vertex that can be used for sorting
     
     Arguments:
     - `nx_graph`:
-    - `vertice`:
+    - `vertex`:
     """
     other_vertices = set(nx_graph.nodes())
-    other_vertices.remove(vertice)
-    root = all((networkx.has_path(nx_graph, vertice, x) for x in other_vertices))
-    antiroot = all((networkx.has_path(nx_graph, x, vertice) for x in other_vertices))
-    star_center = all((nx_graph.has_edge(vertice, x) or nx_graph.has_edge(x, vertice) for x in other_vertices))
+    other_vertices.remove(vertex)
+    root = all((networkx.has_path(nx_graph, vertex, x) for x in other_vertices))
+    antiroot = all((networkx.has_path(nx_graph, x, vertex) for x in other_vertices))
+    star_center = all((nx_graph.has_edge(vertex, x) or nx_graph.has_edge(x, vertex) for x in other_vertices))
     choke_point = None
     if root or antiroot or star_center:
         choke_point = True
     else:
-        choke_point = all((networkx.has_path(nx_graph, vertice, x) or networkx.has_path(nx_graph, x, vertice) for x in other_vertices))
-    label = tuple(sorted(nx_graph.node[vertice].items()))
-    indegree = nx_graph.in_degree(vertice)
-    outdegree = nx_graph.out_degree(vertice)
-    inedgelabels = tuple(sorted([tuple(sorted(nx_graph.edge[s][t].items())) for s, t in nx_graph.in_edges(vertice)]))
-    outedgelabels = tuple(sorted([tuple(sorted(nx_graph.edge[s][t].items())) for s, t in nx_graph.out_edges(vertice)]))
+        choke_point = all((networkx.has_path(nx_graph, vertex, x) or networkx.has_path(nx_graph, x, vertex) for x in other_vertices))
+    label = tuple(sorted(nx_graph.node[vertex].items()))
+    indegree = nx_graph.in_degree(vertex)
+    outdegree = nx_graph.out_degree(vertex)
+    inedgelabels = tuple(sorted([tuple(sorted(nx_graph.edge[s][t].items())) for s, t in nx_graph.in_edges(vertex)]))
+    outedgelabels = tuple(sorted([tuple(sorted(nx_graph.edge[s][t].items())) for s, t in nx_graph.out_edges(vertex)]))
     return (root, antiroot, star_center, choke_point, label, indegree, outdegree, inedgelabels, outedgelabels)
 
 
-def _dfs(nx_graph, vertice, vtuples, return_ids=False, blacklist=[]):
-    """Return vertice tuples in order of depth-first search starting from
-    vertice
+def _dfs(nx_graph, vertex, vtuples, return_ids=False, blacklist=[]):
+    """Return vertex tuples in order of depth-first search starting from
+    vertex
     
     Arguments:
     - `nx_graph`:
-    - `vertice`:
+    - `vertex`:
     - `vtuples`:
     - `return_ids`:
     - `blacklist`:
     """
     order = []
     seen = set(blacklist)
-    agenda = [vertice]
+    agenda = [vertex]
     keyfunc = lambda v: vtuples[v]
     while len(agenda) > 0:
         v = agenda.pop(0)
@@ -350,7 +350,7 @@ def canonical_order(nx_graph):
     - `nx_graph`:
     """
     vertices = nx_graph.nodes()
-    vtuples = {v: _get_vertice_tuple(nx_graph, v) for v in vertices}
+    vtuples = {v: _get_vertex_tuple(nx_graph, v) for v in vertices}
     roots = [v for v in vtuples if vtuples[v][0]]
     antiroots = [v for v in vtuples if vtuples[v][1]]
     if len(roots) == 1:
@@ -404,13 +404,13 @@ def get_choke_point(nx_graph):
         nx_graph:
     
     Returns:
-        The first root vertice in canonical order. If there aren't
-        any, the first antiroot vertice in canonical order. Else the
+        The first root vertex in canonical order. If there aren't
+        any, the first antiroot vertex in canonical order. Else the
         first other choke point in canonical order.
 
     """
     vertices = canonical_order(nx_graph)
-    vtuples = {v: _get_vertice_tuple(nx_graph, v) for v in vertices}
+    vtuples = {v: _get_vertex_tuple(nx_graph, v) for v in vertices}
     roots = [v for v in vertices if vtuples[v][0]]
     antiroots = [v for v in vertices if vtuples[v][1]]
     choke_points = [v for v in vertices if vtuples[v][2]]
@@ -424,7 +424,7 @@ def get_choke_point(nx_graph):
 
 
 def is_star(nx_graph, return_centers=False):
-    """Check if the graph is a star, i.e. if it has one vertice that is
+    """Check if the graph is a star, i.e. if it has one vertex that is
     adjacent to all others."""
     vertices = set(nx_graph.nodes())
     if return_centers:

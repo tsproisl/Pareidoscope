@@ -4,22 +4,22 @@
 from pareidoscope.utils import nx_graph
 
 
-def get_subgraph_isomorphisms_nx(query_graph, target_graph, vertice_candidates=None):
+def get_subgraph_isomorphisms_nx(query_graph, target_graph, vertex_candidates=None):
     """Return a list of isomorphisms that map vertices and edges from
     query_graph to vertices and edges from target_graph.
     
     Arguments:
     - `query_graph`:
     - `target_graph`:
-    - `vertice_candidates`:
+    - `vertex_candidates`:
     """
     subgraph_isomorphisms = None
-    if vertice_candidates is None:
-        vertice_candidates = nx_graph.get_vertice_candidates(query_graph, target_graph)
+    if vertex_candidates is None:
+        vertex_candidates = nx_graph.get_vertex_candidates(query_graph, target_graph)
     if nx_graph.is_purely_structural(query_graph):
-        subgraph_isomorphisms = match_structural(query_graph, target_graph, vertice_candidates, 0)
+        subgraph_isomorphisms = match_structural(query_graph, target_graph, vertex_candidates, 0)
     else:
-        subgraph_isomorphisms = match(query_graph, target_graph, vertice_candidates, 0)
+        subgraph_isomorphisms = match(query_graph, target_graph, vertex_candidates, 0)
     return subgraph_isomorphisms
 
 
@@ -36,7 +36,7 @@ def get_subgraph_isomorphisms(query_graph, target_graph):
     return get_subgraph_isomorphisms_nx(query_graph, target_graph)
 
 
-def match(query_graph, target_graph, vertice_candidates, index):
+def match(query_graph, target_graph, vertex_candidates, index):
     """Find isomorphisms between query_graph and target_graph.
 
     The implementation follows Proisl/Uhrig (2012: 2753) quite
@@ -45,16 +45,16 @@ def match(query_graph, target_graph, vertice_candidates, index):
     Arguments:
     - `query_graph`:
     - `target_graph`:
-    - `vertice_candidates`:
+    - `vertex_candidates`:
     - `index`:
     """
     if index >= query_graph.number_of_nodes():
-        yield tuple([list(cand)[0] for cand in vertice_candidates])
+        yield tuple([list(cand)[0] for cand in vertex_candidates])
     else:
         query_outgoing = query_graph.out_edges(nbunch = [index], data = True)
         query_incoming = query_graph.in_edges(nbunch = [index], data = True)
-        for cpos in vertice_candidates[index]:
-            local_candidates = [cand - set([cpos]) for cand in vertice_candidates]
+        for cpos in vertex_candidates[index]:
+            local_candidates = [cand - set([cpos]) for cand in vertex_candidates]
             local_candidates[index] = set([cpos])
             target_outgoing = target_graph.out_edges(nbunch = [cpos], data = True)
             target_incoming = target_graph.in_edges(nbunch = [cpos], data = True)
@@ -76,7 +76,7 @@ def match(query_graph, target_graph, vertice_candidates, index):
                 yield result
 
 
-def match_structural(query_graph, target_graph, vertice_candidates, index):
+def match_structural(query_graph, target_graph, vertex_candidates, index):
     """Find isomorphisms between query_graph and target_graph.
 
     The implementation follows Proisl/Uhrig (2012: 2753) quite
@@ -85,16 +85,16 @@ def match_structural(query_graph, target_graph, vertice_candidates, index):
     Arguments:
     - `query_graph`:
     - `target_graph`:
-    - `vertice_candidates`:
+    - `vertex_candidates`:
     - `index`:
     """
     if index >= query_graph.number_of_nodes():
-        yield tuple([list(cand)[0] for cand in vertice_candidates])
+        yield tuple([list(cand)[0] for cand in vertex_candidates])
     else:
         query_outgoing = query_graph.out_edges(nbunch = [index], data = True)
         query_incoming = query_graph.in_edges(nbunch = [index], data = True)
-        for cpos in vertice_candidates[index]:
-            local_candidates = [cand - set([cpos]) for cand in vertice_candidates]
+        for cpos in vertex_candidates[index]:
+            local_candidates = [cand - set([cpos]) for cand in vertex_candidates]
             local_candidates[index] = set([cpos])
             target_outgoing = target_graph.out_edges(nbunch = [cpos], data = True)
             target_incoming = target_graph.in_edges(nbunch = [cpos], data = True)

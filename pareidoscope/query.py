@@ -21,9 +21,9 @@ def matches(query_graph, isomorphism, target_graph):
     - `isomorphism`:
     - `target_graph`:
     """
-    vertice_match = all([nx_graph.dictionary_match(query_graph.node[v], target_graph.node[isomorphism[v]]) for v in query_graph.nodes()])
+    vertex_match = all([nx_graph.dictionary_match(query_graph.node[v], target_graph.node[isomorphism[v]]) for v in query_graph.nodes()])
     edge_match = all([nx_graph.dictionary_match(query_graph.edge[s][t], target_graph.edge[isomorphism[s]][isomorphism[t]]) for s, t in query_graph.edges()])
-    return vertice_match and edge_match
+    return vertex_match and edge_match
 
 
 def isomorphisms(go11, gr1, gc1, gn, gs, candidates=None):
@@ -43,7 +43,7 @@ def isomorphisms(go11, gr1, gc1, gn, gs, candidates=None):
     # dgm = networkx.algorithms.isomorphism.DiGraphMatcher(gs, gn, dmatch, dmatch)
     # for iso in dgm.subgraph_isomorphisms_iter():
     #     isomorphism = tuple([x[0] for x in sorted(iso.iteritems(), key=operator.itemgetter(1))])
-    for isomorphism in subgraph_isomorphism.get_subgraph_isomorphisms_nx(gn, gs, vertice_candidates=candidates):
+    for isomorphism in subgraph_isomorphism.get_subgraph_isomorphisms_nx(gn, gs, vertex_candidates=candidates):
         iso_ct["n"] += 1
         if matches(go11, isomorphism, gs):
             iso_ct["o11"] += 1
@@ -67,7 +67,7 @@ def subgraphs(go11, gr1, gc1, gn, gs, candidates=None):
 
     """
     ct = {x: 0 for x in ["o11", "r1", "c1", "n"]}
-    for subgraph in subgraph_enumeration.get_subgraphs_nx(gn, gs, vertice_candidates=candidates):
+    for subgraph in subgraph_enumeration.get_subgraphs_nx(gn, gs, vertex_candidates=candidates):
         ct["n"] += 1
         subsumed_by_o11, subsumed_by_r1, subsumed_by_c1 = None, None, None
         subsumed_by_o11 = subgraph_enumeration.subsumes_nx(go11, subgraph)
@@ -103,15 +103,15 @@ def choke_points(go11, gr1, gc1, gn, gs, choke_point):
 
     """
     ct = {x: 0 for x in ["o11", "r1", "c1", "n"]}
-    for choke_point_vertice in subgraph_enumeration.get_choke_point_matches(gn, gs, choke_point):
+    for choke_point_vertex in subgraph_enumeration.get_choke_point_matches(gn, gs, choke_point):
         ct["n"] += 1
         subsumed_by_o11, subsumed_by_r1, subsumed_by_c1 = None, None, None
-        subsumed_by_o11 = subgraph_enumeration.choke_point_subsumes_nx(go11, gs, choke_point, choke_point_vertice)
+        subsumed_by_o11 = subgraph_enumeration.choke_point_subsumes_nx(go11, gs, choke_point, choke_point_vertex)
         if subsumed_by_o11:
             subsumed_by_r1, subsumed_by_c1 = True, True
         else:
-            subsumed_by_r1 = subgraph_enumeration.choke_point_subsumes_nx(gr1, gs, choke_point, choke_point_vertice)
-            subsumed_by_c1 = subgraph_enumeration.choke_point_subsumes_nx(gc1, gs, choke_point, choke_point_vertice)
+            subsumed_by_r1 = subgraph_enumeration.choke_point_subsumes_nx(gr1, gs, choke_point, choke_point_vertex)
+            subsumed_by_c1 = subgraph_enumeration.choke_point_subsumes_nx(gc1, gs, choke_point, choke_point_vertex)
         if subsumed_by_o11:
             ct["o11"] += 1
             ct["r1"] += 1
@@ -140,7 +140,7 @@ def sentences(go11, gr1, gc1, gn, gs, candidates=None):
     """
     ct = {x: 0 for x in ["o11", "r1", "c1", "n"]}
     subsumed_by_o11, subsumed_by_r1, subsumed_by_c1, subsumed_by_n = None, None, None, None
-    subsumed_by_n = subgraph_enumeration.subsumes_nx(gn, gs, vertice_candidates=candidates)
+    subsumed_by_n = subgraph_enumeration.subsumes_nx(gn, gs, vertex_candidates=candidates)
     if subsumed_by_n:
         subsumed_by_o11 = subgraph_enumeration.subsumes_nx(go11, gs)
         if subsumed_by_o11:
