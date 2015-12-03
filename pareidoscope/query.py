@@ -5,11 +5,55 @@ import copy
 import json
 import operator
 
+import networkx
 from networkx.readwrite import json_graph
 
 from pareidoscope.utils import nx_graph
 from pareidoscope import subgraph_enumeration
 from pareidoscope import subgraph_isomorphism
+
+
+def sanity_check_c_a_b(gc, ga, gb):
+    """Do a few sanity checks on the query graphs."""
+    # ga should subsume gc
+    ga_subsumes_gc = subgraph_enumeration.subsumes_nx(ga, gc)
+    # gb should subsume gc
+    gb_subsumes_gc = subgraph_enumeration.subsumes_nx(gb, gc)
+    sane = ga_subsumes_gc and gb_subsumes_gc
+    if not sane:
+        raise Exception("G_A subsumes G_C: %s, G_B subsumes G_C: %s" % (repr(ga_subsumes_gc), repr(gb_subsumes_gc)))
+    return sane
+
+
+def get_n_from_c_a_b(gc, ga, gb):
+    """Derive gn from gc, ga and gb and return it."""
+    vid_to_ga = {l["vid"]: v for v, l in ga.nodes(data=True)}
+    vid_to_gb = {l["vid"]: v for v, l in gb.nodes(data=True)}
+    vid_to_gcn = {l["vid"]: v for v, l in gc.nodes(data=True)}
+    # vn is the intersection of ga and gb
+    vn = set(vid_to_ga.keys()) & set(vid_to_gb.keys())
+    gn = networkx.DiGraph()
+    for vertex, label in gc.nodes(data=True):
+        vid = label["vid"]
+        if vid not in vn:
+            continue
+        # the label is the maximum of the labels in ga and gb
+        label_keys = set(ga.node[vid_to_ga[vid]].keys()) & set(gb.node[vid_to_gb[vid]].keys())
+        if all([ga.node[vid_to_ga[vid]][lk] == gb.node[vid_to_gb[vid]][lk] for lk in label_keys]):
+            gn.add_node(vertex, {lk: ga.node[vid_to_ga[vid]][lk] for lk in label_keys})
+        else:
+            raise Exception("Incompatible vertex labels: %s and  %s" % (repr(ga.node[vid_to_ga[vid]]), repr(gb.node[vid_to_gb[vid]])))
+    # en is the intersection of ea and eb
+    ea = set([(ga.node[s]["vid"], ga.node[t]["vid"]) for s, t in ga.edges()])
+    eb = set([(gb.node[s]["vid"], gb.node[t]["vid"]) for s, t in gb.edges()])
+    en = ea & eb
+    for s, t in en:
+        label_keys = set(ga.edge[vid_to_ga[s]][vid_to_ga[t]].keys()) & set(gb.edge[vid_to_gb[s]][vid_to_gb[t]].keys())
+        if all([ga.edge[vid_to_ga[s]][vid_to_ga[t]][lk] == gb.edge[vid_to_gb[s]][vid_to_gb[t]][lk] for lk in label_keys]):
+            gn.add_edge(vid_to_gcn[s], vid_to_gcn[t], {lk: ga.edge[vid_to_ga[s]][vid_to_ga[t]][lk] for lk in label_keys})
+        else:
+            raise Exception("Incompatible edge labels: %s and  %s" % (repr(ga.edge[vid_to_ga[s]][vid_to_ga[t]]), repr(gb.edge[vid_to_gb[s]][vid_to_gb[t]])))
+    return gn
 
 
 def matches(query_graph, isomorphism, target_graph):
@@ -179,17 +223,17 @@ def run_queries(args):
     sensible = nx_graph.is_sensible_graph(gs)
     if sensible:
         for qline in queries:
-            go11, gr1, gc1, gn, choke_point = qline
+            gc, ga, gb, gn, choke_point = qline
             # isomorphisms
-            iso_ct = isomorphisms(go11, gr1, gc1, gn, gs)
+            iso_ct = isomorphisms(gc, ga, gb, gn, gs)
             # subgraphs (contingency table)
-            sub_ct = subgraphs(go11, gr1, gc1, gn, gs)
+            sub_ct = subgraphs(gc, ga, gb, gn, gs)
             # choke_points (contingency table)
             choke_point_ct = {}
             if choke_point is not None:
-                choke_point_ct = choke_points(go11, gr1, gc1, gn, gs, choke_point)
+                choke_point_ct = choke_points(gc, ga, gb, gn, gs, choke_point)
             # sentences (contingency table)
-            sent_ct = sentences(go11, gr1, gc1, gn, gs)
+            sent_ct = sentences(gc, ga, gb, gn, gs)
             # we could also append gziped JSON strings if full data
             # structures need too much memory
             result.append({"iso_ct": iso_ct, "sub_ct": sub_ct, "choke_point_ct": choke_point_ct, "sent_ct": sent_ct})
