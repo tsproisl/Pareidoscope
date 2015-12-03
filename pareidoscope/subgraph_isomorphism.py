@@ -117,7 +117,7 @@ def match_structural(query_graph, target_graph, vertex_candidates, index):
 if __name__ == "__main__":
     query_graph = [[{"word": "bachelor"}, {"relation": "amod"}], [{}, {}]]
     target_graph = [[{"word": "he"}, {}, {}, {}, {}, {}], [{}, {"word": "was"}, {}, {}, {}, {}], [{}, {}, {"word": "an"}, {}, {}, {}], [{}, {}, {}, {"word": "old"}, {}, {}], [{}, {}, {}, {}, {"word": "confirmed"}, {}], [{"relation": "nsubj"}, {"relation": "cop"}, {"relation": "det"}, {"relation": "amod"}, {"relation": "amod"}, {"word": "bachelor"}]]
-    print list(get_subgraph_isomorphisms(query_graph, target_graph))
+    print(list(get_subgraph_isomorphisms(query_graph, target_graph)))
     query_graph = [[{}, {'relation': '.+'}, {'relation': '.+'}], [{}, {}, {}], [{}, {}, {}]]
     target_graph = [[{'root': 'root', 'word': 'v0989'}, {'relation': 'e00'}, {}, {}, {}, {}], [{}, {'word': 'v2248'}, {'relation': 'e29'}, {}, {'relation': 'e04'}, {}], [{}, {}, {'word': 'v5171'}, {'relation': 'e05'}, {}, {}], [{}, {}, {}, {'word': 'v7172'}, {}, {}], [{}, {}, {}, {}, {'word': 'v6658'}, {'relation': 'e20'}], [{}, {}, {}, {}, {}, {'word': 'v9605'}]]
-    print list(get_subgraph_isomorphisms(query_graph, target_graph))
+    print(list(get_subgraph_isomorphisms(query_graph, target_graph)))
