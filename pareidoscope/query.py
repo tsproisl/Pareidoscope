@@ -62,6 +62,8 @@ def get_n_from_c_a_b(gc, ga, gb):
             gn.add_edge(vid_to_gcn[s], vid_to_gcn[t], {lk: ga.edge[vid_to_ga[s]][vid_to_ga[t]][lk] for lk in label_keys})
         else:
             raise Exception("Incompatible edge labels: %s and  %s" % (repr(ga.edge[vid_to_ga[s]][vid_to_ga[t]]), repr(gb.edge[vid_to_gb[s]][vid_to_gb[t]])))
+    # make sure that the remaining vertices are consecutively labeled
+    gn = nx_graph.ensure_consecutive_vertices(gn)
     return gn
 
 

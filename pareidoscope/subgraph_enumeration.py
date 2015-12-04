@@ -88,11 +88,9 @@ def get_choke_point_matches(query_graph, target_graph, choke_point, vertex_candi
     """
     if vertex_candidates is None:
         vertex_candidates = nx_graph.get_vertex_candidates(query_graph, target_graph)
-    sorted_vertices = sorted(query_graph.nodes())
-    local_choke_point = sorted_vertices[choke_point]
-    for choke_point_candidate in vertex_candidates[local_choke_point]:
+    for choke_point_candidate in vertex_candidates[choke_point]:
         local_candidates = copy.deepcopy(vertex_candidates)
-        local_candidates[local_choke_point] = set([choke_point_candidate])
+        local_candidates[choke_point] = set([choke_point_candidate])
         if subsumes_nx(query_graph, target_graph, local_candidates):
             yield choke_point_candidate
 
@@ -109,9 +107,7 @@ def choke_point_subsumes_nx(query_graph, target_graph, choke_point, choke_point_
         return False
     if vertex_candidates is None:
         vertex_candidates = nx_graph.get_vertex_candidates(qg, tg)
-    sorted_vertices = sorted(query_graph.nodes())
-    local_choke_point = sorted_vertices[choke_point]
-    vertex_candidates[local_choke_point] = vertex_candidates[local_choke_point].intersection(set([choke_point_candidate]))
+    vertex_candidates[choke_point] = vertex_candidates[choke_point].intersection(set([choke_point_candidate]))
     return match_yes_no(qg, tg, vertex_candidates, 0)
 
 
@@ -428,11 +424,8 @@ def match_yes_no(query_graph, target_graph, vertex_candidates, index):
     """
     if index >= query_graph.number_of_nodes():
         return True
-    sorted_vertices = sorted(query_graph.nodes())
-    vertex_to_index = {v: i for i, v in enumerate(sorted_vertices)}
-    local_index = sorted_vertices[index]
-    query_outgoing = query_graph.out_edges(nbunch=[local_index], data=True)
-    query_incoming = query_graph.in_edges(nbunch=[local_index], data=True)
+    query_outgoing = query_graph.out_edges(nbunch=[index], data=True)
+    query_incoming = query_graph.in_edges(nbunch=[index], data=True)
     for cpos in vertex_candidates[index]:
         local_candidates = [cand - set([cpos]) for cand in vertex_candidates]
         local_candidates[index] = set([cpos])
@@ -442,11 +435,11 @@ def match_yes_no(query_graph, target_graph, vertex_candidates, index):
         for qs, qt, ql in query_outgoing:
             for ts, tt, tl in target_outgoing:
                 if nx_graph.dictionary_match(ql, tl):
-                    target_candidates[vertex_to_index[qt]] = target_candidates[vertex_to_index[qt]].union(set([tt]))
+                    target_candidates[qt] = target_candidates[qt].union(set([tt]))
         for qs, qt, ql in query_incoming:
             for ts, tt, tl in target_incoming:
                 if nx_graph.dictionary_match(ql, tl):
-                    target_candidates[vertex_to_index[qs]] = target_candidates[vertex_to_index[qs]].union(set([ts]))
+                    target_candidates[qs] = target_candidates[qs].union(set([ts]))
         for idx in range(query_graph.number_of_nodes()):
             if len(target_candidates[idx]) > 0:
                 local_candidates[idx] = local_candidates[idx].intersection(target_candidates[idx])

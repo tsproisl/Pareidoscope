@@ -110,7 +110,7 @@ def get_vertex_candidates(query_graph, target_graph):
             candidates[vertex] = target_graph.nodes()
         else:
             candidates[vertex] = [tv for tv in target_graph.nodes() if dictionary_match(query_graph.node[vertex], target_graph.node[tv])]
-        candidates[vertex] = set([tv for tv in candidates[vm] if edge_match(query_graph, vertex, target_graph, tv)])
+        candidates[vertex] = set([tv for tv in candidates[vertex] if edge_match(query_graph, vertex, target_graph, tv)])
     # verify adjacency
     for s, t, l in query_graph.edges(data=True):
         candidates[s] = set([x for x in candidates[s] if any([dictionary_match(l, target_graph.edge[x][y]) for y in candidates[t] if target_graph.has_edge(x, y)])])
@@ -447,4 +447,4 @@ def ensure_consecutive_vertices(graph):
             new_graph.add_node(mapping[vertex], label)
         for s, t, l in graph.edges(data=True):
             new_graph.add_edge(mapping[s], mapping[t], l)
-        return new
+        return new_graph
