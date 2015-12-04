@@ -159,11 +159,11 @@ def export_to_adjacency_matrix(nx_graph, canonical=False):
     Arguments:
     - `nx_graph`:
     """
-    mapping = {}
+    # identity mapping
+    mapping = {v: v for v in nx_graph.nodes()}
+    # or mapping to canonical order
     if canonical:
-        mapping = {n: i for i, n in enumerate(canonical_order(nx_graph))}
-    else:
-        mapping = {n: i for i, n in enumerate(sorted(nx_graph.nodes()))}
+        mapping = {v: i for i, v in enumerate(canonical_order(nx_graph))}
     matrix = [[{} for j in range(nx_graph.number_of_nodes())] for i in range(nx_graph.number_of_nodes())]
     for v, l in nx_graph.nodes(data=True):
         vm = mapping[v]
@@ -182,15 +182,14 @@ def export_to_cwb_format(nx_graph):
     - `nx_graph`:
     """
     output = []
-    mapping = {n: i for i, n in enumerate(sorted(nx_graph.nodes()))}
     for v in sorted(nx_graph.nodes()):
         word = nx_graph.node[v]["word"]
         pos = nx_graph.node[v].get("pos", "X")
         lemma = nx_graph.node[v].get("lemma", word)
         wc = nx_graph.node[v].get("wc", "X")
         root = nx_graph.node[v].get("root", "")
-        indeps = ["%s(%d,0)" % (l["relation"], mapping[s] - mapping[v]) for s, t, l in nx_graph.in_edges(v, data=True)]
-        outdeps = ["%s(0,%d)" % (l["relation"], mapping[t] - mapping[v]) for s, t, l in nx_graph.out_edges(v, data=True)]
+        indeps = ["%s(%d,0)" % (l["relation"], s - v) for s, t, l in nx_graph.in_edges(v, data=True)]
+        outdeps = ["%s(0,%d)" % (l["relation"], t - v) for s, t, l in nx_graph.out_edges(v, data=True)]
         indeps = "|" + "|".join(indeps)
         if len(indeps) > 1:
             indeps += "|"
