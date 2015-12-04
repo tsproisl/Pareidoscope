@@ -438,15 +438,16 @@ def is_star(nx_graph, return_centers=False):
         return any((set([v] + nx_graph.predecessors(v) + nx_graph.successors(v)) == vertices for v in vertices))
 
 
-def reconstruct_graph(graph):
-    """Reconstruct the graph, such that its n vertices have indices 0 to
-    n-1.
-
-    """
-    mapping = {v: i for i, v in enumerate(sorted(graph.nodes()))}
-    new_graph = networkx.DiGraph()
-    for vertex, label in graph.nodes(data=True):
-        new_graph.add_node(mapping[vertex], label)
-    for s, t, l in graph.edges(data=True):
-        new_graph.add_edge(mapping[s], mapping[t], l)
-    return new
+def ensure_consecutive_vertices(graph):
+    """Make sure that the n vertices of the graph have indices 0 to
+    n-1."""
+    if sorted(graph.nodes()) == list(range(graph.number_of_nodes())):
+        return graph
+    else:
+        mapping = {v: i for i, v in enumerate(sorted(graph.nodes()))}
+        new_graph = networkx.DiGraph()
+        for vertex, label in graph.nodes(data=True):
+            new_graph.add_node(mapping[vertex], label)
+        for s, t, l in graph.edges(data=True):
+            new_graph.add_edge(mapping[s], mapping[t], l)
+        return new
