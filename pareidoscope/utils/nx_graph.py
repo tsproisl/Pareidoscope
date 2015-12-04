@@ -102,21 +102,17 @@ def get_vertex_candidates(query_graph, target_graph):
     - `query_graph`:
     - `target_graph`:
     """
-    mapping = {v: i for i, v in enumerate(sorted(query_graph.nodes()))}
-    candidates = [[] for i in range(query_graph.number_of_nodes())]
+    candidates = [[] for v in query_graph.nodes()]
     for vertex in query_graph.nodes():
-        vm = mapping[vertex]
         if len(query_graph.node[vertex]) == 0:
-            candidates[vm] = target_graph.nodes()
+            candidates[vertex] = target_graph.nodes()
         else:
-            candidates[vm] = [tv for tv in target_graph.nodes() if dictionary_match(query_graph.node[vertex], target_graph.node[tv])]
-        candidates[vm] = set([tv for tv in candidates[vm] if edge_match(query_graph, vertex, target_graph, tv)])
+            candidates[vertex] = [tv for tv in target_graph.nodes() if dictionary_match(query_graph.node[vertex], target_graph.node[tv])]
+        candidates[vertex] = set([tv for tv in candidates[vm] if edge_match(query_graph, vertex, target_graph, tv)])
     # verify adjacency
-    for source, target, label in query_graph.edges(data=True):
-        sm = mapping[source]
-        tm = mapping[target]
-        candidates[sm] = set([x for x in candidates[sm] if any([dictionary_match(label, target_graph.edge[x][y]) for y in candidates[tm] if target_graph.has_edge(x, y)])])
-        candidates[tm] = set([y for y in candidates[tm] if any([dictionary_match(label, target_graph.edge[x][y]) for x in candidates[sm] if target_graph.has_edge(x, y)])])
+    for s, t, l in query_graph.edges(data=True):
+        candidates[s] = set([x for x in candidates[s] if any([dictionary_match(l, target_graph.edge[x][y]) for y in candidates[t] if target_graph.has_edge(x, y)])])
+        candidates[t] = set([y for y in candidates[t] if any([dictionary_match(l, target_graph.edge[x][y]) for x in candidates[s] if target_graph.has_edge(x, y)])])
     return candidates
 
 
