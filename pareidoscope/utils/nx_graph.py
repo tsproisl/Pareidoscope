@@ -140,10 +140,10 @@ def edge_match(query_graph, query_vertex, target_graph, target_vertex):
     - `target_graph`:
     - `target_index`:
     """
-    query_outgoing = query_graph.out_edges(nbunch = [query_vertex], data = True)
-    query_incoming = query_graph.in_edges(nbunch = [query_vertex], data = True)
-    target_outgoing = target_graph.out_edges(nbunch = [target_vertex], data = True)
-    target_incoming = target_graph.in_edges(nbunch = [target_vertex], data = True)
+    query_outgoing = query_graph.out_edges(nbunch=[query_vertex], data=True)
+    query_incoming = query_graph.in_edges(nbunch=[query_vertex], data=True)
+    target_outgoing = target_graph.out_edges(nbunch=[target_vertex], data=True)
+    target_incoming = target_graph.in_edges(nbunch=[target_vertex], data=True)
     if len(query_outgoing) > len(target_outgoing):
         return False
     if len(query_incoming) > len(target_incoming):
