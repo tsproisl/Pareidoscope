@@ -54,6 +54,8 @@ def create_nx_digraph_from_cwb(cwb, origid=None):
     for v, l in dg.nodes(data=True):
         if "root" not in l and dg.degree(v) == 0:
             dg.remove_node(v)
+    # make sure that the remaining vertices are consecutively labeled
+    dg = ensure_consecutive_vertices(dg)
     return dg
 
 
