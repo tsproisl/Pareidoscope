@@ -66,6 +66,9 @@ def is_sensible_graph(nx_graph):
     - `nx_graph`:
 
     """
+    # are the vertices consecutively labeled?
+    if sorted(nx_graph.nodes()) != list(range(nx_graph.number_of_nodes())):
+        raise Exception("Vertices are not consecutively labeled")
     # is there a vertex explicitly labeled as "root"?
     roots = [v for v, l in nx_graph.nodes(data=True) if "root" in l]
     if len(roots) != 1:
@@ -433,3 +436,17 @@ def is_star(nx_graph, return_centers=False):
         return is_star, set(centers)
     else:
         return any((set([v] + nx_graph.predecessors(v) + nx_graph.successors(v)) == vertices for v in vertices))
+
+
+def reconstruct_graph(graph):
+    """Reconstruct the graph, such that its n vertices have indices 0 to
+    n-1.
+
+    """
+    mapping = {v: i for i, v in enumerate(sorted(graph.nodes()))}
+    new_graph = networkx.DiGraph()
+    for vertex, label in graph.nodes(data=True):
+        new_graph.add_node(mapping[vertex], label)
+    for s, t, l in graph.edges(data=True):
+        new_graph.add_edge(mapping[s], mapping[t], l)
+    return new
