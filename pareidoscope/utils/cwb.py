@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import re
@@ -14,7 +14,7 @@ def sentences_iter(corpus, return_id=False):
     origid = ""
     sentence = []
     for line in corpus:
-        line = line.decode("utf-8").rstrip("\n")
+        line = line.rstrip("\n")
         if line == "</s>":
             if return_id:
                 yield sentence, origid

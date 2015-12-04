@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import itertools
@@ -18,7 +18,7 @@ def grouper_nofill(n, iterable):
     def take():
         while True:
             yield list(itertools.islice(it, n))
-    return iter(take().next, [])
+    return iter(take().__next__, [])
 
 
 def get_int_bins(min_value, max_value, nr_of_bins=10):

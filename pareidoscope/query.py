@@ -15,13 +15,22 @@ from pareidoscope import subgraph_isomorphism
 
 def sanity_check_c_a_b(gc, ga, gb):
     """Do a few sanity checks on the query graphs."""
+    vid_c = set([l["vid"] for v, l in gc.nodes(data=True)])
+    vid_a = set([l["vid"] for v, l in ga.nodes(data=True)])
+    vid_b = set([l["vid"] for v, l in gb.nodes(data=True)])
+    # vids are unique
+    vid_c_uniq = gc.number_of_nodes() == len(vid_c)
+    vid_a_uniq = ga.number_of_nodes() == len(vid_a)
+    vid_b_uniq = gb.number_of_nodes() == len(vid_b)
+    # union of vid_a and vid_b is vid_c
+    a_and_b_is_c = vid_a | vid_b == vid_c
     # ga should subsume gc
     ga_subsumes_gc = subgraph_enumeration.subsumes_nx(ga, gc)
     # gb should subsume gc
     gb_subsumes_gc = subgraph_enumeration.subsumes_nx(gb, gc)
-    sane = ga_subsumes_gc and gb_subsumes_gc
+    sane = all([vid_c_uniq, vid_a_uniq, vid_b_uniq, a_and_b_is_c, ga_subsumes_gc, gb_subsumes_gc])
     if not sane:
-        raise Exception("G_A subsumes G_C: %s, G_B subsumes G_C: %s" % (repr(ga_subsumes_gc), repr(gb_subsumes_gc)))
+        raise Exception("Incorrect formulation of query.")
     return sane
 
 
@@ -56,6 +65,14 @@ def get_n_from_c_a_b(gc, ga, gb):
     return gn
 
 
+def strip_vid(graph):
+    """Return a copy of graph without vertex id (vid) labels."""
+    copy = graph.copy()
+    for vertex in copy.nodes():
+        del copy.node[vertex]["vid"]
+    return copy
+    
+
 def matches(query_graph, isomorphism, target_graph):
     """Does query_graph match the isomorphism subgraph of
     target_graph?
@@ -70,7 +87,23 @@ def matches(query_graph, isomorphism, target_graph):
     return vertex_match and edge_match
 
 
-def isomorphisms(go11, gr1, gc1, gn, gs, candidates=None):
+def _get_isomorphism_vertex_candidates(query_graph, target_graph, v_target, v_isomorphism, vid_to_iso):
+    """Return vertex candidates that are compatible with isomorphism."""
+    normal_candidates = nx_graph.get_vertex_candidates(strip_vid(query_graph), target_graph)
+    isomorphism_candidates = [set([vid_to_iso[l["vid"]]]) if l["vid"] in vid_to_iso else v_target - v_isomorphism for v, l in sorted(query_graph.nodes(data=True))]
+    candidates = [a & b for a, b in zip(normal_candidates, isomorphism_candidates)]
+    return candidates
+
+
+def _get_subgraph_vertex_candidates(query_graph, target_graph, vid_n, v_target, v_subgraph):
+    """Return vertex candidates that are compatible with subgraph."""
+    normal_candidates = nx_graph.get_vertex_candidates(strip_vid(query_graph), target_graph)
+    subgraph_candidates = [v_subgraph if l["vid"] in vid_n else v_target - v_subgraph for v, l in sorted(query_graph.nodes(data=True))]
+    candidates = [a & b for a, b in zip(normal_candidates, subgraph_candidates)]
+    return candidates
+
+
+def isomorphisms(gc, ga, gb, gn, gs, candidates=None):
     """Count isomorphisms
     
     Arguments:
@@ -82,23 +115,38 @@ def isomorphisms(go11, gr1, gc1, gn, gs, candidates=None):
     - `candidates`:
 
     """
+    vid_to_gn = {l["vid"]: v for v, l in gn.nodes(data=True)}
     iso_ct = {x: 0 for x in ["o11", "r1", "c1", "n"]}
-    # dmatch = lambda g1, g2: nx_graph.dictionary_match(g2, g1)
-    # dgm = networkx.algorithms.isomorphism.DiGraphMatcher(gs, gn, dmatch, dmatch)
-    # for iso in dgm.subgraph_isomorphisms_iter():
-    #     isomorphism = tuple([x[0] for x in sorted(iso.iteritems(), key=operator.itemgetter(1))])
-    for isomorphism in subgraph_isomorphism.get_subgraph_isomorphisms_nx(gn, gs, vertex_candidates=candidates):
+    vs = set(gs.nodes())
+    stripped_gc = strip_vid(gc)
+    stripped_ga = strip_vid(ga)
+    stripped_gb = strip_vid(gb)
+    for isomorphism in subgraph_isomorphism.get_subgraph_isomorphisms_nx(strip_vid(gn), gs, vertex_candidates=candidates):
+        vid_iso = {gn.node[qv]["vid"]: tv for qv, tv in zip(sorted(gn.nodes()), isomorphism)}
+        v_isomorphism = set(isomorphism)
+        vert_cand_c = _get_isomorphism_vertex_candidates(gc, gs, vs, v_isomorphism, vid_iso)
+        vert_cand_a = _get_isomorphism_vertex_candidates(ga, gs, vs, v_isomorphism, vid_iso)
+        vert_cand_b = _get_isomorphism_vertex_candidates(gb, gs, vs, v_isomorphism, vid_iso)
+        gc_subsumes_iso = subgraph_enumeration.subsumes_nx(stripped_gc, gs, vertex_candidates=vert_cand_c)
+        ga_subsumes_iso = subgraph_enumeration.subsumes_nx(stripped_ga, gs, vertex_candidates=vert_cand_a)
+        gb_subsumes_iso = subgraph_enumeration.subsumes_nx(stripped_gb, gs, vertex_candidates=vert_cand_b)
         iso_ct["n"] += 1
-        if matches(go11, isomorphism, gs):
+        if gc_subsumes_iso and ga_subsumes_iso and gb_subsumes_iso:
             iso_ct["o11"] += 1
-        if matches(gr1, isomorphism, gs):
             iso_ct["r1"] += 1
-        if matches(gc1, isomorphism, gs):
             iso_ct["c1"] += 1
+        elif (not gc_subsumes_iso) and ga_subsumes_iso and (not gb_subsumes_iso):
+            iso_ct["r1"] += 1
+        elif (not gc_subsumes_iso) and (not ga_subsumes_iso) and gb_subsumes_iso:
+            iso_ct["c1"] += 1
+        elif (not gc_subsumes_iso) and (not ga_subsumes_iso) and (not gb_subsumes_iso):
+            pass
+        else:
+            raise Exception("Inconsistent classification of subgraph isomorphisms.")
     return iso_ct
 
 
-def subgraphs(go11, gr1, gc1, gn, gs, candidates=None):
+def subgraphs(gc, ga, gb, gn, gs, candidates=None):
     """Count subgraphs
     
     Arguments:
@@ -111,30 +159,39 @@ def subgraphs(go11, gr1, gc1, gn, gs, candidates=None):
 
     """
     ct = {x: 0 for x in ["o11", "r1", "c1", "n"]}
-    for subgraph in subgraph_enumeration.get_subgraphs_nx(gn, gs, vertex_candidates=candidates):
+    vid_n = set([l["vid"] for v, l in gn.nodes(data=True)])
+    vs = set(gs.nodes())
+    stripped_gc = strip_vid(gc)
+    stripped_ga = strip_vid(ga)
+    stripped_gb = strip_vid(gb)
+    for subgraph in subgraph_enumeration.get_subgraphs_nx(strip_vid(gn), gs, vertex_candidates=candidates):
+        v_subgraph = set(subgraph.nodes())
+        vert_cand_c = _get_subgraph_vertex_candidates(gc, gs, vid_n, vs, v_subgraph)
+        vert_cand_a = _get_subgraph_vertex_candidates(ga, gs, vid_n, vs, v_subgraph)
+        vert_cand_b = _get_subgraph_vertex_candidates(gb, gs, vid_n, vs, v_subgraph)
+        subsumed_by_gc = subgraph_enumeration.subsumes_nx(stripped_gc, gs, vertex_candidates=vert_cand_c)
+        subsumed_by_ga = subgraph_enumeration.subsumes_nx(stripped_ga, gs, vertex_candidates=vert_cand_a)
+        subsumed_by_gb = subgraph_enumeration.subsumes_nx(stripped_gb, gs, vertex_candidates=vert_cand_b)
         ct["n"] += 1
-        subsumed_by_o11, subsumed_by_r1, subsumed_by_c1 = None, None, None
-        subsumed_by_o11 = subgraph_enumeration.subsumes_nx(go11, subgraph)
-        if subsumed_by_o11:
-            subsumed_by_r1, subsumed_by_c1 = True, True
-        else:
-            subsumed_by_r1 = subgraph_enumeration.subsumes_nx(gr1, subgraph)
-            subsumed_by_c1 = subgraph_enumeration.subsumes_nx(gc1, subgraph)
-        if subsumed_by_o11:
+        if subsumed_by_gc and subsumed_by_ga and subsumed_by_gb:
             ct["o11"] += 1
             ct["r1"] += 1
             ct["c1"] += 1
-        if subsumed_by_r1 and subsumed_by_c1 and not subsumed_by_o11:
+        elif (not subsumed_by_gc) and subsumed_by_ga and (not subsumed_by_gb):
+            ct["r1"] += 1
+        elif (not subsumed_by_gc) and (not subsumed_by_ga) and subsumed_by_gb:
+            ct["c1"] += 1
+        elif (not subsumed_by_gc) and subsumed_by_ga and subsumed_by_gb:
             ct["r1"] += 0.5
             ct["c1"] += 0.5
-        if subsumed_by_r1 and not subsumed_by_c1:
-            ct["r1"] += 1
-        if subsumed_by_c1 and not subsumed_by_r1:
-            ct["c1"] += 1
+        elif (not subsumed_by_gc) and (not subsumed_by_ga) and (not subsumed_by_gb):
+            pass
+        else:
+            raise Exception("Inconsistent classification of subgraph isomorphisms.")
     return ct
 
 
-def choke_points(go11, gr1, gc1, gn, gs, choke_point):
+def choke_points(gc, ga, gb, gn, gs, choke_point):
     """Count choke points
     
     Arguments:
@@ -147,30 +204,37 @@ def choke_points(go11, gr1, gc1, gn, gs, choke_point):
 
     """
     ct = {x: 0 for x in ["o11", "r1", "c1", "n"]}
-    for choke_point_vertex in subgraph_enumeration.get_choke_point_matches(gn, gs, choke_point):
+    stripped_gc = strip_vid(gc)
+    stripped_ga = strip_vid(ga)
+    stripped_gb = strip_vid(gb)
+    choke_vid = gn.node[choke_point]["vid"]
+    choke_c = [v for v, l in gc.nodes(data=True) if l["vid"] == choke_vid][0]
+    choke_a = [v for v, l in ga.nodes(data=True) if l["vid"] == choke_vid][0]
+    choke_b = [v for v, l in gb.nodes(data=True) if l["vid"] == choke_vid][0]
+    for choke_point_vertex in subgraph_enumeration.get_choke_point_matches(strip_vid(gn), gs, choke_point):
+        subsumed_by_gc = subgraph_enumeration.choke_point_subsumes_nx(stripped_gc, gs, choke_c, choke_point_vertex)
+        subsumed_by_ga = subgraph_enumeration.choke_point_subsumes_nx(stripped_ga, gs, choke_a, choke_point_vertex)
+        subsumed_by_gb = subgraph_enumeration.choke_point_subsumes_nx(stripped_gb, gs, choke_b, choke_point_vertex)
         ct["n"] += 1
-        subsumed_by_o11, subsumed_by_r1, subsumed_by_c1 = None, None, None
-        subsumed_by_o11 = subgraph_enumeration.choke_point_subsumes_nx(go11, gs, choke_point, choke_point_vertex)
-        if subsumed_by_o11:
-            subsumed_by_r1, subsumed_by_c1 = True, True
-        else:
-            subsumed_by_r1 = subgraph_enumeration.choke_point_subsumes_nx(gr1, gs, choke_point, choke_point_vertex)
-            subsumed_by_c1 = subgraph_enumeration.choke_point_subsumes_nx(gc1, gs, choke_point, choke_point_vertex)
-        if subsumed_by_o11:
+        if subsumed_by_gc and subsumed_by_ga and subsumed_by_gb:
             ct["o11"] += 1
             ct["r1"] += 1
             ct["c1"] += 1
-        if subsumed_by_r1 and subsumed_by_c1 and not subsumed_by_o11:
+        elif (not subsumed_by_gc) and subsumed_by_ga and (not subsumed_by_gb):
+            ct["r1"] += 1
+        elif (not subsumed_by_gc) and (not subsumed_by_ga) and subsumed_by_gb:
+            ct["c1"] += 1
+        elif (not subsumed_by_gc) and subsumed_by_ga and subsumed_by_gb:
             ct["r1"] += 0.5
             ct["c1"] += 0.5
-        if subsumed_by_r1 and not subsumed_by_c1:
-            ct["r1"] += 1
-        if subsumed_by_c1 and not subsumed_by_r1:
-            ct["c1"] += 1
+        elif (not subsumed_by_gc) and (not subsumed_by_ga) and (not subsumed_by_gb):
+            pass
+        else:
+            raise Exception("Inconsistent classification of choke point vertices.")
     return ct
 
 
-def sentences(go11, gr1, gc1, gn, gs, candidates=None):
+def sentences(gc, ga, gb, gn, gs, candidates=None):
     """Count sentences
     
     Arguments:
@@ -183,30 +247,27 @@ def sentences(go11, gr1, gc1, gn, gs, candidates=None):
 
     """
     ct = {x: 0 for x in ["o11", "r1", "c1", "n"]}
-    subsumed_by_o11, subsumed_by_r1, subsumed_by_c1, subsumed_by_n = None, None, None, None
-    subsumed_by_n = subgraph_enumeration.subsumes_nx(gn, gs, vertex_candidates=candidates)
+    subsumed_by_n = subgraph_enumeration.subsumes_nx(strip_vid(gn), gs, vertex_candidates=candidates)
     if subsumed_by_n:
-        subsumed_by_o11 = subgraph_enumeration.subsumes_nx(go11, gs)
-        if subsumed_by_o11:
-            subsumed_by_r1, subsumed_by_c1 = True, True
-        else:
-            subsumed_by_r1 = subgraph_enumeration.subsumes_nx(gr1, gs)
-            subsumed_by_c1 = subgraph_enumeration.subsumes_nx(gc1, gs)
-    else:
-        subsumed_by_o11, subsumed_by_r1, subsumed_by_c1 = False, False, False
-    if subsumed_by_n:
+        subsumed_by_gc = subgraph_enumeration.subsumes_nx(strip_vid(gc), gs, vertex_candidates=candidates)
+        subsumed_by_ga = subgraph_enumeration.subsumes_nx(strip_vid(ga), gs, vertex_candidates=candidates)
+        subsumed_by_gb = subgraph_enumeration.subsumes_nx(strip_vid(gb), gs, vertex_candidates=candidates)
         ct["n"] += 1
-    if subsumed_by_o11:
-        ct["o11"] += 1
-        ct["r1"] += 1
-        ct["c1"] += 1
-    if subsumed_by_r1 and subsumed_by_c1 and not subsumed_by_o11:
-        ct["r1"] += 0.5
-        ct["c1"] += 0.5
-    if subsumed_by_r1 and not subsumed_by_c1:
-        ct["r1"] += 1
-    if subsumed_by_c1 and not subsumed_by_r1:
-        ct["c1"] += 1
+        if subsumed_by_gc and subsumed_by_ga and subsumed_by_gb:
+            ct["o11"] += 1
+            ct["r1"] += 1
+            ct["c1"] += 1
+        elif (not subsumed_by_gc) and subsumed_by_ga and (not subsumed_by_gb):
+            ct["r1"] += 1
+        elif (not subsumed_by_gc) and (not subsumed_by_ga) and subsumed_by_gb:
+            ct["c1"] += 1
+        elif (not subsumed_by_gc) and subsumed_by_ga and subsumed_by_gb:
+            ct["r1"] += 0.5
+            ct["c1"] += 0.5
+        elif (not subsumed_by_gc) and (not subsumed_by_ga) and (not subsumed_by_gb):
+            pass
+        else:
+            raise Exception("Inconsistent classification of choke point vertices.")
     return ct
 
 

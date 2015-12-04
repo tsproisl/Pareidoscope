@@ -51,22 +51,25 @@ def match(query_graph, target_graph, vertex_candidates, index):
     if index >= query_graph.number_of_nodes():
         yield tuple([list(cand)[0] for cand in vertex_candidates])
     else:
-        query_outgoing = query_graph.out_edges(nbunch = [index], data = True)
-        query_incoming = query_graph.in_edges(nbunch = [index], data = True)
+        sorted_vertices = sorted(query_graph.nodes())
+        vertex_to_index = {v: i for i, v in enumerate(sorted_vertices)}
+        local_index = sorted_vertices[index]
+        query_outgoing = query_graph.out_edges(nbunch=[local_index], data=True)
+        query_incoming = query_graph.in_edges(nbunch=[local_index], data=True)
         for cpos in vertex_candidates[index]:
             local_candidates = [cand - set([cpos]) for cand in vertex_candidates]
             local_candidates[index] = set([cpos])
-            target_outgoing = target_graph.out_edges(nbunch = [cpos], data = True)
-            target_incoming = target_graph.in_edges(nbunch = [cpos], data = True)
+            target_outgoing = target_graph.out_edges(nbunch=[cpos], data=True)
+            target_incoming = target_graph.in_edges(nbunch=[cpos], data=True)
             target_candidates = [set([]) for _ in query_graph.nodes()]
             for qs, qt, ql in query_outgoing:
                 for ts, tt, tl in target_outgoing:
                     if nx_graph.dictionary_match(ql, tl):
-                        target_candidates[qt] = target_candidates[qt].union(set([tt]))
+                        target_candidates[vertex_to_index[qt]] = target_candidates[vertex_to_index[qt]].union(set([tt]))
             for qs, qt, ql in query_incoming:
                 for ts, tt, tl in target_incoming:
                     if nx_graph.dictionary_match(ql, tl):
-                        target_candidates[qs] = target_candidates[qs].union(set([ts]))
+                        target_candidates[vertex_to_index[qs]] = target_candidates[vertex_to_index[qs]].union(set([ts]))
             for idx in range(query_graph.number_of_nodes()):
                 if len(target_candidates[idx]) > 0:
                     local_candidates[idx] = local_candidates[idx].intersection(target_candidates[idx])

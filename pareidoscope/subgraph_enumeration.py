@@ -1,7 +1,8 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import copy
+import functools
 import itertools
 
 import networkx
@@ -21,7 +22,7 @@ def get_subgraphs_nx(query_graph, target_graph, vertex_candidates=None):
     bfo_graph, bfo_to_raw = get_bfo(target_graph)
     if vertex_candidates is None:
         vertex_candidates = nx_graph.get_vertex_candidates(query_graph, bfo_graph)
-    vertex_candidates = reduce(lambda x, y: x.union(y), vertex_candidates)
+    vertex_candidates = functools.reduce(lambda x, y: x.union(y), vertex_candidates)
     for subgraph in enumerate_connected_subgraphs(bfo_graph, bfo_to_raw, query_graph.number_of_nodes(), query_graph.number_of_edges(), vertex_candidates):
         vc = nx_graph.get_vertex_candidates(query_graph, subgraph)
         if match_yes_no(query_graph, subgraph, vc, 0):
@@ -87,9 +88,11 @@ def get_choke_point_matches(query_graph, target_graph, choke_point, vertex_candi
     """
     if vertex_candidates is None:
         vertex_candidates = nx_graph.get_vertex_candidates(query_graph, target_graph)
-    for choke_point_candidate in vertex_candidates[choke_point]:
+    sorted_vertices = sorted(query_graph.nodes())
+    local_choke_point = sorted_vertices[choke_point]
+    for choke_point_candidate in vertex_candidates[local_choke_point]:
         local_candidates = copy.deepcopy(vertex_candidates)
-        local_candidates[choke_point] = set([choke_point_candidate])
+        local_candidates[local_choke_point] = set([choke_point_candidate])
         if subsumes_nx(query_graph, target_graph, local_candidates):
             yield choke_point_candidate
 
@@ -106,7 +109,9 @@ def choke_point_subsumes_nx(query_graph, target_graph, choke_point, choke_point_
         return False
     if vertex_candidates is None:
         vertex_candidates = nx_graph.get_vertex_candidates(qg, tg)
-    vertex_candidates[choke_point] = vertex_candidates[choke_point].intersection(set([choke_point_candidate]))
+    sorted_vertices = sorted(query_graph.nodes())
+    local_choke_point = sorted_vertices[choke_point]
+    vertex_candidates[local_choke_point] = vertex_candidates[local_choke_point].intersection(set([choke_point_candidate]))
     return match_yes_no(qg, tg, vertex_candidates, 0)
 
 
@@ -259,9 +264,9 @@ def enumerate_connected_subgraphs_recursive(graph, subgraph, prohibited_edges, n
                 # add edges
                 for s, t in ec + nec:
                     local_subgraph.add_edge(s, t, graph.edge[s][t])
-                    for k, v in graph.node[s].iteritems():
+                    for k, v in graph.node[s].items():
                         local_subgraph.node[s][k] = v
-                    for k, v in graph.node[t].iteritems():
+                    for k, v in graph.node[t].items():
                         local_subgraph.node[t][k] = v
                 nr_of_subgraph_vertices = local_subgraph.number_of_nodes()
                 nr_of_subgraph_edges = local_subgraph.number_of_edges()
@@ -365,9 +370,9 @@ def enumerate_csg_minmax_recursive(graph, subgraph, prohibited_edges, graph_to_r
                 # add edges
                 for s, t in ec + nec:
                     local_subgraph.add_edge(s, t, graph.edge[s][t])
-                    for k, v in graph.node[s].iteritems():
+                    for k, v in graph.node[s].items():
                         local_subgraph.node[s][k] = v
-                    for k, v in graph.node[t].iteritems():
+                    for k, v in graph.node[t].items():
                         local_subgraph.node[t][k] = v
                 nr_of_subgraph_vertices = local_subgraph.number_of_nodes()
                 nr_of_subgraph_edges = local_subgraph.number_of_edges()
@@ -423,22 +428,25 @@ def match_yes_no(query_graph, target_graph, vertex_candidates, index):
     """
     if index >= query_graph.number_of_nodes():
         return True
-    query_outgoing = query_graph.out_edges(nbunch = [index], data = True)
-    query_incoming = query_graph.in_edges(nbunch = [index], data = True)
+    sorted_vertices = sorted(query_graph.nodes())
+    vertex_to_index = {v: i for i, v in enumerate(sorted_vertices)}
+    local_index = sorted_vertices[index]
+    query_outgoing = query_graph.out_edges(nbunch=[local_index], data=True)
+    query_incoming = query_graph.in_edges(nbunch=[local_index], data=True)
     for cpos in vertex_candidates[index]:
         local_candidates = [cand - set([cpos]) for cand in vertex_candidates]
         local_candidates[index] = set([cpos])
-        target_outgoing = target_graph.out_edges(nbunch = [cpos], data = True)
-        target_incoming = target_graph.in_edges(nbunch = [cpos], data = True)
+        target_outgoing = target_graph.out_edges(nbunch=[cpos], data=True)
+        target_incoming = target_graph.in_edges(nbunch=[cpos], data=True)
         target_candidates = [set([]) for _ in query_graph.nodes()]
         for qs, qt, ql in query_outgoing:
             for ts, tt, tl in target_outgoing:
                 if nx_graph.dictionary_match(ql, tl):
-                    target_candidates[qt] = target_candidates[qt].union(set([tt]))
+                    target_candidates[vertex_to_index[qt]] = target_candidates[vertex_to_index[qt]].union(set([tt]))
         for qs, qt, ql in query_incoming:
             for ts, tt, tl in target_incoming:
                 if nx_graph.dictionary_match(ql, tl):
-                    target_candidates[qs] = target_candidates[qs].union(set([ts]))
+                    target_candidates[vertex_to_index[qs]] = target_candidates[vertex_to_index[qs]].union(set([ts]))
         for idx in range(query_graph.number_of_nodes()):
             if len(target_candidates[idx]) > 0:
                 local_candidates[idx] = local_candidates[idx].intersection(target_candidates[idx])

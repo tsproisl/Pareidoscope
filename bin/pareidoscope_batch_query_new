@@ -2,7 +2,9 @@
 # -*- coding: utf-8 -*-
 
 import argparse
+import itertools
 import json
+import multiprocessing
 
 import pareidoscope.query
 from pareidoscope.utils import cwb
@@ -35,12 +37,43 @@ def search_choke_points(queries):
     return queries
 
 
+def write_results(prefix, results):
+    """Write results to files
+    
+    Arguments:
+    - `prefix`:
+    - `results`:
+    """
+    with open("%s.dat" % prefix, "w") as fh:
+        json.dump(results, fh)
+    for suffix in results[0].keys():
+        with open("%s_%s.mi" % (prefix, suffix), "w") as fh:
+            fh.write("MI\n")
+            for i, q in enumerate(results):
+                s = q[suffix]
+                e11 = 0
+                if s["o11"] == 0:
+                    continue
+                if suffix in ["iso_ct", "sub_ct", "choke_point_ct", "sent_ct"]:
+                    if any([s[x] == 0 for x in ["r1", "c1", "n"]]):
+                        e11 = 0
+                    else:
+                        e11 = (s["r1"] * s["c1"]) / float(s["n"])
+                else:
+                    pass
+                mi = math.log(s["o11"]/float(e11), 2)
+                fh.write("%d\t%f\n" % (i+1, mi))
+
+                
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run a batch of queries against a corpus')
     parser.add_argument("-c", "--corpus", type=argparse.FileType("r"), required=True, help="Corpus in CWB format")
     parser.add_argument("-o", "--output", type=str, required=True, help="Output prefix")
     parser.add_argument("QUERIES", type=argparse.FileType("r"), help="Queries file with G_C\tG_A\tG_A")
     args = parser.parse_args()
+
+    groupsize = 5 * 10 * multiprocessing.cpu_count()
     
     queries = read_queries(args.QUERIES)
     queries = check_queries(queries)
@@ -50,13 +83,13 @@ if __name__ == "__main__":
         for q in l[:-1]:
             print(nx_graph.export_to_adjacency_matrix(q))
     
-    # results = [{} for q in queries]
-    # pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
-    # sents = cwb.sentences_iter(args.corpus)
-    # for sentences in helper.grouper_nofill(groupsize, sents):
-    #     r = pool.imap(pareidoscope.query.run_queries, itertools.izip(sentences, itertools.repeat(queries)), 10)
-    #     # r = map(pareidoscope.query.run_queries, itertools.izip(sentences, itertools.repeat(queries)))
-    #     for result, sensible in r:
-    #         if sensible:
-    #             pareidoscope.query.merge_result(result, results)
-    # write_results(args.output, results)
+    results = [{} for q in queries]
+    pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
+    sents = cwb.sentences_iter(args.corpus)
+    for sentences in helper.grouper_nofill(groupsize, sents):
+        r = pool.imap(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(queries)), 10)
+        # r = list(map(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(queries))))
+        for result, sensible in r:
+            if sensible:
+                pareidoscope.query.merge_result(result, results)
+    write_results(args.output, results)
