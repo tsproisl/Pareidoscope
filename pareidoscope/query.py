@@ -67,6 +67,8 @@ def get_n_from_c_a_b(gc, ga, gb):
             raise Exception("Incompatible edge labels: %s and  %s" % (repr(ga.edge[vid_to_ga[s]][vid_to_ga[t]]), repr(gb.edge[vid_to_gb[s]][vid_to_gb[t]])))
     # make sure that the remaining vertices are consecutively labeled
     gn = nx_graph.ensure_consecutive_vertices(gn)
+    if not networkx.is_weakly_connected(gn):
+        raise Exception("gn is not a connected graph")
     return gn
 
 
