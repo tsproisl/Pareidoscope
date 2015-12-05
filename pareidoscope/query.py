@@ -15,6 +15,9 @@ from pareidoscope import subgraph_isomorphism
 
 def sanity_check_c_a_b(gc, ga, gb):
     """Do a few sanity checks on the query graphs."""
+    connected_c = networkx.is_weakly_connected(gc)
+    connected_a = networkx.is_weakly_connected(ga)
+    connected_b = networkx.is_weakly_connected(gb)
     vid_c = set([l["vid"] for v, l in gc.nodes(data=True)])
     vid_a = set([l["vid"] for v, l in ga.nodes(data=True)])
     vid_b = set([l["vid"] for v, l in gb.nodes(data=True)])
@@ -28,7 +31,7 @@ def sanity_check_c_a_b(gc, ga, gb):
     ga_subsumes_gc = subgraph_enumeration.subsumes_nx(ga, gc)
     # gb should subsume gc
     gb_subsumes_gc = subgraph_enumeration.subsumes_nx(gb, gc)
-    sane = all([vid_c_uniq, vid_a_uniq, vid_b_uniq, a_and_b_is_c, ga_subsumes_gc, gb_subsumes_gc])
+    sane = all([connected_c, connected_a, connected_b, vid_c_uniq, vid_a_uniq, vid_b_uniq, a_and_b_is_c, ga_subsumes_gc, gb_subsumes_gc])
     if not sane:
         raise Exception("Incorrect formulation of query.")
     return sane
