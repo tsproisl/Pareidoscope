@@ -304,7 +304,8 @@ def run_queries(args):
             # sent_ct = sentences(gc, ga, gb, gn, gs)
             # we could also append gziped JSON strings if full data
             # structures need too much memory
-            result.append({"iso_ct": iso_ct, "sub_ct": sub_ct, "choke_point_ct": choke_point_ct, "sent_ct": sent_ct})
+            # result.append({"iso_ct": iso_ct, "sub_ct": sub_ct, "choke_point_ct": choke_point_ct, "sent_ct": sent_ct})
+            result.append({"choke_point_ct": choke_point_ct})
     return result, sensible
 
 
