@@ -22,6 +22,8 @@ def get_subgraphs_nx(query_graph, target_graph, vertex_candidates=None):
     bfo_graph, bfo_to_raw = get_bfo(target_graph)
     if vertex_candidates is None:
         vertex_candidates = nx_graph.get_vertex_candidates(query_graph, bfo_graph)
+    # if any([len(cands) == 0 for cands in vertex_candidates]):
+    #     return
     vertex_candidates = functools.reduce(lambda x, y: x.union(y), vertex_candidates)
     for subgraph in enumerate_connected_subgraphs(bfo_graph, bfo_to_raw, query_graph.number_of_nodes(), query_graph.number_of_edges(), vertex_candidates):
         vc = nx_graph.get_vertex_candidates(query_graph, subgraph)
@@ -69,6 +71,8 @@ def subsumes_nx(query_graph, target_graph, vertex_candidates=None):
         return False
     if vertex_candidates is None:
         vertex_candidates = nx_graph.get_vertex_candidates(qg, tg)
+    # if any([len(cands) == 0 for cands in vertex_candidates]):
+    #     return
     return match_yes_no(qg, tg, vertex_candidates, 0)
 
 

@@ -292,20 +292,20 @@ def run_queries(args):
     if sensible:
         for qline in queries:
             gc, ga, gb, gn, choke_point = qline
-            # # isomorphisms
-            # iso_ct = isomorphisms(gc, ga, gb, gn, gs)
-            # # subgraphs (contingency table)
-            # sub_ct = subgraphs(gc, ga, gb, gn, gs)
+            # isomorphisms
+            iso_ct = isomorphisms(gc, ga, gb, gn, gs)
+            # subgraphs (contingency table)
+            sub_ct = subgraphs(gc, ga, gb, gn, gs)
             # choke_points (contingency table)
             choke_point_ct = {}
             if choke_point is not None:
                 choke_point_ct = choke_points(gc, ga, gb, gn, gs, choke_point)
-            # # sentences (contingency table)
-            # sent_ct = sentences(gc, ga, gb, gn, gs)
+            # sentences (contingency table)
+            sent_ct = sentences(gc, ga, gb, gn, gs)
             # we could also append gziped JSON strings if full data
             # structures need too much memory
-            # result.append({"iso_ct": iso_ct, "sub_ct": sub_ct, "choke_point_ct": choke_point_ct, "sent_ct": sent_ct})
-            result.append({"choke_point_ct": choke_point_ct})
+            result.append({"iso_ct": iso_ct, "sub_ct": sub_ct, "choke_point_ct": choke_point_ct, "sent_ct": sent_ct})
+            # result.append({"choke_point_ct": choke_point_ct})
     return result, sensible
 
 
