@@ -71,7 +71,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run a batch of queries against a corpus')
     parser.add_argument("-c", "--corpus", type=argparse.FileType("r"), required=True, help="Corpus in CWB format")
     parser.add_argument("-o", "--output", type=str, required=True, help="Output prefix")
-    parser.add_argument("QUERIES", type=argparse.FileType("r"), help="Queries file with G_C\tG_A\tG_A")
+    parser.add_argument("QUERIES", type=argparse.FileType("r"), help="Queries file with G_C\tG_A\tG_B")
     args = parser.parse_args()
 
     groupsize = 5 * 10 * multiprocessing.cpu_count()
