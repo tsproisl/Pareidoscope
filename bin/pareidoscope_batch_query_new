@@ -83,7 +83,7 @@ if __name__ == "__main__":
     parser.add_argument("QUERIES", type=argparse.FileType("r"), help="Queries file with G_C\tG_A\tG_B")
     args = parser.parse_args()
 
-    groupsize = 5 * 10 * multiprocessing.cpu_count()
+    groupsize = 5 * 50 * multiprocessing.cpu_count()
     
     queries = read_queries(args.QUERIES)
     queries = check_queries(queries)
