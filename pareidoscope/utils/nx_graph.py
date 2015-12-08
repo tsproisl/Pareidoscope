@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import itertools
@@ -110,11 +110,20 @@ def get_vertex_candidates(query_graph, target_graph):
             candidates[vertex] = target_graph.nodes()
         else:
             candidates[vertex] = [tv for tv in target_graph.nodes() if dictionary_match(query_graph.node[vertex], target_graph.node[tv])]
-        candidates[vertex] = set([tv for tv in candidates[vertex] if edge_match(query_graph, vertex, target_graph, tv)])
-    # verify adjacency
+        query_in = query_graph.in_degree(vertex)
+        query_out = query_graph.out_degree(vertex)
+        candidates[vertex] = set([tv for tv in candidates[vertex] if (query_in <= target_graph.in_degree(tv)) and (query_out <= target_graph.out_degree(tv))])
+    # verify adjacency and edge labels
     for s, t, l in query_graph.edges(data=True):
-        candidates[s] = set([x for x in candidates[s] if any([dictionary_match(l, target_graph.edge[x][y]) for y in candidates[t] if target_graph.has_edge(x, y)])])
-        candidates[t] = set([y for y in candidates[t] if any([dictionary_match(l, target_graph.edge[x][y]) for x in candidates[s] if target_graph.has_edge(x, y)])])
+        source_candidates = set([])
+        target_candidates = set([])
+        for cs, ct in itertools.product(candidates[s], candidates[t]):
+            if target_graph.has_edge(cs, ct):
+                if dictionary_match(l, target_graph.edge[cs][ct]):
+                    source_candidates.add(cs)
+                    target_candidates.add(ct)
+        candidates[s] = source_candidates
+        candidates[t] = target_candidates
     return candidates
 
 
@@ -131,28 +140,28 @@ def dictionary_match(query_dictionary, target_dictionary):
     # return all([label in target_dictionary and (query_dictionary[label] == ".+" or query_dictionary[label] == ".*" or query_dictionary[label] == target_dictionary[label]) for label in query_dictionary])
 
 
-def edge_match(query_graph, query_vertex, target_graph, target_vertex):
-    """Does vertex with target_index from target_graph have the same
-    outgoing and incoming edges as vertex query_index from
-    query_graph?
+# def edge_match(query_graph, query_vertex, target_graph, target_vertex):
+#     """Does vertex with target_index from target_graph have the same
+#     outgoing and incoming edges as vertex query_index from
+#     query_graph?
     
-    Arguments:
-    - `query_graph`:
-    - `query_index`:
-    - `target_graph`:
-    - `target_index`:
-    """
-    query_outgoing = query_graph.out_edges(nbunch=[query_vertex], data=True)
-    query_incoming = query_graph.in_edges(nbunch=[query_vertex], data=True)
-    target_outgoing = target_graph.out_edges(nbunch=[target_vertex], data=True)
-    target_incoming = target_graph.in_edges(nbunch=[target_vertex], data=True)
-    if len(query_outgoing) > len(target_outgoing):
-        return False
-    if len(query_incoming) > len(target_incoming):
-        return False
-    outgoing_match = all([any([dictionary_match(qout[2], tout[2]) for tout in target_outgoing]) for qout in query_outgoing])
-    incoming_match = all([any([dictionary_match(qin[2], tin[2]) for tin in target_incoming]) for qin in query_incoming])
-    return outgoing_match and incoming_match
+#     Arguments:
+#     - `query_graph`:
+#     - `query_index`:
+#     - `target_graph`:
+#     - `target_index`:
+#     """
+#     query_outgoing = query_graph.out_edges(nbunch=[query_vertex], data=True)
+#     query_incoming = query_graph.in_edges(nbunch=[query_vertex], data=True)
+#     target_outgoing = target_graph.out_edges(nbunch=[target_vertex], data=True)
+#     target_incoming = target_graph.in_edges(nbunch=[target_vertex], data=True)
+#     if len(query_outgoing) > len(target_outgoing):
+#         return False
+#     if len(query_incoming) > len(target_incoming):
+#         return False
+#     outgoing_match = all([any([dictionary_match(qout[2], tout[2]) for tout in target_outgoing]) for qout in query_outgoing])
+#     incoming_match = all([any([dictionary_match(qin[2], tin[2]) for tin in target_incoming]) for qin in query_incoming])
+#     return outgoing_match and incoming_match
 
 
 def export_to_adjacency_matrix(nx_graph, canonical=False):
