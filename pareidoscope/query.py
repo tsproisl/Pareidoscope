@@ -80,31 +80,15 @@ def strip_vid(graph):
     return copy
     
 
-def matches(query_graph, isomorphism, target_graph):
-    """Does query_graph match the isomorphism subgraph of
-    target_graph?
-    
-    Arguments:
-    - `query_graph`:
-    - `isomorphism`:
-    - `target_graph`:
-    """
-    vertex_match = all([nx_graph.dictionary_match(query_graph.node[v], target_graph.node[isomorphism[v]]) for v in query_graph.nodes()])
-    edge_match = all([nx_graph.dictionary_match(query_graph.edge[s][t], target_graph.edge[isomorphism[s]][isomorphism[t]]) for s, t in query_graph.edges()])
-    return vertex_match and edge_match
-
-
-def _get_isomorphism_vertex_candidates(query_graph, target_graph, v_target, v_isomorphism, vid_to_iso):
+def _get_isomorphism_vertex_candidates(query_graph, normal_candidates, v_target, v_isomorphism, vid_to_iso):
     """Return vertex candidates that are compatible with isomorphism."""
-    normal_candidates = nx_graph.get_vertex_candidates(strip_vid(query_graph), target_graph)
     isomorphism_candidates = [set([vid_to_iso[l["vid"]]]) if l["vid"] in vid_to_iso else v_target - v_isomorphism for v, l in sorted(query_graph.nodes(data=True))]
     candidates = [a & b for a, b in zip(normal_candidates, isomorphism_candidates)]
     return candidates
 
 
-def _get_subgraph_vertex_candidates(query_graph, target_graph, vid_n, v_target, v_subgraph):
+def _get_subgraph_vertex_candidates(query_graph, normal_candidates, vid_n, v_target, v_subgraph):
     """Return vertex candidates that are compatible with subgraph."""
-    normal_candidates = nx_graph.get_vertex_candidates(strip_vid(query_graph), target_graph)
     subgraph_candidates = [v_subgraph if l["vid"] in vid_n else v_target - v_subgraph for v, l in sorted(query_graph.nodes(data=True))]
     candidates = [a & b for a, b in zip(normal_candidates, subgraph_candidates)]
     return candidates
@@ -128,12 +112,19 @@ def isomorphisms(gc, ga, gb, gn, gs, candidates=None):
     stripped_gc = strip_vid(gc)
     stripped_ga = strip_vid(ga)
     stripped_gb = strip_vid(gb)
+    normal_cand_c, normal_cand_a, normal_cand_b = None, None, None
     for isomorphism in subgraph_isomorphism.get_subgraph_isomorphisms_nx(strip_vid(gn), gs, vertex_candidates=candidates):
+        if normal_cand_c is None:
+            normal_cand_c = nx_graph.get_vertex_candidates(stripped_gc, gs)
+        if normal_cand_a is None:
+            normal_cand_a = nx_graph.get_vertex_candidates(stripped_ga, gs)
+        if normal_cand_b is None:
+            normal_cand_b = nx_graph.get_vertex_candidates(stripped_gb, gs)
         vid_iso = {gn.node[qv]["vid"]: tv for qv, tv in zip(sorted(gn.nodes()), isomorphism)}
         v_isomorphism = set(isomorphism)
-        vert_cand_c = _get_isomorphism_vertex_candidates(gc, gs, vs, v_isomorphism, vid_iso)
-        vert_cand_a = _get_isomorphism_vertex_candidates(ga, gs, vs, v_isomorphism, vid_iso)
-        vert_cand_b = _get_isomorphism_vertex_candidates(gb, gs, vs, v_isomorphism, vid_iso)
+        vert_cand_c = _get_isomorphism_vertex_candidates(gc, normal_cand_c, vs, v_isomorphism, vid_iso)
+        vert_cand_a = _get_isomorphism_vertex_candidates(ga, normal_cand_a, vs, v_isomorphism, vid_iso)
+        vert_cand_b = _get_isomorphism_vertex_candidates(gb, normal_cand_b, vs, v_isomorphism, vid_iso)
         gc_subsumes_iso = subgraph_enumeration.subsumes_nx(stripped_gc, gs, vertex_candidates=vert_cand_c)
         ga_subsumes_iso = subgraph_enumeration.subsumes_nx(stripped_ga, gs, vertex_candidates=vert_cand_a)
         gb_subsumes_iso = subgraph_enumeration.subsumes_nx(stripped_gb, gs, vertex_candidates=vert_cand_b)
@@ -171,11 +162,18 @@ def subgraphs(gc, ga, gb, gn, gs, candidates=None):
     stripped_gc = strip_vid(gc)
     stripped_ga = strip_vid(ga)
     stripped_gb = strip_vid(gb)
+    normal_cand_c, normal_cand_a, normal_cand_b = None, None, None
     for subgraph in subgraph_enumeration.get_subgraphs_nx(strip_vid(gn), gs, vertex_candidates=candidates):
+        if normal_cand_c is None:
+            normal_cand_c = nx_graph.get_vertex_candidates(stripped_gc, gs)
+        if normal_cand_a is None:
+            normal_cand_a = nx_graph.get_vertex_candidates(stripped_ga, gs)
+        if normal_cand_b is None:
+            normal_cand_b = nx_graph.get_vertex_candidates(stripped_gb, gs)
         v_subgraph = set(subgraph.nodes())
-        vert_cand_c = _get_subgraph_vertex_candidates(gc, gs, vid_n, vs, v_subgraph)
-        vert_cand_a = _get_subgraph_vertex_candidates(ga, gs, vid_n, vs, v_subgraph)
-        vert_cand_b = _get_subgraph_vertex_candidates(gb, gs, vid_n, vs, v_subgraph)
+        vert_cand_c = _get_subgraph_vertex_candidates(gc, normal_cand_c, vid_n, vs, v_subgraph)
+        vert_cand_a = _get_subgraph_vertex_candidates(ga, normal_cand_a, vid_n, vs, v_subgraph)
+        vert_cand_b = _get_subgraph_vertex_candidates(gb, normal_cand_b, vid_n, vs, v_subgraph)
         subsumed_by_gc = subgraph_enumeration.subsumes_nx(stripped_gc, gs, vertex_candidates=vert_cand_c)
         subsumed_by_ga = subgraph_enumeration.subsumes_nx(stripped_ga, gs, vertex_candidates=vert_cand_a)
         subsumed_by_gb = subgraph_enumeration.subsumes_nx(stripped_gb, gs, vertex_candidates=vert_cand_b)

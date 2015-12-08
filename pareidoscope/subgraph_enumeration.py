@@ -71,8 +71,8 @@ def subsumes_nx(query_graph, target_graph, vertex_candidates=None):
         return False
     if vertex_candidates is None:
         vertex_candidates = nx_graph.get_vertex_candidates(qg, tg)
-    # if any([len(cands) == 0 for cands in vertex_candidates]):
-    #     return
+    if any([len(cands) == 0 for cands in vertex_candidates]):
+        return False
     return match_yes_no(qg, tg, vertex_candidates, 0)
 
 
@@ -112,6 +112,8 @@ def choke_point_subsumes_nx(query_graph, target_graph, choke_point, choke_point_
     if vertex_candidates is None:
         vertex_candidates = nx_graph.get_vertex_candidates(qg, tg)
     vertex_candidates[choke_point] = vertex_candidates[choke_point].intersection(set([choke_point_candidate]))
+    if any([len(cands) == 0 for cands in vertex_candidates]):
+        return False
     return match_yes_no(qg, tg, vertex_candidates, 0)
 
 

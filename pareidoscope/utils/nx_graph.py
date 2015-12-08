@@ -140,30 +140,6 @@ def dictionary_match(query_dictionary, target_dictionary):
     # return all([label in target_dictionary and (query_dictionary[label] == ".+" or query_dictionary[label] == ".*" or query_dictionary[label] == target_dictionary[label]) for label in query_dictionary])
 
 
-# def edge_match(query_graph, query_vertex, target_graph, target_vertex):
-#     """Does vertex with target_index from target_graph have the same
-#     outgoing and incoming edges as vertex query_index from
-#     query_graph?
-    
-#     Arguments:
-#     - `query_graph`:
-#     - `query_index`:
-#     - `target_graph`:
-#     - `target_index`:
-#     """
-#     query_outgoing = query_graph.out_edges(nbunch=[query_vertex], data=True)
-#     query_incoming = query_graph.in_edges(nbunch=[query_vertex], data=True)
-#     target_outgoing = target_graph.out_edges(nbunch=[target_vertex], data=True)
-#     target_incoming = target_graph.in_edges(nbunch=[target_vertex], data=True)
-#     if len(query_outgoing) > len(target_outgoing):
-#         return False
-#     if len(query_incoming) > len(target_incoming):
-#         return False
-#     outgoing_match = all([any([dictionary_match(qout[2], tout[2]) for tout in target_outgoing]) for qout in query_outgoing])
-#     incoming_match = all([any([dictionary_match(qin[2], tin[2]) for tin in target_incoming]) for qin in query_incoming])
-#     return outgoing_match and incoming_match
-
-
 def export_to_adjacency_matrix(nx_graph, canonical=False):
     """Return an adjacency matrix representing nx_graph.
     
