@@ -216,10 +216,17 @@ def choke_points(gc, ga, gb, gn, gs, choke_point):
     choke_c = [v for v, l in gc.nodes(data=True) if l["vid"] == choke_vid][0]
     choke_a = [v for v, l in ga.nodes(data=True) if l["vid"] == choke_vid][0]
     choke_b = [v for v, l in gb.nodes(data=True) if l["vid"] == choke_vid][0]
+    normal_cand_c, normal_cand_a, normal_cand_b = None, None, None
     for choke_point_vertex in subgraph_enumeration.get_choke_point_matches(strip_vid(gn), gs, choke_point):
-        subsumed_by_gc = subgraph_enumeration.choke_point_subsumes_nx(stripped_gc, gs, choke_c, choke_point_vertex)
-        subsumed_by_ga = subgraph_enumeration.choke_point_subsumes_nx(stripped_ga, gs, choke_a, choke_point_vertex)
-        subsumed_by_gb = subgraph_enumeration.choke_point_subsumes_nx(stripped_gb, gs, choke_b, choke_point_vertex)
+        if normal_cand_c is None:
+            normal_cand_c = nx_graph.get_vertex_candidates(stripped_gc, gs)
+        if normal_cand_a is None:
+            normal_cand_a = nx_graph.get_vertex_candidates(stripped_ga, gs)
+        if normal_cand_b is None:
+            normal_cand_b = nx_graph.get_vertex_candidates(stripped_gb, gs)
+        subsumed_by_gc = subgraph_enumeration.choke_point_subsumes_nx(stripped_gc, gs, choke_c, choke_point_vertex, vertex_candidates=normal_cand_c)
+        subsumed_by_ga = subgraph_enumeration.choke_point_subsumes_nx(stripped_ga, gs, choke_a, choke_point_vertex, vertex_candidates=normal_cand_a)
+        subsumed_by_gb = subgraph_enumeration.choke_point_subsumes_nx(stripped_gb, gs, choke_b, choke_point_vertex, vertex_candidates=normal_cand_b)
         ct["n"] += 1
         if subsumed_by_gc and subsumed_by_ga and subsumed_by_gb:
             ct["o11"] += 1

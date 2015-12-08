@@ -103,18 +103,16 @@ def choke_point_subsumes_nx(query_graph, target_graph, choke_point, choke_point_
     """Return whether the query_graph subsumes the target graph.
 
     """
-    qg = query_graph
-    tg = target_graph
-    if qg.number_of_nodes() > tg.number_of_nodes():
+    if query_graph.number_of_nodes() > target_graph.number_of_nodes():
         return False
-    if qg.number_of_edges() > tg.number_of_edges():
+    if query_graph.number_of_edges() > target_graph.number_of_edges():
         return False
     if vertex_candidates is None:
-        vertex_candidates = nx_graph.get_vertex_candidates(qg, tg)
+        vertex_candidates = nx_graph.get_vertex_candidates(query_graph, target_graph)
     vertex_candidates[choke_point] = vertex_candidates[choke_point].intersection(set([choke_point_candidate]))
     if any([len(cands) == 0 for cands in vertex_candidates]):
         return False
-    return match_yes_no(qg, tg, vertex_candidates, 0)
+    return match_yes_no(query_graph, target_graph, vertex_candidates, 0)
 
 
 def get_bfo(target_graph, fragment=False):

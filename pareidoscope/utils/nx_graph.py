@@ -234,7 +234,9 @@ def is_purely_structural(nx_graph):
     Arguments:
     - `query_graph`:
     """
-    return all([_is_unrestricted(edge[2]) for edge in nx_graph.edges(data=True)])
+    vertices = all([_is_unrestricted(l) for v, l in nx_graph.nodes(data=True)])
+    edges = all([_is_unrestricted(l) for s, t, l in nx_graph.edges(data=True)])
+    return vertices and edges
 
 
 def _is_unrestricted(dictionary):
