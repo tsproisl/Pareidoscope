@@ -378,7 +378,7 @@ def skeletize(nx_graph, only_vertices=False):
     skeleton = networkx.DiGraph()
     for s, t, l in nx_graph.edges(data=True):
         if only_vertices:
-            skeleton.add_edge(s, t, {k: v for k, v in l.iteritems()})
+            skeleton.add_edge(s, t, {k: v for k, v in l.items()})
         else:
             skeleton.add_edge(s, t)
     return skeleton

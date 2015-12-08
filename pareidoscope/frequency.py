@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 from pareidoscope.utils import nx_graph
@@ -58,7 +58,7 @@ def merge_nested_result(result, results):
     for outer_key in result:
         if outer_key not in results:
             results[outer_key] = {}
-        for inner_key, value in result[outer_key].iteritems():
+        for inner_key, value in result[outer_key].items():
             if inner_key not in results[outer_key]:
                 results[outer_key][inner_key] = 0
             results[outer_key][inner_key] += value

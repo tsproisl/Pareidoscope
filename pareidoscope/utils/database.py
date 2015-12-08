@@ -1,6 +1,7 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import functools
 import json
 import operator
 import re
@@ -44,7 +45,7 @@ def create_sql_query(query_graph):
             where.append("tok_%s.indegree >= %d" % (vertex, indegree))
         if outdegree > 0:
             where.append("tok_%s.outdegree >= %d" % (vertex, outdegree))
-        for k, v in query_graph.node[vertex].iteritems():
+        for k, v in query_graph.node[vertex].items():
             if k in pos_lexical:
                 where.append("tok_%s.%s = ?" % (vertex, k))
                 if k == "root":
@@ -89,7 +90,7 @@ def get_candidates(c, graph):
     mapping = {v: i for i, v in enumerate(sorted(graph.nodes()))}
     sentpos = {}
     sentences = []
-    queries = [(i, _create_sql_query(graph, v)) for v, i in mapping.iteritems()]
+    queries = [(i, _create_sql_query(graph, v)) for v, i in mapping.items()]
     for i, (query, args) in queries:
         sentpos[i] = {}
         vsents = set()
@@ -100,7 +101,7 @@ def get_candidates(c, graph):
             sentpos[i][sentid].add(position)
             vsents.add(sentid)
         sentences.append(vsents)
-    sent_intersect = reduce(lambda x, y: x.intersection(y), sentences)
+    sent_intersect = functools.reduce(lambda x, y: x.intersection(y), sentences)
     candidates = {sentid: [sentpos[i][sentid] for i in sorted(sentpos)] for sentid in sent_intersect}
     return candidates
 
@@ -121,7 +122,7 @@ def _create_sql_query(graph, v):
     pos_lexical = set(["word", "pos", "lemma", "wc", "root"])
     neg_lexical = set(["not_%s" % pl for pl in pos_lexical])
     match_all = set([".*", ".+", "^.*$", "^.+$"])
-    for key, value in graph.node[v].iteritems():
+    for key, value in graph.node[v].items():
         # check if value could be a regular expression
         if key in pos_lexical:
             if might_contain_re(value):
@@ -158,7 +159,7 @@ def _create_sql_query(graph, v):
     # to express any object
     incounter = 0
     for s, t, l in graph.in_edges(v, data=True):
-        for key, value in l.iteritems():
+        for key, value in l.items():
             if key == "relation":
                 if value in match_all:
                     continue
@@ -175,7 +176,7 @@ def _create_sql_query(graph, v):
                 raise Exception("Unsupported key: %s" % key)
     outcounter = 0
     for s, t, l in graph.out_edges(v, data=True):
-        for key, value in l.iteritems():
+        for key, value in l.items():
             if key == "relation":
                 if value in match_all:
                     continue

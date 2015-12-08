@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import functools
@@ -36,5 +36,5 @@ def map_reduce(map_function, reduce_function, map_arguments, reduce_arguments, p
     map_f = _unpack_args(map_function)
     reduce_f = functools.partial(reduce_function, *reduce_arguments)
 
-    results = reduce(reduce_f, pool.imap_unordered(map_f, arguments, chunksize=chunksize))
+    results = functools.reduce(reduce_f, pool.imap_unordered(map_f, arguments, chunksize=chunksize))
     return results

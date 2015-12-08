@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import collections
@@ -99,7 +99,7 @@ def extract_stars_for_position(args):
     edge_to_skel = {}
     gs = json_graph.node_link_graph(json.loads(graph))
     bfo_graph, bfo_to_raw = subgraph_enumeration.get_bfo(gs)
-    raw_to_bfo = {v: k for k, v in bfo_to_raw.iteritems()}
+    raw_to_bfo = {v: k for k, v in bfo_to_raw.items()}
     vertex = raw_to_bfo[position]
     _extract_stars(bfo_graph, vertex, edge_stars, skel_stars, edge_to_skel, include_pos=False)
     _center_sets_to_center_freqs(edge_stars, skel_stars)
