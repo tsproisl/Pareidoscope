@@ -7,11 +7,7 @@ import re
 import networkx
 
 def create_nx_digraph(adj_matrix):
-    """Return a networkx.DiGraph object of the adjacency matrix.
-    
-    Arguments:
-    - `adj_matrix`:
-    """
+    """Return a networkx.DiGraph object of the adjacency matrix."""
     dg = networkx.DiGraph()
     dg.add_nodes_from([(i, adj_matrix[i][i]) for i in range(len(adj_matrix))])
     for i in range(len(adj_matrix)):
@@ -24,11 +20,7 @@ def create_nx_digraph(adj_matrix):
 
 
 def create_nx_digraph_from_cwb(cwb, origid=None):
-    """Return a networkx.DiGraph object of the CWB representation.
-    
-    Arguments:
-    - `cwb`:
-    """
+    """Return a networkx.DiGraph object of the CWB representation."""
     relpattern = re.compile(r"^(?P<relation>[^(]+)[(](?P<offset>-?\d+)(?:&apos;|')*,0(?:&apos;|')*[)]$")
     dg = networkx.DiGraph()
     if origid is not None:
@@ -49,7 +41,7 @@ def create_nx_digraph_from_cwb(cwb, origid=None):
                 if relation == "punct":
                     continue
                 if offset != 0:
-                    dg.add_edge(i+offset, i, {"relation": relation})
+                    dg.add_edge(i + offset, i, {"relation": relation})
     # remove unconnected vertices, e.g. punctuation in the SD model
     for v, l in dg.nodes(data=True):
         if "root" not in l and dg.degree(v) == 0:
@@ -63,9 +55,6 @@ def is_sensible_graph(nx_graph):
     """Check if graph is a sensible syntactic representation of a
     sentence, i.e. rooted, connected, sensible outdegree, sensible
     density, …
-    
-    Arguments:
-    - `nx_graph`:
 
     """
     # are the vertices consecutively labeled?
@@ -99,10 +88,7 @@ def is_sensible_graph(nx_graph):
 def get_vertex_candidates(query_graph, target_graph):
     """For each vertex in query_graph return a list of possibly
     corresponding vertices from target_graph.
-    
-    Arguments:
-    - `query_graph`:
-    - `target_graph`:
+
     """
     candidates = [[] for v in query_graph.nodes()]
     for vertex in query_graph.nodes():
@@ -129,23 +115,15 @@ def get_vertex_candidates(query_graph, target_graph):
 
 def dictionary_match(query_dictionary, target_dictionary):
     """Does target_vertex match query_vertex? I.e. are all keys from
-    query_vertex in target_vertex and if yes, are their values
-    equal?
-    
-    Arguments:
-    - `query_dictionary`:
-    - `target_dictionary`:
+    query_vertex in target_vertex and if yes, are their values equal?
+
     """
     return all([label in target_dictionary and (query_dictionary[label] == target_dictionary[label] or re.search(r"^" + str(query_dictionary[label]) + r"$", str(target_dictionary[label]))) for label in query_dictionary])
     # return all([label in target_dictionary and (query_dictionary[label] == ".+" or query_dictionary[label] == ".*" or query_dictionary[label] == target_dictionary[label]) for label in query_dictionary])
 
 
 def export_to_adjacency_matrix(nx_graph, canonical=False):
-    """Return an adjacency matrix representing nx_graph.
-    
-    Arguments:
-    - `nx_graph`:
-    """
+    """Return an adjacency matrix representing nx_graph."""
     # identity mapping
     mapping = {v: v for v in nx_graph.nodes()}
     # or mapping to canonical order
@@ -163,11 +141,7 @@ def export_to_adjacency_matrix(nx_graph, canonical=False):
 
 
 def export_to_cwb_format(nx_graph):
-    """Do actual formatting work.
-    
-    Arguments:
-    - `nx_graph`:
-    """
+    """Do actual formatting work."""
     output = []
     for v in sorted(nx_graph.nodes()):
         word = nx_graph.node[v]["word"]
@@ -190,11 +164,6 @@ def export_to_cwb_format(nx_graph):
 def export_to_chemical_format(graph, vertex_dict, edge_dict):
     """Export to chemical format for use with Gaston
     (http://www.liacs.nl/~snijssen/gaston/index.html).
-    
-    Arguments:
-    - `graph`:
-    - `vertex_dict`:
-    - `edge_dict`:
 
     """
     export = ["t # "]
@@ -230,9 +199,7 @@ def export_to_chemical_format(graph, vertex_dict, edge_dict):
 def is_purely_structural(nx_graph):
     """Is query_graph purely structural, i.e. does it contain no
     restrictions on vertex and edge labels?
-    
-    Arguments:
-    - `query_graph`:
+
     """
     vertices = all([_is_unrestricted(l) for v, l in nx_graph.nodes(data=True)])
     edges = all([_is_unrestricted(l) for s, t, l in nx_graph.edges(data=True)])
@@ -240,11 +207,9 @@ def is_purely_structural(nx_graph):
 
 
 def _is_unrestricted(dictionary):
-    """Is the dictionary unrestricted, i.e. is it empty or does it
-    only have ".+" or ".*" as values?
-    
-    Arguments:
-    - `dictionary`:
+    """Is the dictionary unrestricted, i.e. is it empty or does it only
+    have ".+" or ".*" as values?
+
     """
     if dictionary == {}:
         return True
@@ -252,12 +217,7 @@ def _is_unrestricted(dictionary):
 
 
 def _get_vertex_tuple(nx_graph, vertex):
-    """Return a tuple for the vertex that can be used for sorting
-    
-    Arguments:
-    - `nx_graph`:
-    - `vertex`:
-    """
+    """Return a tuple for the vertex that can be used for sorting"""
     other_vertices = set(nx_graph.nodes())
     other_vertices.remove(vertex)
     root = all((networkx.has_path(nx_graph, vertex, x) for x in other_vertices))
@@ -279,13 +239,7 @@ def _get_vertex_tuple(nx_graph, vertex):
 def _dfs(nx_graph, vertex, vtuples, return_ids=False, blacklist=set()):
     """Return vertex tuples in order of depth-first search starting from
     vertex
-    
-    Arguments:
-    - `nx_graph`:
-    - `vertex`:
-    - `vtuples`:
-    - `return_ids`:
-    - `blacklist`:
+
     """
     order = []
     seen = blacklist
@@ -306,14 +260,7 @@ def _dfs(nx_graph, vertex, vtuples, return_ids=False, blacklist=set()):
 
 
 def _get_unique_order(nx_graph, sorted_vertices, vtuples, blacklist=set()):
-    """Resolve any groups within sorted_vertices
-    
-    Arguments:
-    - `nx_graph`:
-    - `sorted_vertices`:
-    - `vtuples`:
-    - `blacklist`:
-    """
+    """Resolve any groups within sorted_vertices"""
     order = []
     keyfunc = lambda v: vtuples[v]
     for k, g in itertools.groupby(sorted_vertices, keyfunc):
@@ -331,11 +278,7 @@ def _get_unique_order(nx_graph, sorted_vertices, vtuples, blacklist=set()):
 
 
 def canonical_order(nx_graph):
-    """Return the vertices of nx_graph in canonical order
-    
-    Arguments:
-    - `nx_graph`:
-    """
+    """Return the vertices of nx_graph in canonical order"""
     vertices = nx_graph.nodes()
     vtuples = {v: _get_vertex_tuple(nx_graph, v) for v in vertices}
     roots = [v for v in vtuples if vtuples[v][0]]
@@ -350,11 +293,7 @@ def canonical_order(nx_graph):
 
 
 def canonize(nx_graph, order=False):
-    """Return canonized copy of nx_graph
-    
-    Arguments:
-    - `nx_graph`:
-    """
+    """Return canonized copy of nx_graph"""
     co = canonical_order(nx_graph)
     mapping = {v: i for i, v in enumerate(co)}
     canonized = networkx.DiGraph()
@@ -369,12 +308,7 @@ def canonize(nx_graph, order=False):
 
 
 def skeletize(nx_graph, only_vertices=False):
-    """Return skeleton copy of nx_graph
-    
-    Arguments:
-    - `nx_graph`:
-
-    """
+    """Return skeleton copy of nx_graph"""
     skeleton = networkx.DiGraph()
     for s, t, l in nx_graph.edges(data=True):
         if only_vertices:
@@ -412,7 +346,9 @@ def get_choke_point(nx_graph):
 
 def is_star(nx_graph, return_centers=False):
     """Check if the graph is a star, i.e. if it has one vertex that is
-    adjacent to all others."""
+    adjacent to all others.
+
+    """
     vertices = set(nx_graph.nodes())
     if return_centers:
         centers = [v for v in vertices if set([v] + nx_graph.predecessors(v) + nx_graph.successors(v)) == vertices]
@@ -424,7 +360,9 @@ def is_star(nx_graph, return_centers=False):
 
 def ensure_consecutive_vertices(graph):
     """Make sure that the n vertices of the graph have indices 0 to
-    n-1."""
+    n-1.
+
+    """
     if sorted(graph.nodes()) == list(range(graph.number_of_nodes())):
         return graph
     else:
