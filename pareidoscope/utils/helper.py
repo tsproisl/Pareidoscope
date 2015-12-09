@@ -14,11 +14,14 @@ def grouper_nofill(n, iterable):
         iterable:
 
     """
-    it = iter(iterable)
-    def take():
-        while True:
-            yield list(itertools.islice(it, n))
-    return iter(take().__next__, [])
+    group = []
+    for element in iterable:
+        group.append(element)
+        if len(group) == n:
+            yield group
+            group = []
+    if len(group) > 0:
+        yield group
 
 
 def get_int_bins(min_value, max_value, nr_of_bins=10):
