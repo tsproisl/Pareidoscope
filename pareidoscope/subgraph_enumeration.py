@@ -11,13 +11,9 @@ from pareidoscope.utils import nx_graph
 
 
 def get_subgraphs_nx(query_graph, target_graph, vertex_candidates=None):
-    """Return a list of subgraphs of target_graph that are isomorphic
-    to query_graph
-    
-    Arguments:
-    - `query_graph`:
-    - `target_graph`:
-    - `vertex_candidates`:
+    """Return a list of subgraphs of target_graph that are isomorphic to
+    query_graph
+
     """
     bfo_graph, bfo_to_raw = get_bfo(target_graph)
     if vertex_candidates is None:
@@ -45,24 +41,14 @@ def get_subgraphs(query_graph, target_graph):
 
 
 def subsumes(query_graph, target_graph):
-    """Return whether the query_graph subsumes the target graph.
-    
-    Arguments:
-    - `query_graph`:
-    - `target_graph`:
-    """
+    """Return whether the query_graph subsumes the target graph."""
     qg = nx_graph.create_nx_digraph(query_graph)
     tg = nx_graph.create_nx_digraph(target_graph)
     return subsumes_nx(qg, tg)
 
 
 def subsumes_nx(query_graph, target_graph, vertex_candidates=None):
-    """Return whether the query_graph subsumes the target graph.
-    
-    Arguments:
-    - `query_graph`:
-    - `target_graph`:
-    """
+    """Return whether the query_graph subsumes the target graph."""
     qg = query_graph
     tg = target_graph
     if qg.number_of_nodes() > tg.number_of_nodes():
@@ -100,9 +86,7 @@ def get_choke_point_matches(query_graph, target_graph, choke_point, vertex_candi
 
 
 def choke_point_subsumes_nx(query_graph, target_graph, choke_point, choke_point_candidate, vertex_candidates=None):
-    """Return whether the query_graph subsumes the target graph.
-
-    """
+    """Return whether the query_graph subsumes the target graph."""
     if query_graph.number_of_nodes() > target_graph.number_of_nodes():
         return False
     if query_graph.number_of_edges() > target_graph.number_of_edges():
@@ -127,6 +111,7 @@ def get_bfo(target_graph, fragment=False):
     
     Raises:
     - IndexError: No root vertex has been found
+
     """
     graph = networkx.DiGraph()
     roots = [v[0] for v in target_graph.nodes(data=True) if "root" in v[1]]
@@ -180,12 +165,7 @@ def enumerate_connected_subgraphs(graph, graph_to_raw, nr_of_vertices, nr_of_edg
     
     Perl implementation:
     trunk/ResourcesPareidoscope/Create/hpc_01_collect_dependency_subgraphs.pl
-    
-    Arguments:
-    - `graph`:
-    - `graph_to_raw`:
-    - `min_n`:
-    - `max_n`:
+
     """
     for vertex in sorted(graph.nodes(), reverse=True):
         max_subgraph_size = len([v for v in graph.nodes() if v >= vertex])
@@ -214,15 +194,7 @@ def enumerate_connected_subgraphs(graph, graph_to_raw, nr_of_vertices, nr_of_edg
 
 
 def enumerate_connected_subgraphs_recursive(graph, subgraph, prohibited_edges, nr_of_vertices, nr_of_edges, graph_to_raw):
-    """See enumerate_connected_subgraphs()
-    
-    Arguments:
-    - `graph`:
-    - `subgraph`:
-    - `prohibited_edges`:
-    - `nr_of_vertices`:
-    - `graph_to_raw`:
-    """
+    """See enumerate_connected_subgraphs()"""
     out_edges, in_edges, neighbours = set([]), set([]), set([])
     neighbour_edges = {}
     subgraph_size = subgraph.number_of_nodes()
@@ -299,12 +271,7 @@ def enumerate_csg_minmax(graph, graph_to_raw, min_vertices=2, max_vertices=5):
     for all S' ⊆ N, S' = ∅, enumerate subsets first {
         EnumerateCsgRec(G, (S ∪ S'), (X ∪ N));
     }
-    
-    Arguments:
-    - `graph`:
-    - `graph_to_raw`:
-    - `min_vertices`:
-    - `max_vertices`:
+
     """
     for vertex in sorted(graph.nodes(), reverse=True):
         subgraph = networkx.DiGraph()
@@ -321,16 +288,7 @@ def enumerate_csg_minmax(graph, graph_to_raw, min_vertices=2, max_vertices=5):
 
 
 def enumerate_csg_minmax_recursive(graph, subgraph, prohibited_edges, graph_to_raw, min_vertices, max_vertices):
-    """See enumerate_connected_subgraphs()
-    
-    Arguments:
-    - `graph`:
-    - `subgraph`:
-    - `prohibited_edges`:
-    - `graph_to_raw`:
-    - `min_vertices`:
-    - `max_vertices`:
-    """
+    """See enumerate_connected_subgraphs()"""
     out_edges, in_edges, neighbours = set([]), set([]), set([])
     neighbour_edges = {}
     subgraph_size = subgraph.number_of_nodes()
@@ -388,12 +346,7 @@ def enumerate_csg_minmax_recursive(graph, subgraph, prohibited_edges, graph_to_r
 
 
 def powerset(iterable, min_size, max_size = -1):
-    """(Partial) powerset of set with at most max_size elements.
-    
-    Arguments:
-    - `set`:
-    - `max_size`:
-    """
+    """(Partial) powerset of set with at most max_size elements."""
     s = list(iterable)
     if max_size == -1:
         max_size = len(s)
@@ -406,12 +359,7 @@ def powerset(iterable, min_size, max_size = -1):
 
 
 def return_corpus_order(subgraph, bfo_to_raw):
-    """foo
-    
-    Arguments:
-    - `subgraph`:
-    - `bfo_to_raw`:
-    """
+    """"""
     corpus_order = networkx.DiGraph()
     corpus_order.add_nodes_from([(bfo_to_raw[v], l) for v, l in subgraph.nodes(data = True)])
     corpus_order.add_edges_from([(bfo_to_raw[s], bfo_to_raw[t], l) for s, t, l in subgraph.edges(data = True)])
@@ -419,14 +367,9 @@ def return_corpus_order(subgraph, bfo_to_raw):
 
 
 def match_yes_no(query_graph, target_graph, vertex_candidates, index):
-    """Return wether there is at least one subgraph isomorphism
-    between query_graph and target_graph.
-    
-    Arguments:
-    - `query_graph`:
-    - `target_graph`:
-    - `vertex_candidates`:
-    - `index`:
+    """Return wether there is at least one subgraph isomorphism between
+    query_graph and target_graph.
+
     """
     if index >= query_graph.number_of_nodes():
         return True
