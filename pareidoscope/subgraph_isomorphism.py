@@ -7,11 +7,7 @@ from pareidoscope.utils import nx_graph
 def get_subgraph_isomorphisms_nx(query_graph, target_graph, vertex_candidates=None):
     """Return a list of isomorphisms that map vertices and edges from
     query_graph to vertices and edges from target_graph.
-    
-    Arguments:
-    - `query_graph`:
-    - `target_graph`:
-    - `vertex_candidates`:
+
     """
     subgraph_isomorphisms = None
     if vertex_candidates is None:
@@ -41,12 +37,7 @@ def match(query_graph, target_graph, vertex_candidates, index):
 
     The implementation follows Proisl/Uhrig (2012: 2753) quite
     closely.
-    
-    Arguments:
-    - `query_graph`:
-    - `target_graph`:
-    - `vertex_candidates`:
-    - `index`:
+
     """
     if index >= query_graph.number_of_nodes():
         yield tuple([next(iter(cand)) for cand in vertex_candidates])
@@ -81,12 +72,7 @@ def match_structural(query_graph, target_graph, vertex_candidates, index):
 
     The implementation follows Proisl/Uhrig (2012: 2753) quite
     closely.
-    
-    Arguments:
-    - `query_graph`:
-    - `target_graph`:
-    - `vertex_candidates`:
-    - `index`:
+
     """
     if index >= query_graph.number_of_nodes():
         yield tuple([next(iter(cand)) for cand in vertex_candidates])
