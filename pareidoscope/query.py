@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import copy
+import functools
 import json
 import operator
 
@@ -94,6 +95,31 @@ def _get_subgraph_vertex_candidates(query_graph, normal_candidates, vid_n, v_tar
     return candidates
 
 
+def _frequency_signature(subsumes, args_c, args_a, args_b):
+    """Return O11, R1, C1 and N for gs."""
+    subsumed_by_gc = subsumes(**args_c)
+    subsumed_by_ga = subsumes(**args_a)
+    subsumed_by_gb = subsumes(**args_b)
+    o11, r1, c1, n = 0, 0, 0, 0
+    n = 1
+    if subsumed_by_gc and subsumed_by_ga and subsumed_by_gb:
+        o11 = 1
+        r1 = 1
+        c1 = 1
+    elif (not subsumed_by_gc) and subsumed_by_ga and (not subsumed_by_gb):
+        r1 = 1
+    elif (not subsumed_by_gc) and (not subsumed_by_ga) and subsumed_by_gb:
+        c1 = 1
+    elif (not subsumed_by_gc) and subsumed_by_ga and subsumed_by_gb:
+        r1 = 0.5
+        c1 = 0.5
+    elif (not subsumed_by_gc) and (not subsumed_by_ga) and (not subsumed_by_gb):
+        pass
+    else:
+        raise Exception("Inconsistent classification.")
+    return o11, r1, c1, n
+
+
 def isomorphisms(gc, ga, gb, gn, gs, candidates=None):
     """Count isomorphisms
     
@@ -107,7 +133,7 @@ def isomorphisms(gc, ga, gb, gn, gs, candidates=None):
 
     """
     vid_to_gn = {l["vid"]: v for v, l in gn.nodes(data=True)}
-    iso_ct = {x: 0 for x in ["o11", "r1", "c1", "n"]}
+    ct = {x: 0 for x in ["o11", "r1", "c1", "n"]}
     vs = set(gs.nodes())
     stripped_gc = strip_vid(gc)
     stripped_ga = strip_vid(ga)
@@ -125,23 +151,15 @@ def isomorphisms(gc, ga, gb, gn, gs, candidates=None):
         vert_cand_c = _get_isomorphism_vertex_candidates(gc, normal_cand_c, vs, v_isomorphism, vid_iso)
         vert_cand_a = _get_isomorphism_vertex_candidates(ga, normal_cand_a, vs, v_isomorphism, vid_iso)
         vert_cand_b = _get_isomorphism_vertex_candidates(gb, normal_cand_b, vs, v_isomorphism, vid_iso)
-        gc_subsumes_iso = subgraph_enumeration.subsumes_nx(stripped_gc, gs, vertex_candidates=vert_cand_c)
-        ga_subsumes_iso = subgraph_enumeration.subsumes_nx(stripped_ga, gs, vertex_candidates=vert_cand_a)
-        gb_subsumes_iso = subgraph_enumeration.subsumes_nx(stripped_gb, gs, vertex_candidates=vert_cand_b)
-        iso_ct["n"] += 1
-        if gc_subsumes_iso and ga_subsumes_iso and gb_subsumes_iso:
-            iso_ct["o11"] += 1
-            iso_ct["r1"] += 1
-            iso_ct["c1"] += 1
-        elif (not gc_subsumes_iso) and ga_subsumes_iso and (not gb_subsumes_iso):
-            iso_ct["r1"] += 1
-        elif (not gc_subsumes_iso) and (not ga_subsumes_iso) and gb_subsumes_iso:
-            iso_ct["c1"] += 1
-        elif (not gc_subsumes_iso) and (not ga_subsumes_iso) and (not gb_subsumes_iso):
-            pass
-        else:
-            raise Exception("Inconsistent classification of subgraph isomorphisms.")
-    return iso_ct
+        args_c = {"query_graph": stripped_gc, "vertex_candidates": vert_cand_c}
+        args_a = {"query_graph": stripped_ga, "vertex_candidates": vert_cand_a}
+        args_b = {"query_graph": stripped_gb, "vertex_candidates": vert_cand_b}
+        o11, r1, c1, n = _frequency_signature(functools.partial(subgraph_enumeration.subsumes_nx, target_graph=gs), args_c, args_a, args_b)
+        ct["o11"] += o11
+        ct["r1"] += r1
+        ct["c1"] += c1
+        ct["n"] += n
+    return ct
 
 
 def subgraphs(gc, ga, gb, gn, gs, candidates=None):
@@ -174,25 +192,14 @@ def subgraphs(gc, ga, gb, gn, gs, candidates=None):
         vert_cand_c = _get_subgraph_vertex_candidates(gc, normal_cand_c, vid_n, vs, v_subgraph)
         vert_cand_a = _get_subgraph_vertex_candidates(ga, normal_cand_a, vid_n, vs, v_subgraph)
         vert_cand_b = _get_subgraph_vertex_candidates(gb, normal_cand_b, vid_n, vs, v_subgraph)
-        subsumed_by_gc = subgraph_enumeration.subsumes_nx(stripped_gc, gs, vertex_candidates=vert_cand_c)
-        subsumed_by_ga = subgraph_enumeration.subsumes_nx(stripped_ga, gs, vertex_candidates=vert_cand_a)
-        subsumed_by_gb = subgraph_enumeration.subsumes_nx(stripped_gb, gs, vertex_candidates=vert_cand_b)
-        ct["n"] += 1
-        if subsumed_by_gc and subsumed_by_ga and subsumed_by_gb:
-            ct["o11"] += 1
-            ct["r1"] += 1
-            ct["c1"] += 1
-        elif (not subsumed_by_gc) and subsumed_by_ga and (not subsumed_by_gb):
-            ct["r1"] += 1
-        elif (not subsumed_by_gc) and (not subsumed_by_ga) and subsumed_by_gb:
-            ct["c1"] += 1
-        elif (not subsumed_by_gc) and subsumed_by_ga and subsumed_by_gb:
-            ct["r1"] += 0.5
-            ct["c1"] += 0.5
-        elif (not subsumed_by_gc) and (not subsumed_by_ga) and (not subsumed_by_gb):
-            pass
-        else:
-            raise Exception("Inconsistent classification of subgraph isomorphisms.")
+        args_c = {"query_graph": stripped_gc, "vertex_candidates": vert_cand_c}
+        args_a = {"query_graph": stripped_ga, "vertex_candidates": vert_cand_a}
+        args_b = {"query_graph": stripped_gb, "vertex_candidates": vert_cand_b}
+        o11, r1, c1, n = _frequency_signature(functools.partial(subgraph_enumeration.subsumes_nx, target_graph=gs), args_c, args_a, args_b)
+        ct["o11"] += o11
+        ct["r1"] += r1
+        ct["c1"] += c1
+        ct["n"] += n
     return ct
 
 
@@ -224,25 +231,14 @@ def choke_points(gc, ga, gb, gn, gs, choke_point):
             normal_cand_a = nx_graph.get_vertex_candidates(stripped_ga, gs)
         if normal_cand_b is None:
             normal_cand_b = nx_graph.get_vertex_candidates(stripped_gb, gs)
-        subsumed_by_gc = subgraph_enumeration.choke_point_subsumes_nx(stripped_gc, gs, choke_c, choke_point_vertex, vertex_candidates=normal_cand_c)
-        subsumed_by_ga = subgraph_enumeration.choke_point_subsumes_nx(stripped_ga, gs, choke_a, choke_point_vertex, vertex_candidates=normal_cand_a)
-        subsumed_by_gb = subgraph_enumeration.choke_point_subsumes_nx(stripped_gb, gs, choke_b, choke_point_vertex, vertex_candidates=normal_cand_b)
-        ct["n"] += 1
-        if subsumed_by_gc and subsumed_by_ga and subsumed_by_gb:
-            ct["o11"] += 1
-            ct["r1"] += 1
-            ct["c1"] += 1
-        elif (not subsumed_by_gc) and subsumed_by_ga and (not subsumed_by_gb):
-            ct["r1"] += 1
-        elif (not subsumed_by_gc) and (not subsumed_by_ga) and subsumed_by_gb:
-            ct["c1"] += 1
-        elif (not subsumed_by_gc) and subsumed_by_ga and subsumed_by_gb:
-            ct["r1"] += 0.5
-            ct["c1"] += 0.5
-        elif (not subsumed_by_gc) and (not subsumed_by_ga) and (not subsumed_by_gb):
-            pass
-        else:
-            raise Exception("Inconsistent classification of choke point vertices.")
+        args_c = {"query_graph": stripped_gc, "choke_point": choke_c, "vertex_candidates": normal_cand_c}
+        args_a = {"query_graph": stripped_ga, "choke_point": choke_a, "vertex_candidates": normal_cand_a}
+        args_b = {"query_graph": stripped_gb, "choke_point": choke_b, "vertex_candidates": normal_cand_b}
+        o11, r1, c1, n = _frequency_signature(functools.partial(subgraph_enumeration.choke_point_subsumes_nx, target_graph=gs, choke_point_candidate=choke_point_vertex), args_c, args_a, args_b)
+        ct["o11"] += o11
+        ct["r1"] += r1
+        ct["c1"] += c1
+        ct["n"] += n
     return ct
 
 
@@ -261,25 +257,14 @@ def sentences(gc, ga, gb, gn, gs, candidates=None):
     ct = {x: 0 for x in ["o11", "r1", "c1", "n"]}
     subsumed_by_n = subgraph_enumeration.subsumes_nx(strip_vid(gn), gs, vertex_candidates=candidates)
     if subsumed_by_n:
-        subsumed_by_gc = subgraph_enumeration.subsumes_nx(strip_vid(gc), gs, vertex_candidates=candidates)
-        subsumed_by_ga = subgraph_enumeration.subsumes_nx(strip_vid(ga), gs, vertex_candidates=candidates)
-        subsumed_by_gb = subgraph_enumeration.subsumes_nx(strip_vid(gb), gs, vertex_candidates=candidates)
-        ct["n"] += 1
-        if subsumed_by_gc and subsumed_by_ga and subsumed_by_gb:
-            ct["o11"] += 1
-            ct["r1"] += 1
-            ct["c1"] += 1
-        elif (not subsumed_by_gc) and subsumed_by_ga and (not subsumed_by_gb):
-            ct["r1"] += 1
-        elif (not subsumed_by_gc) and (not subsumed_by_ga) and subsumed_by_gb:
-            ct["c1"] += 1
-        elif (not subsumed_by_gc) and subsumed_by_ga and subsumed_by_gb:
-            ct["r1"] += 0.5
-            ct["c1"] += 0.5
-        elif (not subsumed_by_gc) and (not subsumed_by_ga) and (not subsumed_by_gb):
-            pass
-        else:
-            raise Exception("Inconsistent classification of choke point vertices.")
+        args_c = {"query_graph": strip_vid(gc)}
+        args_a = {"query_graph": strip_vid(ga)}
+        args_b = {"query_graph": strip_vid(gb)}
+        o11, r1, c1, n = _frequency_signature(functools.partial(subgraph_enumeration.subsumes_nx, target_graph=gs, vertex_candidates=candidates), args_c, args_a, args_b)
+        ct["o11"] += o11
+        ct["r1"] += r1
+        ct["c1"] += c1
+        ct["n"] += n
     return ct
 
 
