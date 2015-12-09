@@ -109,6 +109,8 @@ def choke_point_subsumes_nx(query_graph, target_graph, choke_point, choke_point_
         return False
     if vertex_candidates is None:
         vertex_candidates = nx_graph.get_vertex_candidates(query_graph, target_graph)
+    else:
+        vertex_candidates = copy.deepcopy(vertex_candidates)
     vertex_candidates[choke_point] = vertex_candidates[choke_point].intersection(set([choke_point_candidate]))
     if any([len(cands) == 0 for cands in vertex_candidates]):
         return False
