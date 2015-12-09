@@ -9,10 +9,6 @@ def grouper_nofill(n, iterable):
     """list(grouper_nofill(3, 'ABCDEFG')) --> [['A', 'B', 'C'], ['D', 'E',
     'F'], ['G']]
 
-    Arguments:
-        n:
-        iterable:
-
     """
     it = iter(iterable)
     while True:
