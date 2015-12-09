@@ -49,7 +49,7 @@ def match(query_graph, target_graph, vertex_candidates, index):
     - `index`:
     """
     if index >= query_graph.number_of_nodes():
-        yield tuple([list(cand)[0] for cand in vertex_candidates])
+        yield tuple([next(iter(cand)) for cand in vertex_candidates])
     else:
         query_outgoing = query_graph.out_edges(nbunch=[index], data=True)
         query_incoming = query_graph.in_edges(nbunch=[index], data=True)
@@ -89,7 +89,7 @@ def match_structural(query_graph, target_graph, vertex_candidates, index):
     - `index`:
     """
     if index >= query_graph.number_of_nodes():
-        yield tuple([list(cand)[0] for cand in vertex_candidates])
+        yield tuple([next(iter(cand)) for cand in vertex_candidates])
     else:
         query_outgoing = query_graph.out_edges(nbunch=[index], data=True)
         query_incoming = query_graph.in_edges(nbunch=[index], data=True)
