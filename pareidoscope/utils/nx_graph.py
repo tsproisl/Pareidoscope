@@ -276,7 +276,7 @@ def _get_vertex_tuple(nx_graph, vertex):
     return (root, antiroot, star_center, choke_point, label, indegree, outdegree, inedgelabels, outedgelabels)
 
 
-def _dfs(nx_graph, vertex, vtuples, return_ids=False, blacklist=[]):
+def _dfs(nx_graph, vertex, vtuples, return_ids=False, blacklist=set()):
     """Return vertex tuples in order of depth-first search starting from
     vertex
     
@@ -288,7 +288,7 @@ def _dfs(nx_graph, vertex, vtuples, return_ids=False, blacklist=[]):
     - `blacklist`:
     """
     order = []
-    seen = set(blacklist)
+    seen = blacklist
     agenda = [vertex]
     keyfunc = lambda v: vtuples[v]
     while len(agenda) > 0:
@@ -301,11 +301,11 @@ def _dfs(nx_graph, vertex, vtuples, return_ids=False, blacklist=[]):
         else:
             order.append(vtuples[v])
         successors = sorted([x for x in nx_graph.successors(v) if x not in seen], key=keyfunc)
-        agenda = _get_unique_order(nx_graph, successors, vtuples, blacklist=list(seen)) + agenda
+        agenda = _get_unique_order(nx_graph, successors, vtuples, blacklist=seen) + agenda
     return order
 
 
-def _get_unique_order(nx_graph, sorted_vertices, vtuples, blacklist=[]):
+def _get_unique_order(nx_graph, sorted_vertices, vtuples, blacklist=set()):
     """Resolve any groups within sorted_vertices
     
     Arguments:
