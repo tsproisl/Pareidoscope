@@ -248,7 +248,7 @@ def enumerate_connected_subgraphs_recursive(graph, subgraph, prohibited_edges, n
     for combination in powerset(neighbours, 1, nr_of_vertices - subgraph_size):
         # all combinations of edges
         edges = tuple([powerset(neighbour_edges[vertex], 1, nr_of_edges - subgraph_edges) for vertex in combination])
-        for edge_combi in list(itertools.product(*edges)):
+        for edge_combi in itertools.product(*edges):
             ec = []
             for edges in edge_combi:
                 ec.extend(edges)
@@ -356,7 +356,7 @@ def enumerate_csg_minmax_recursive(graph, subgraph, prohibited_edges, graph_to_r
     for combination in powerset(neighbours, 1):
         # all combinations of edges
         edges = tuple([powerset(neighbour_edges[vertex], 1) for vertex in combination])
-        for edge_combi in list(itertools.product(*edges)):
+        for edge_combi in itertools.product(*edges):
             ec = []
             for edges in edge_combi:
                 ec.extend(edges)
