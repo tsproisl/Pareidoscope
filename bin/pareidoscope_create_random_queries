@@ -73,7 +73,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     groupsize = 5 * 50 * multiprocessing.cpu_count()
-
+    pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
+    
     lemmata = read_lemmata(args.lemmata)
     sents = cwb.sentences_iter(args.corpus)
     sents = (s for s in sents if len(s) >= args.vn + args.dv)
