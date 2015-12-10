@@ -82,8 +82,8 @@ if __name__ == "__main__":
     sents = (s for s in sents if len(s) >= args.vn + args.dv)
     sents = ((s, set([(t[2], t[3]) for t in s]).intersection(lemmata)) for s in sents)
     sents = (s for s in sents if len(s[1]) > 0)
-    # results = pool.imap_unordered(create_query, zip(sents, itertools.repeat((args.vn, args.dv))), 50)
-    results = map(create_query, zip(sents, itertools.repeat((args.vn, args.dv))))
+    results = pool.imap_unordered(create_query, zip(sents, itertools.repeat((args.vn, args.dv))), 50)
+    # results = map(create_query, zip(sents, itertools.repeat((args.vn, args.dv))))
     results = (r for r in results if r is not None)
     for query_graphs in results:
         args.output.write("\t".join(json.dumps(qg) for qg in query_graphs) + "\n")
