@@ -81,9 +81,9 @@ if __name__ == "__main__":
     queries = check_queries(queries)
     queries = derive_gn(queries)
     queries = search_choke_points(queries)
-    for l in queries:
-        for q in l[:-1]:
-            print(nx_graph.export_to_adjacency_matrix(q))
+    # for l in queries:
+    #     for q in l[:-1]:
+    #         print(nx_graph.export_to_adjacency_matrix(q))
     
     results = [{} for q in queries]
     pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
