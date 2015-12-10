@@ -1,0 +1,86 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import argparse
+import collections
+import itertools
+import json
+import multiprocessing
+import random
+
+
+from pareidoscope import subgraph_enumeration
+from pareidoscope import query
+from pareidoscope.utils import cwb
+from pareidoscope.utils import helper
+from pareidoscope.utils import nx_graph
+
+
+def read_lemmata(fh):
+    """"""
+    lemmata = set()
+    for line in fh:
+        lemma, wc = line.strip().split("\t")
+        lemmata.add((lemma, wc))
+    return lemmata
+
+
+def create_query(args):
+    """"""
+    (sentence, lemmata), (vn, dv) = args
+    gs = nx_graph.create_nx_digraph_from_cwb(sentence)
+    target_vertices = set([v for v, l in gs.nodes(data=True) if (l["lemma"], l["wc"]) in lemmata])
+    nr_of_vertices = vn + dv
+    if len(gs.nodes()) < nr_of_vertices:
+        return None
+    # generate all subgraphs with the proper number of vertices
+    subgraphs = subgraph_enumeration.enumerate_csg_minmax(gs, {v: v for v in gs.nodes()}, nr_of_vertices, nr_of_vertices)
+    # remove all subgraphs that do not contain a target vertex
+    subgraphs = (sg for sg in subgraphs if len(set(sg.nodes()) & target_vertices) > 0)
+    subgraphs = list(subgraphs)
+    # pick one subgraph and target vertex at random
+    subgraph = random.choice(subgraphs)
+    local_target = random.choice(list(set(subgraph.nodes()) & target_vertices))
+    # obtain gc
+    gc = nx_graph.skeletize(subgraph, only_vertices=True)
+    for i, v in enumerate(sorted(gc.nodes())):
+        gc.node[v]["vid"] = i
+    gc.node[local_target]["lemma"] = subgraph.node[local_target]["lemma"]
+    gc.node[local_target]["wc"] = subgraph.node[local_target]["wc"]
+    # obtain gb
+    gb = gc.copy()
+    del gb.node[local_target]["lemma"]
+    del gb.node[local_target]["wc"]
+    # obtain ga
+    gc_subgraphs = subgraph_enumeration.enumerate_csg_minmax(gc, {v: v for v in gc.nodes()}, vn, vn)
+    gc_subgraphs = (sg for sg in gc_subgraphs if local_target in set(sg.nodes()))
+    ga = random.choice(list(gc_subgraphs))
+    # export to adjacency matrix
+    gc = nx_graph.export_to_adjacency_matrix(gc, canonical=True)
+    ga = nx_graph.export_to_adjacency_matrix(ga, canonical=True)
+    gb = nx_graph.export_to_adjacency_matrix(gb, canonical=True)
+    return gc, ga, gb
+
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Given a word list and a corpus, create random queries satisfying certain constraints.")
+    parser.add_argument("-c", "--corpus", type=argparse.FileType("r"), required=True, help="Corpus in CWB format")
+    parser.add_argument("-l", "--lemmata", type=argparse.FileType("r"), required=True, help="List of lemmata and word classes, tab-seperated, one per line")
+    parser.add_argument("--vn", type=int, required=True, help="Cardinality of VN")
+    parser.add_argument("--dv", type=int, required=True, help="Delta V, i.e. difference between |VN| and |VC|")
+    parser.add_argument("-o", "--output", type=argparse.FileType("w"), required=True, help="Output file")
+    args = parser.parse_args()
+
+    groupsize = 5 * 50 * multiprocessing.cpu_count()
+
+    lemmata = read_lemmata(args.lemmata)
+    sents = cwb.sentences_iter(args.corpus)
+    sents = (s for s in sents if len(s) >= args.vn + args.dv)
+    sents = ((s, set([(t[2], t[3]) for t in s]).intersection(lemmata)) for s in sents)
+    sents = (s for s in sents if len(s[1]) > 0)
+    results = pool.imap_unordered(create_query, zip(sents, itertools.repeat((args.vn, args.dv))), 50)
+    # results = map(create_query, zip(sents, itertools.repeat((args.vn, args.dv))))
+    results = (r for r in results if r is not None)
+    for query_graphs in results:
+        args.output.write("\t".join(json.dumps(qg) for qg in query_graphs) + "\n")
