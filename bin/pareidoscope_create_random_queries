@@ -29,6 +29,8 @@ def create_query(args):
     """"""
     (sentence, lemmata), (vn, dv) = args
     gs = nx_graph.create_nx_digraph_from_cwb(sentence)
+    if not nx_graph.is_sensible_graph(gs):
+        return None
     target_vertices = set([v for v, l in gs.nodes(data=True) if (l["lemma"], l["wc"]) in lemmata])
     nr_of_vertices = vn + dv
     if len(gs.nodes()) < nr_of_vertices:
