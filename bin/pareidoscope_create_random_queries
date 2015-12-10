@@ -81,6 +81,7 @@ if __name__ == "__main__":
     
     lemmata = read_lemmata(args.lemmata)
     sents = cwb.sentences_iter(args.corpus)
+    sents = helper.sample(sents, 0.01)
     sents = (s for s in sents if len(s) >= args.vn + args.dv)
     sents = ((s, set([(t[2], t[3]) for t in s]).intersection(lemmata)) for s in sents)
     sents = (s for s in sents if len(s[1]) > 0)
