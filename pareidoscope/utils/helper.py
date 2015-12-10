@@ -3,6 +3,7 @@
 
 import itertools
 import math
+import random
 
 
 def grouper_nofill(n, iterable):
@@ -16,6 +17,14 @@ def grouper_nofill(n, iterable):
         if not group:
             return
         yield group
+
+
+def sample(iterable, p):
+    """Return a sample of iterable where each element will be chosen with
+    probability p.
+
+    """
+    return (e for e in iterable if random.random() < p)
 
 
 def get_int_bins(min_value, max_value, nr_of_bins=10):
