@@ -33,7 +33,7 @@ def connect_to_db(filename):
     c.execute("PRAGMA page_size=4096")
     c.execute("PRAGMA cache_size=100000")
     c.execute("CREATE TABLE sentences (sentence_id INTEGER PRIMARY KEY AUTOINCREMENT, original_id TEXT, graph TEXT, UNIQUE (original_id))")
-    c.execute("CREATE TABLE tokens (token_id INTEGER PRIMARY KEY AUTOINCREMENT, sentence_id INTEGER, position INTEGER, word TEXT, pos TEXT, lemma TEXT, wc TEXT, indegree INTEGER, outdegree INTEGER, root BOOLEAN, FOREIGN KEY (sentence_id) REFERENCES sentences (sentence_id) UNIQUE (sentence_id, position))")
+    c.execute("CREATE TABLE tokens (token_id INTEGER PRIMARY KEY AUTOINCREMENT, sentence_id INTEGER, position INTEGER, word TEXT, pos TEXT, lemma TEXT, wc TEXT, indegree INTEGER, outdegree INTEGER, root BOOLEAN, FOREIGN KEY (sentence_id) REFERENCES sentences (sentence_id), UNIQUE (sentence_id, position))")
     c.execute("CREATE TABLE dependencies (governor_id INTEGER, dependent_id INTEGER, relation TEXT, FOREIGN KEY (governor_id) REFERENCES tokens (token_id), FOREIGN KEY (dependent_id) REFERENCES tokens (token_id), UNIQUE (governor_id, dependent_id))")
     c.execute("CREATE INDEX word_idx ON tokens (word)")
     c.execute("CREATE INDEX pos_idx ON tokens (pos)")
