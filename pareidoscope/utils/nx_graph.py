@@ -6,6 +6,7 @@ import re
 
 import networkx
 
+
 def create_nx_digraph(adj_matrix):
     """Return a networkx.DiGraph object of the adjacency matrix."""
     dg = networkx.DiGraph()
@@ -320,10 +321,10 @@ def skeletize(nx_graph, only_vertices=False):
 
 def get_choke_point(nx_graph):
     """Return one of the choke point vertices if there are any.
-    
+
     Arguments:
         nx_graph:
-    
+
     Returns:
         The first root vertex in canonical order. If there aren't
         any, the first antiroot vertex in canonical order. Else the

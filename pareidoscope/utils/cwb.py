@@ -6,7 +6,7 @@ import re
 
 def sentences_iter(corpus, return_id=False):
     """Iterate over the sentences in a corpus.
-    
+
     Arguments:
     - `corpus`:
     """

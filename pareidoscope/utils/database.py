@@ -3,7 +3,6 @@
 
 import functools
 import json
-import operator
 import re
 import sqlite3
 
@@ -60,12 +59,12 @@ def create_sql_query(query_graph):
                     arguments.append(v)
             elif k == "not_indep":
                 for rel_item in v:
-                    for rel in rel_item.split("|"):                
+                    for rel in rel_item.split("|"):
                         where.append("? NOT IN (SELECT relation FROM dependencies WHERE dependent_id = tok_%s.token_id)" % vertex)
                         arguments.append(rel)
             elif k == "not_outdep":
                 for rel_item in v:
-                    for rel in rel_item.split("|"):                
+                    for rel in rel_item.split("|"):
                         where.append("? NOT IN (SELECT relation FROM dependencies WHERE governor_id = tok_%s.token_id)" % vertex)
                         arguments.append(rel)
             else:
@@ -81,7 +80,7 @@ def create_sql_query(query_graph):
 def get_candidates(c, graph):
     """Get candidate tokens for each vertex in the graph from the
     database.
-    
+
     Arguments:
     - `c`: Database cursor
     - `graph`:
@@ -109,7 +108,7 @@ def get_candidates(c, graph):
 def _create_sql_query(graph, v):
     """Create an SQL query for the given node and return a tuple
     consisting of query string and parameters.
-    
+
     Arguments:
     - `graph`:
     - `v`:
@@ -198,7 +197,7 @@ def _create_sql_query(graph, v):
 def might_contain_re(s):
     """Return if the string might contain a regular expression, i.e. any
     non-alphanumeric characters
-    
+
     Arguments:
     - `s`:
 
@@ -209,7 +208,7 @@ def might_contain_re(s):
 
 def regexp(expression, item):
     """Does expression match item?
-    
+
     Arguments:
     - `expression`:
     - `item`:
@@ -222,7 +221,7 @@ def regexp(expression, item):
 def get_structure_candidates(c, graph):
     """Get candidate tokens for each vertex in the graph from the
     database.
-    
+
     Arguments:
     - `c`: Database cursor
     - `graph`:
