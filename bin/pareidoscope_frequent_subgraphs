@@ -24,6 +24,9 @@ def arguments():
     parser = argparse.ArgumentParser(description="Collect frequent subgraphs.")
     parser.add_argument("-c", "--corpus", type=os.path.abspath, required=True, help="SQLite3 corpus database as created by pareidoscope_cwb_to_sqlite")
     parser.add_argument("--db", type=os.path.abspath, required=True, help="SQLite3 database for results")
+    parser.add_argument("--lemma-support", type=int, default=50, help="Minimum lemma support (default: 50)")
+    parser.add_argument("--min", type=int, default=4, help="Minimal number of vertices of the subgraph (default: 4)")
+    parser.add_argument("--max", type=int, default=6, help="Maximal number of vertices of the subgraph (default: 6)")
     parser.add_argument("LEMMATA", type=argparse.FileType("r"), help="A file with one tab-separated lemma-wc pair per line")
     args = parser.parse_args()
     return args
@@ -44,14 +47,15 @@ def get_graph(c, sentence_id):
 
 def get_relevant_subgraphs(args):
     """"""
-    sentence, lemmata = args
+    sentence, lemmata, min_vertices, max_vertices = args
     s = json_graph.node_link_graph(json.loads(sentence))
     local_lemmata = set((l["lemma"], l["wc"]) for v, l in s.nodes(data=True))
     relevant_lemmata = local_lemmata & lemmata
     bfo_graph, bfo_to_raw = subgraph_enumeration.get_bfo(s)
     subgraphs = []
-    for subgraph in subgraph_enumeration.enumerate_csg_minmax_node_induced(bfo_graph, bfo_to_raw, min_vertices=4, max_vertices=min(7, s.number_of_nodes())):
+    for subgraph in subgraph_enumeration.enumerate_csg_minmax_node_induced(bfo_graph, bfo_to_raw, min_vertices=min_vertices, max_vertices=min(max_vertices, s.number_of_nodes())):
         local_lemmata = set((l["lemma"], l["wc"]) for v, l in subgraph.nodes(data=True))
+        # print(" ".join(l["word"] for v, l in subgraph.nodes(data=True)))
         # local_lemmata = sorted((l["lemma"], l["wc"]) for v, l in subgraph.nodes(data=True))
         # print(local_lemmata)
         # print(json.dumps(json_graph.node_link_data(subgraph), ensure_ascii=False))
@@ -74,7 +78,7 @@ def main():
     for line in args.LEMMATA:
         lemma, wc = line.rstrip().split("\t")
         sent_ids = get_sentence_ids_for_lemma_wc(c, lemma, wc)
-        if len(sent_ids) < 5:
+        if len(sent_ids) < args.lemma_support:
             continue
         logging.info("%s (%s): %d" % (lemma, wc, len(sent_ids)))
         lemmata.add((lemma, wc))
@@ -85,7 +89,7 @@ def main():
     graphs = (get_graph(c, sid) for sid in sids)
     for sid, g in zip(sids, graphs):
         print(sid)
-        x = get_relevant_subgraphs((g, lemmata))
+        x = get_relevant_subgraphs((g, lemmata, args.min, args.max))
     # for sentences in helper.grouper_nofill(groupsize, graphs):
     #     print("group")
         #r = pool.imap_unordered(get_relevant_subgraphs, zip(sentences, itertools.repeat(lemmata)))
