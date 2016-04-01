@@ -10,8 +10,10 @@ import os
 
 from networkx.readwrite import json_graph
 
+from pareidoscope import subgraph_enumeration
 from pareidoscope.utils import database
 from pareidoscope.utils import helper
+from pareidoscope.utils import nx_graph
 
 
 logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=logging.INFO)
@@ -46,6 +48,18 @@ def get_relevant_subgraphs(args):
     s = json_graph.node_link_graph(json.loads(sentence))
     local_lemmata = set((l["lemma"], l["wc"]) for v, l in s.nodes(data=True))
     relevant_lemmata = local_lemmata & lemmata
+    bfo_graph, bfo_to_raw = subgraph_enumeration.get_bfo(s)
+    subgraphs = []
+    for subgraph in subgraph_enumeration.enumerate_csg_minmax_node_induced(bfo_graph, bfo_to_raw, min_vertices=4, max_vertices=min(7, s.number_of_nodes())):
+        local_lemmata = set((l["lemma"], l["wc"]) for v, l in subgraph.nodes(data=True))
+        # local_lemmata = sorted((l["lemma"], l["wc"]) for v, l in subgraph.nodes(data=True))
+        # print(local_lemmata)
+        # print(json.dumps(json_graph.node_link_data(subgraph), ensure_ascii=False))
+        # print(nx_graph.export_to_adjacency_matrix(nx_graph.canonize(subgraph)))
+        if len(relevant_lemmata & local_lemmata) > 0:
+            canonical_subgraph = nx_graph.canonize(subgraph)
+            subgraphs.append(json.dumps(json_graph.node_link_data(canonical_subgraph), ensure_ascii=False))
+    return subgraphs
 
 
 def main():
@@ -65,12 +79,18 @@ def main():
         logging.info("%s (%s): %d" % (lemma, wc, len(sent_ids)))
         lemmata.add((lemma, wc))
         sentence_ids.update(sent_ids)
-    graphs = (get_graph(c, sid) for sid in sentence_ids)
-    for sentences in helper.grouper_nofill(groupsize, graphs):
-        print("group")
+    logging.info("checking %d sentences for subgraphs containing any of %d lemmata" % (len(sentence_ids), len(lemmata)))
+    sids = list(sentence_ids)
+    #graphs = (get_graph(c, sid) for sid in sentence_ids)
+    graphs = (get_graph(c, sid) for sid in sids)
+    for sid, g in zip(sids, graphs):
+        print(sid)
+        x = get_relevant_subgraphs((g, lemmata))
+    # for sentences in helper.grouper_nofill(groupsize, graphs):
+    #     print("group")
         #r = pool.imap_unordered(get_relevant_subgraphs, zip(sentences, itertools.repeat(lemmata)))
-        r = map(get_relevant_subgraphs, zip(sentences, itertools.repeat(lemmata)))
-        print(list(r))
+        #r = map(get_relevant_subgraphs, zip(sentences, itertools.repeat(lemmata)))
+        #print(list(r))
     
 
 if __name__ == "__main__":
