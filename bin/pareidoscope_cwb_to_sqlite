@@ -20,6 +20,7 @@ def arguments():
     """"""
     parser = argparse.ArgumentParser(description="Convert a corpus in CWB format into a corresponding SQLite database")
     parser.add_argument("--db", type=os.path.abspath, required=True, help="SQLite3 database for results")
+    parser.add_argument("--no-id", action="store_true", help="Corpus has no unique sentence IDs, create them on the fly")
     parser.add_argument("CORPUS", type=argparse.FileType("r"), help="Corpus in CWB format")
     args = parser.parse_args()
     return args
@@ -70,10 +71,12 @@ def main():
     """"""
     args = arguments()
     conn, c = connect_to_db(args.db)
-    # sents = cwb.sentences_iter(args.CORPUS, return_id=False)
-    # for origid, sentence in enumerate(sents):
+    i = 1
     sents = cwb.sentences_iter(args.CORPUS, return_id=True)
     for sentence, origid in sents:
+        if args.no_id:
+            origid = "s-%d" % i
+            i += 1
         gs = nx_graph.create_nx_digraph_from_cwb(sentence)
         sensible = nx_graph.is_sensible_graph(gs)
         if sensible:
