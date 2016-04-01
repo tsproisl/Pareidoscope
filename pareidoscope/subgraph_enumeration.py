@@ -24,13 +24,13 @@ def get_subgraphs_nx(query_graph, target_graph, vertex_candidates=None):
     for subgraph in enumerate_connected_subgraphs(bfo_graph, bfo_to_raw, query_graph.number_of_nodes(), query_graph.number_of_edges(), vertex_candidates):
         vc = nx_graph.get_vertex_candidates(query_graph, subgraph)
         if match_yes_no(query_graph, subgraph, vc, 0):
-            yield subgraph    
+            yield subgraph
 
 
 def get_subgraphs(query_graph, target_graph):
     """Return a list of subgraphs of target_graph that are isomorphic
     to query_graph
-    
+
     Arguments:
     - `query_graph`: query graph as adjacency matrix
     - `target_graph`: target graph as adjacency matrix
@@ -65,12 +65,12 @@ def subsumes_nx(query_graph, target_graph, vertex_candidates=None):
 def get_choke_point_matches(query_graph, target_graph, choke_point, vertex_candidates=None):
     """Return the vertices from target that match the choke point vertex
     from query.
-    
+
     Arguments:
         query_graph:
         target_graph:
         choke_point:
-    
+
     Returns:
         Vertices from target_graph that correspond to the choke point
         vertex from query_graph.
@@ -104,11 +104,11 @@ def choke_point_subsumes_nx(query_graph, target_graph, choke_point, choke_point_
 def get_bfo(target_graph, fragment=False):
     """Return target_graph in breadth-first-order as well as a mapping of
     vertices.
-    
+
     Arguments:
     - `target_graph`:
     - `fragment`: is target graph a fragment?
-    
+
     Raises:
     - IndexError: No root vertex has been found
 
@@ -130,8 +130,8 @@ def get_bfo(target_graph, fragment=False):
         if vertex in seen_vertices:
             continue
         seen_vertices.add(vertex)
-        edges = target_graph.out_edges(nbunch = [vertex], data = True)
-        edges.sort(key = lambda x: (x[2]["relation"], x[1]))
+        edges = target_graph.out_edges(nbunch=[vertex], data=True)
+        edges.sort(key=lambda x: (x[2]["relation"], x[1]))
         for source, target, label in edges:
             if target not in raw_to_bfo:
                 raw_to_bfo[target] = vertex_counter
@@ -147,13 +147,13 @@ def enumerate_connected_subgraphs(graph, graph_to_raw, nr_of_vertices, nr_of_edg
     """Python reimplementation of my implementation of the following
     algorithm
     (https://mpi-inf.mpg.de/departments/d5/teaching/ss09/queryoptimization/lecture8.pdf):
-    
+
     EnumerateCsg(G)
     for all i ∈ [n − 1, ... , 0] descending {
         emit {v_i};
         EnumerateCsgRec(G , {v_i}, B_i );
     }
-    
+
     EnumerateCsgRec(G, S, X)
     N = N(S) \ X;
     for all S' ⊆ N, S' = ∅, enumerate subsets first {
@@ -162,7 +162,7 @@ def enumerate_connected_subgraphs(graph, graph_to_raw, nr_of_vertices, nr_of_edg
     for all S' ⊆ N, S' = ∅, enumerate subsets first {
         EnumerateCsgRec(G, (S ∪ S'), (X ∪ N));
     }
-    
+
     Perl implementation:
     trunk/ResourcesPareidoscope/Create/hpc_01_collect_dependency_subgraphs.pl
 
@@ -183,12 +183,12 @@ def enumerate_connected_subgraphs(graph, graph_to_raw, nr_of_vertices, nr_of_edg
             continue
         prohibited_edges = set([])
         for v in [u for u in graph.nodes() if u < vertex]:
-            prohibited_edges.update(set(graph.out_edges(nbunch = [v])))
-            prohibited_edges.update(set(graph.in_edges(nbunch = [v])))
+            prohibited_edges.update(set(graph.out_edges(nbunch=[v])))
+            prohibited_edges.update(set(graph.in_edges(nbunch=[v])))
         # prohibit edges that do not connect to vertices from vertex_candidates
         for v in [u for u in graph.nodes() if u >= vertex]:
-            prohibited_edges.update(set([e for e in graph.out_edges(nbunch = [v]) if e[1] not in vertex_candidates]))
-            prohibited_edges.update(set([e for e in graph.in_edges(nbunch = [v]) if e[0] not in vertex_candidates]))
+            prohibited_edges.update(set([e for e in graph.out_edges(nbunch=[v]) if e[1] not in vertex_candidates]))
+            prohibited_edges.update(set([e for e in graph.in_edges(nbunch=[v]) if e[0] not in vertex_candidates]))
         for result in enumerate_connected_subgraphs_recursive(graph, subgraph, prohibited_edges, nr_of_vertices, nr_of_edges, graph_to_raw):
             yield result
 
@@ -200,7 +200,7 @@ def enumerate_connected_subgraphs_recursive(graph, subgraph, prohibited_edges, n
     subgraph_size = subgraph.number_of_nodes()
     subgraph_edges = subgraph.number_of_edges()
     for vertex in subgraph.nodes():
-        for e in graph.out_edges(nbunch = [vertex]):
+        for e in graph.out_edges(nbunch=[vertex]):
             if e in prohibited_edges:
                 continue
             out_edges.add(e)
@@ -208,7 +208,7 @@ def enumerate_connected_subgraphs_recursive(graph, subgraph, prohibited_edges, n
             if e[1] not in neighbour_edges:
                 neighbour_edges[e[1]] = []
             neighbour_edges[e[1]].append(e)
-        for e in graph.in_edges(nbunch = [vertex]):
+        for e in graph.in_edges(nbunch=[vertex]):
             if e in prohibited_edges:
                 continue
             in_edges.add(e)
@@ -231,7 +231,7 @@ def enumerate_connected_subgraphs_recursive(graph, subgraph, prohibited_edges, n
             # edges between new vertices
             new_edges = set([])
             for new_vertex in new_vertices:
-                new_edges.update([e for e in graph.out_edges(nbunch = [new_vertex]) if e[1] in new_vertices])
+                new_edges.update([e for e in graph.out_edges(nbunch=[new_vertex]) if e[1] in new_vertices])
             for new_edge_combi in powerset(new_edges, 0, nr_of_edges - (subgraph_edges + len(ec))):
                 nec = list(new_edge_combi)
                 local_subgraph = subgraph.copy()
@@ -256,13 +256,13 @@ def enumerate_connected_subgraphs_recursive(graph, subgraph, prohibited_edges, n
 def enumerate_csg_minmax(graph, graph_to_raw, min_vertices=2, max_vertices=5):
     """Based on
     https://mpi-inf.mpg.de/departments/d5/teaching/ss09/queryoptimization/lecture8.pdf:
-    
+
     EnumerateCsg(G)
     for all i ∈ [n − 1, ... , 0] descending {
         emit {v_i};
         EnumerateCsgRec(G , {v_i}, B_i );
     }
-    
+
     EnumerateCsgRec(G, S, X)
     N = N(S) \ X;
     for all S' ⊆ N, S' = ∅, enumerate subsets first {
@@ -291,10 +291,9 @@ def enumerate_csg_minmax_recursive(graph, subgraph, prohibited_edges, graph_to_r
     """See enumerate_connected_subgraphs()"""
     out_edges, in_edges, neighbours = set([]), set([]), set([])
     neighbour_edges = {}
-    subgraph_size = subgraph.number_of_nodes()
     subgraph_edges = subgraph.number_of_edges()
     for vertex in subgraph.nodes():
-        for e in graph.out_edges(nbunch = [vertex]):
+        for e in graph.out_edges(nbunch=[vertex]):
             if e in prohibited_edges:
                 continue
             out_edges.add(e)
@@ -302,7 +301,7 @@ def enumerate_csg_minmax_recursive(graph, subgraph, prohibited_edges, graph_to_r
             if e[1] not in neighbour_edges:
                 neighbour_edges[e[1]] = []
             neighbour_edges[e[1]].append(e)
-        for e in graph.in_edges(nbunch = [vertex]):
+        for e in graph.in_edges(nbunch=[vertex]):
             if e in prohibited_edges:
                 continue
             in_edges.add(e)
@@ -345,7 +344,7 @@ def enumerate_csg_minmax_recursive(graph, subgraph, prohibited_edges, graph_to_r
                         yield result
 
 
-def powerset(iterable, min_size, max_size = -1):
+def powerset(iterable, min_size, max_size=-1):
     """(Partial) powerset of set with at most max_size elements."""
     s = list(iterable)
     if max_size == -1:
@@ -361,8 +360,8 @@ def powerset(iterable, min_size, max_size = -1):
 def return_corpus_order(subgraph, bfo_to_raw):
     """"""
     corpus_order = networkx.DiGraph()
-    corpus_order.add_nodes_from([(bfo_to_raw[v], l) for v, l in subgraph.nodes(data = True)])
-    corpus_order.add_edges_from([(bfo_to_raw[s], bfo_to_raw[t], l) for s, t, l in subgraph.edges(data = True)])
+    corpus_order.add_nodes_from([(bfo_to_raw[v], l) for v, l in subgraph.nodes(data=True)])
+    corpus_order.add_edges_from([(bfo_to_raw[s], bfo_to_raw[t], l) for s, t, l in subgraph.edges(data=True)])
     return corpus_order
 
 
@@ -395,6 +394,6 @@ def match_yes_no(query_graph, target_graph, vertex_candidates, index):
         if any([len(x) == 0 for x in local_candidates]):
             continue
         local_result = match_yes_no(query_graph, target_graph, local_candidates, index + 1)
-        if local_result == True:
+        if local_result is True:
             return True
     return False
