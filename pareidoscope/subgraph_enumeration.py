@@ -156,10 +156,10 @@ def enumerate_connected_subgraphs(graph, graph_to_raw, nr_of_vertices, nr_of_edg
 
     EnumerateCsgRec(G, S, X)
     N = N(S) \ X;
-    for all S' ⊆ N, S' = ∅, enumerate subsets first {
+    for all S' ⊆ N, S' ≠ ∅, enumerate subsets first {
         emit (S ∪ S');
     }
-    for all S' ⊆ N, S' = ∅, enumerate subsets first {
+    for all S' ⊆ N, S' ≠ ∅, enumerate subsets first {
         EnumerateCsgRec(G, (S ∪ S'), (X ∪ N));
     }
 
@@ -265,10 +265,10 @@ def enumerate_csg_minmax(graph, graph_to_raw, min_vertices=2, max_vertices=5):
 
     EnumerateCsgRec(G, S, X)
     N = N(S) \ X;
-    for all S' ⊆ N, S' = ∅, enumerate subsets first {
+    for all S' ⊆ N, S' ≠ ∅, enumerate subsets first {
         emit (S ∪ S');
     }
-    for all S' ⊆ N, S' = ∅, enumerate subsets first {
+    for all S' ⊆ N, S' ≠ ∅, enumerate subsets first {
         EnumerateCsgRec(G, (S ∪ S'), (X ∪ N));
     }
 
@@ -342,6 +342,42 @@ def enumerate_csg_minmax_recursive(graph, subgraph, prohibited_edges, graph_to_r
                 if nr_of_subgraph_vertices < max_vertices:
                     for result in enumerate_csg_minmax_recursive(graph, local_subgraph, prohibited_edges.union(in_edges, out_edges, new_edges), graph_to_raw, min_vertices, max_vertices):
                         yield result
+
+
+def enumerate_csg_minmax_node_induced(graph, graph_to_raw, min_vertices=2, max_vertices=5):
+    """Enumerate all connected subgraphs of graph with at least
+    min_vertices and at most max_vertices that are induced from a
+    subset of its vertices (i.e. that include all edges between the
+    vertices).
+
+    """
+    for vertex in sorted(graph.nodes(), reverse=True):
+        vertices = set([vertex])
+        nr_of_subgraph_vertices = len(vertices)
+        if min_vertices <= nr_of_subgraph_vertices <= max_vertices:
+            subgraph = graph.subgraph(vertices)
+            yield return_corpus_order(subgraph, graph_to_raw)
+        prohibited_vertices = set([v for v in graph.nodes() if v <= vertex])
+        for result in enumerate_csg_minmax_node_induced_recursive(graph, vertices, prohibited_vertices, graph_to_raw, min_vertices, max_vertices):
+            yield result
+
+
+def enumerate_csg_minmax_node_induced_recursive(graph, vertices, prohibited_vertices, graph_to_raw, min_vertices, max_vertices):
+    """See enumerate_connected_subgraphs()"""
+    neighbours = set()
+    for vertex in vertices:
+        neighbours.update(set(graph.successors(vertex)))
+        neighbours.update(set(graph.predecessors(vertex)))
+    neighbours.difference_update(prohibited_vertices | vertices)
+    for subset in powerset(neighbours, 1):
+        local_vertices = vertices | set(subset)
+        nr_of_subgraph_vertices = len(local_vertices)
+        if min_vertices <= nr_of_subgraph_vertices <= max_vertices:
+            local_subgraph = graph.subgraph(local_vertices)
+            yield return_corpus_order(local_subgraph, graph_to_raw)
+        if nr_of_subgraph_vertices < max_vertices:
+            for result in enumerate_csg_minmax_node_induced_recursive(graph, local_vertices, prohibited_vertices | neighbours, graph_to_raw, min_vertices, max_vertices):
+                yield result
 
 
 def powerset(iterable, min_size, max_size=-1):
