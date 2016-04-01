@@ -1,0 +1,77 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import argparse
+import itertools
+import json
+import logging
+import multiprocessing
+import os
+
+from networkx.readwrite import json_graph
+
+from pareidoscope.utils import database
+from pareidoscope.utils import helper
+
+
+logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=logging.INFO)
+
+
+def arguments():
+    """"""
+    parser = argparse.ArgumentParser(description="Collect frequent subgraphs.")
+    parser.add_argument("-c", "--corpus", type=os.path.abspath, required=True, help="SQLite3 corpus database as created by pareidoscope_cwb_to_sqlite")
+    parser.add_argument("--db", type=os.path.abspath, required=True, help="SQLite3 database for results")
+    parser.add_argument("LEMMATA", type=argparse.FileType("r"), help="A file with one tab-separated lemma-wc pair per line")
+    args = parser.parse_args()
+    return args
+
+
+def get_sentence_ids_for_lemma_wc(c, lemma, wc):
+    """Return the IDs of the sentences in which the given lemma-wc
+    combination occurs.
+
+    """
+    return [_[0] for _ in c.execute("SELECT DISTINCT sentence_id FROM tokens WHERE lemma=? AND wc=?", (lemma, wc)).fetchall()]
+
+
+def get_graph(c, sentence_id):
+    """Return the graph representation of the given sentence."""
+    return c.execute("SELECT graph FROM sentences WHERE sentence_id=?", (sentence_id, )).fetchall()[0][0]
+
+
+def get_relevant_subgraphs(args):
+    """"""
+    sentence, lemmata = args
+    s = json_graph.node_link_graph(json.loads(sentence))
+    local_lemmata = set((l["lemma"], l["wc"]) for v, l in s.nodes(data=True))
+    relevant_lemmata = local_lemmata & lemmata
+
+
+def main():
+    """"""
+    args = arguments()
+    conn, c = database.connect_to_database(args.corpus)
+    #groupsize = 50 * 10 * multiprocessing.cpu_count()
+    groupsize = 5
+    pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
+    lemmata = set()
+    sentence_ids = set()
+    for line in args.LEMMATA:
+        lemma, wc = line.rstrip().split("\t")
+        sent_ids = get_sentence_ids_for_lemma_wc(c, lemma, wc)
+        if len(sent_ids) < 5:
+            continue
+        logging.info("%s (%s): %d" % (lemma, wc, len(sent_ids)))
+        lemmata.add((lemma, wc))
+        sentence_ids.update(sent_ids)
+    graphs = (get_graph(c, sid) for sid in sentence_ids)
+    for sentences in helper.grouper_nofill(groupsize, graphs):
+        print("group")
+        #r = pool.imap_unordered(get_relevant_subgraphs, zip(sentences, itertools.repeat(lemmata)))
+        r = map(get_relevant_subgraphs, zip(sentences, itertools.repeat(lemmata)))
+        print(list(r))
+    
+
+if __name__ == "__main__":
+    main()
