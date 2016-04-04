@@ -2,11 +2,13 @@
 # -*- coding: utf-8 -*-
 
 import argparse
+import collections
 import itertools
 import json
 import logging
 import multiprocessing
 import os
+import sqlite3
 
 from networkx.readwrite import json_graph
 
@@ -25,11 +27,27 @@ def arguments():
     parser.add_argument("-c", "--corpus", type=os.path.abspath, required=True, help="SQLite3 corpus database as created by pareidoscope_cwb_to_sqlite")
     parser.add_argument("--db", type=os.path.abspath, required=True, help="SQLite3 database for results")
     parser.add_argument("--lemma-support", type=int, default=50, help="Minimum lemma support (default: 50)")
+    parser.add_argument("--subgraph-support", type=int, default=5, help="Minimum subgraph support (default: 10)")
     parser.add_argument("--min", type=int, default=4, help="Minimal number of vertices of the subgraph (default: 4)")
     parser.add_argument("--max", type=int, default=6, help="Maximal number of vertices of the subgraph (default: 6)")
     parser.add_argument("LEMMATA", type=argparse.FileType("r"), help="A file with one tab-separated lemma-wc pair per line")
     args = parser.parse_args()
     return args
+
+
+def connect_to_output_db(filename):
+    """Connect to database, create tables and indexes and return
+    connection and cursor."""
+    conn = sqlite3.connect(filename)
+    c = conn.cursor()
+    c.execute("PRAGMA page_size=4096")
+    c.execute("PRAGMA cache_size=100000")
+    c.execute("CREATE TABLE lemmata (lemma_id INTEGER PRIMARY KEY AUTOINCREMENT, lemma TEXT, wc TEXT, UNIQUE (lemma, wc))")
+    c.execute("CREATE TABLE graphs (graph_id INTEGER PRIMARY KEY AUTOINCREMENT, lemma_id INTEGER, graph TEXT, size INTEGER, frequency INTEGER, FOREIGN KEY (lemma_id) REFERENCES lemmata (lemma_id), UNIQUE (lemma_id, graph))")
+    c.execute("CREATE INDEX graph_idx ON graphs (graph)")
+    c.execute("CREATE INDEX frequency_idx ON graphs (frequency)")
+    c.execute("CREATE INDEX size_idx ON graphs (size)")
+    return conn, c
 
 
 def get_sentence_ids_for_lemma_wc(c, lemma, wc):
@@ -47,12 +65,13 @@ def get_graph(c, sentence_id):
 
 def get_relevant_subgraphs(args):
     """"""
-    sentence, lemmata, min_vertices, max_vertices = args
+    sentence, lemma, min_vertices, max_vertices = args
     s = json_graph.node_link_graph(json.loads(sentence))
     local_lemmata = set((l["lemma"], l["wc"]) for v, l in s.nodes(data=True))
-    relevant_lemmata = local_lemmata & lemmata
-    bfo_graph, bfo_to_raw = subgraph_enumeration.get_bfo(s)
     subgraphs = []
+    if lemma not in local_lemmata:
+        return subgraphs
+    bfo_graph, bfo_to_raw = subgraph_enumeration.get_bfo(s)
     for subgraph in subgraph_enumeration.enumerate_csg_minmax_node_induced(bfo_graph, bfo_to_raw, min_vertices=min_vertices, max_vertices=min(max_vertices, s.number_of_nodes())):
         local_lemmata = set((l["lemma"], l["wc"]) for v, l in subgraph.nodes(data=True))
         # print(" ".join(l["word"] for v, l in subgraph.nodes(data=True)))
@@ -60,42 +79,43 @@ def get_relevant_subgraphs(args):
         # print(local_lemmata)
         # print(json.dumps(json_graph.node_link_data(subgraph), ensure_ascii=False))
         # print(nx_graph.export_to_adjacency_matrix(nx_graph.canonize(subgraph)))
-        if len(relevant_lemmata & local_lemmata) > 0:
+        if lemma in local_lemmata:
             canonical_subgraph = nx_graph.canonize(subgraph)
-            subgraphs.append(json.dumps(json_graph.node_link_data(canonical_subgraph), ensure_ascii=False))
-    return subgraphs
+            subgraphs.append((json.dumps(json_graph.node_link_data(canonical_subgraph), ensure_ascii=False, sort_keys=True), subgraph.number_of_nodes()))
+    return list(set(subgraphs))
 
 
 def main():
     """"""
     args = arguments()
     conn, c = database.connect_to_database(args.corpus)
-    #groupsize = 50 * 10 * multiprocessing.cpu_count()
-    groupsize = 5
+    out_conn, out_c = connect_to_output_db(args.db)
+    groupsize = 50 * 10 * multiprocessing.cpu_count()
+    # groupsize = 5
     pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
-    lemmata = set()
-    sentence_ids = set()
     for line in args.LEMMATA:
         lemma, wc = line.rstrip().split("\t")
         sent_ids = get_sentence_ids_for_lemma_wc(c, lemma, wc)
-        if len(sent_ids) < args.lemma_support:
-            continue
         logging.info("%s (%s): %d" % (lemma, wc, len(sent_ids)))
-        lemmata.add((lemma, wc))
-        sentence_ids.update(sent_ids)
-    logging.info("checking %d sentences for subgraphs containing any of %d lemmata" % (len(sentence_ids), len(lemmata)))
-    sids = list(sentence_ids)
-    #graphs = (get_graph(c, sid) for sid in sentence_ids)
-    graphs = (get_graph(c, sid) for sid in sids)
-    for sid, g in zip(sids, graphs):
-        print(sid)
-        x = get_relevant_subgraphs((g, lemmata, args.min, args.max))
-    # for sentences in helper.grouper_nofill(groupsize, graphs):
-    #     print("group")
-        #r = pool.imap_unordered(get_relevant_subgraphs, zip(sentences, itertools.repeat(lemmata)))
-        #r = map(get_relevant_subgraphs, zip(sentences, itertools.repeat(lemmata)))
-        #print(list(r))
-    
+        if len(sent_ids) < args.lemma_support:
+            logging.info("skipping")
+            continue
+        out_c.execute("INSERT INTO lemmata (lemma, wc) VALUES (?, ?)", (lemma, wc))
+        lemma_id = out_c.execute("SELECT lemma_id FROM lemmata WHERE lemma=? AND wc=?", (lemma, wc)).fetchall()[0][0]
+        graphs = (get_graph(c, sid) for sid in sent_ids)
+        graph_frequencies = collections.Counter()
+        for sentences in helper.grouper_nofill(groupsize, graphs):
+            r = pool.imap_unordered(get_relevant_subgraphs, zip(sentences, itertools.repeat((lemma, wc)), itertools.repeat(args.min), itertools.repeat(args.max)))
+            # r = map(get_relevant_subgraphs, zip(sentences, itertools.repeat((lemma, wc)), itertools.repeat(args.min), itertools.repeat(args.max)))
+            for subgraphs in r:
+                graph_frequencies.update(subgraphs)
+        for graph, frequency in graph_frequencies.items():
+            if frequency < args.subgraph_support:
+                continue
+            out_c.execute("INSERT INTO graphs (lemma_id, graph, size, frequency) VALUES (?, ?, ?, ?)", (lemma_id, graph[0], graph[1], frequency))
+        out_conn.commit()
+    out_conn.close()
+
 
 if __name__ == "__main__":
     main()
