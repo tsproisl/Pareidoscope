@@ -80,6 +80,9 @@ def get_relevant_subgraphs(args):
         # print(json.dumps(json_graph.node_link_data(subgraph), ensure_ascii=False))
         # print(nx_graph.export_to_adjacency_matrix(nx_graph.canonize(subgraph)))
         if lemma in local_lemmata:
+            for v in subgraph.nodes():
+                if "root" in subgraph.node[v]:
+                    del subgraph.node[v]["root"]
             canonical_subgraph = nx_graph.canonize(subgraph)
             subgraphs.append((json.dumps(json_graph.node_link_data(canonical_subgraph), ensure_ascii=False, sort_keys=True), subgraph.number_of_nodes()))
     return list(set(subgraphs))
