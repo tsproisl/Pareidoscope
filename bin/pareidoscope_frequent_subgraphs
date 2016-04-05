@@ -107,12 +107,13 @@ def main():
         lemma_id = out_c.execute("SELECT lemma_id FROM lemmata WHERE lemma=? AND wc=?", (lemma, wc)).fetchall()[0][0]
         graphs = (get_graph(c, sid) for sid in sent_ids)
         graph_frequencies = collections.Counter()
-        with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
-            for sentences in helper.grouper_nofill(groupsize, graphs):
-                r = pool.imap_unordered(get_relevant_subgraphs, zip(sentences, itertools.repeat((lemma, wc)), itertools.repeat(args.min), itertools.repeat(args.max)))
-                # r = map(get_relevant_subgraphs, zip(sentences, itertools.repeat((lemma, wc)), itertools.repeat(args.min), itertools.repeat(args.max)))
-                for subgraphs in r:
-                    graph_frequencies.update(subgraphs)
+        pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
+        for sentences in helper.grouper_nofill(groupsize, graphs):
+            r = pool.imap_unordered(get_relevant_subgraphs, zip(sentences, itertools.repeat((lemma, wc)), itertools.repeat(args.min), itertools.repeat(args.max)))
+            # r = map(get_relevant_subgraphs, zip(sentences, itertools.repeat((lemma, wc)), itertools.repeat(args.min), itertools.repeat(args.max)))
+            for subgraphs in r:
+                graph_frequencies.update(subgraphs)
+        pool.close()
         for graph, frequency in graph_frequencies.items():
             if frequency < args.subgraph_support:
                 continue
