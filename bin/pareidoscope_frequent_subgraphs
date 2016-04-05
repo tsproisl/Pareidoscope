@@ -89,7 +89,8 @@ def main():
     """"""
     args = arguments()
     conn, c = database.connect_to_database(args.corpus)
-    out_conn, out_c = connect_to_output_db(args.db)
+    # out_conn, out_c = connect_to_output_db(args.db)
+    out_conn, out_c = database.connect_to_database(args.db)
     groupsize = 50 * 10 * multiprocessing.cpu_count()
     # groupsize = 5
     pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
