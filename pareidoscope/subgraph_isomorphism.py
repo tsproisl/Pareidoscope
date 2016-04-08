@@ -22,7 +22,7 @@ def get_subgraph_isomorphisms_nx(query_graph, target_graph, vertex_candidates=No
 def get_subgraph_isomorphisms(query_graph, target_graph):
     """Return a list of isomorphisms that map vertices and edges from
     query_graph to vertices and edges from target_graph.
-    
+
     Arguments:
     - `query_graph`: query graph as adjacency matrix
     - `target_graph`: target graph as adjacency matrix
