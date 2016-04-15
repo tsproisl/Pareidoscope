@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import copy
 import functools
 import json
-import operator
 
 import networkx
 from networkx.readwrite import json_graph
@@ -79,7 +77,7 @@ def strip_vid(graph):
     for vertex in copy.nodes():
         del copy.node[vertex]["vid"]
     return copy
-    
+
 
 def _get_isomorphism_vertex_candidates(query_graph, normal_candidates, v_target, v_isomorphism, vid_to_iso):
     """Return vertex candidates that are compatible with isomorphism."""
@@ -122,7 +120,7 @@ def _frequency_signature(subsumes, args_c, args_a, args_b):
 
 def isomorphisms(gc, ga, gb, gn, gs, candidates=None):
     """Count isomorphisms
-    
+
     Arguments:
     - `go11`:
     - `gr1`:
@@ -132,7 +130,7 @@ def isomorphisms(gc, ga, gb, gn, gs, candidates=None):
     - `candidates`:
 
     """
-    vid_to_gn = {l["vid"]: v for v, l in gn.nodes(data=True)}
+    # vid_to_gn = {l["vid"]: v for v, l in gn.nodes(data=True)}
     ct = {x: 0 for x in ["o11", "r1", "c1", "n"]}
     vs = set(gs.nodes())
     stripped_gc = strip_vid(gc)
@@ -164,7 +162,7 @@ def isomorphisms(gc, ga, gb, gn, gs, candidates=None):
 
 def subgraphs(gc, ga, gb, gn, gs, candidates=None):
     """Count subgraphs
-    
+
     Arguments:
     - `go11`:
     - `gr1`:
@@ -205,7 +203,7 @@ def subgraphs(gc, ga, gb, gn, gs, candidates=None):
 
 def choke_points(gc, ga, gb, gn, gs, choke_point):
     """Count choke points
-    
+
     Arguments:
     - `go11`:
     - `gr1`:
@@ -244,7 +242,7 @@ def choke_points(gc, ga, gb, gn, gs, choke_point):
 
 def sentences(gc, ga, gb, gn, gs, candidates=None):
     """Count sentences
-    
+
     Arguments:
     - `go11`:
     - `gr1`:
@@ -271,7 +269,7 @@ def sentences(gc, ga, gb, gn, gs, candidates=None):
 def run_queries(args):
     """Run queries on graphs from input_queue and write output to
     output_queue.
-    
+
     Arguments:
     - `args`:
     """
@@ -302,7 +300,7 @@ def run_queries(args):
 def run_queries_db(args):
     """Run queries on graphs from input_queue and write output to
     output_queue.
-    
+
     Arguments:
     - `args`:
     """
@@ -322,7 +320,7 @@ def run_queries_db(args):
 
 def merge_result(result, results):
     """Merge result with results
-    
+
     Arguments:
     - `result`:
     - `results`:
@@ -337,7 +335,7 @@ def merge_result(result, results):
 
 def merge_result_db(result, query_number, results):
     """Merge result with results
-    
+
     Arguments:
     - `query`:
     - `query_number`:
