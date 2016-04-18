@@ -8,35 +8,39 @@ import math
 import multiprocessing
 import random
 
-import pareidoscope.query
+from networkx.readwrite import json_graph
+
+import pareidoscope.query_new
 from pareidoscope.utils import cwb
 from pareidoscope.utils import helper
 from pareidoscope.utils import nx_graph
 
 
+def arguments():
+    """"""
+    parser = argparse.ArgumentParser(description='Run a batch of queries against a corpus')
+    parser.add_argument("-c", "--corpus", type=argparse.FileType("r"), required=True, help="Corpus in CWB format")
+    parser.add_argument("-o", "--output", type=str, required=True, help="Output prefix")
+    parser.add_argument("QUERIES", type=argparse.FileType("r"), help="Queries file with one graph per line and vertices marked as belonging to A, B or both (AB)")
+    return parser.parse_args()
+
+
 def read_queries(queries_file):
     """Read all queries."""
-    queries = [line.rstrip("\n").split("\t") for line in queries_file if not (line.startswith("#") or line == "\n")]
-    queries = [[nx_graph.create_nx_digraph(json.loads(q)) for q in l] for l in queries]
-    return queries
+    for line in queries_file:
+        if line.startswith("#") or line == "\n":
+            continue
+        yield json_graph.node_link_graph(json.loads(line))
 
 
-def check_queries(queries):
-    """Do a sanity check on all queries."""
-    queries = [q for q in queries if pareidoscope.query.sanity_check_c_a_b(*q)]
-    return queries
-
-
-def derive_gn(queries):
-    """For all queries, derive gn from gc, ga and gb."""
-    queries = [q + [pareidoscope.query.get_n_from_c_a_b(*q)] for q in queries]
-    return queries
-
-
-def search_choke_points(queries):
-    """Search for choke point vertices"""
-    queries = [q + [nx_graph.get_choke_point(q[3])] for q in queries]
-    return queries
+def extract_graphs(query):
+    """Extract query graphs for A, B and N"""
+    a = query.subgraph([v for v, l in query.nodes(data=True) if l["query"] == "A"])
+    b = query.subgraph([v for v, l in query.nodes(data=True) if l["query"] == "B"])
+    n = query.subgraph([v for v, l in query.nodes(data=True) if l["query"] == "AB"])
+    for v, l in query.nodes(data=True):
+        del l["query"]
+    return a, b, query, n
 
 
 def write_results(prefix, results):
@@ -66,41 +70,42 @@ def write_results(prefix, results):
                 mi = math.log(s["o11"]/float(e11), 2)
                 fh.write("%d\t%f\n" % (i+1, mi))
 
+
+def main():
+    """"""
+    args = arguments()
+    queries = list(read_queries(args.QUERIES))[:10]
+    queries = (extract_graphs(q) for q in queries)
+
+    for a, b, c, n in queries:
+        focus_point = nx_graph.get_choke_point(n)
+        print(json.dumps(json_graph.node_link_data(n), ensure_ascii=False, sort_keys=True))
+        
+    
+    # groupsize = 5 * 50 * multiprocessing.cpu_count()
+    
+    
+    # results = [{} for q in queries]
+    # pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
+    # # sents = cwb.sentences_iter(args.corpus)
+    # # # for testing purposes only:
+    # # # sents = helper.sample(sents, 0.0005)
+    # # for sentences in helper.grouper_nofill(groupsize, sents):
+    # #     r = pool.imap_unordered(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(queries)), 50)
+    # #     # r = list(map(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(queries))))
+    # #     for result, sensible in r:
+    # #         if sensible:
+    # #             pareidoscope.query.merge_result(result, results)
+    # # write_results(args.output, results)
+
+    # sentences = cwb.sentences_iter(args.corpus)
+    # r = pool.imap_unordered(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(queries)), 50)
+    # for result, sensible in r:
+    #     if sensible:
+    #         pareidoscope.query.merge_result(result, results)
+    # write_results(args.output, results)
+
                 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Run a batch of queries against a corpus')
-    parser.add_argument("-c", "--corpus", type=argparse.FileType("r"), required=True, help="Corpus in CWB format")
-    parser.add_argument("-o", "--output", type=str, required=True, help="Output prefix")
-    parser.add_argument("QUERIES", type=argparse.FileType("r"), help="Queries file with G_C\tG_A\tG_B")
-    args = parser.parse_args()
-
-    groupsize = 5 * 50 * multiprocessing.cpu_count()
-    
-    queries = read_queries(args.QUERIES)
-    queries = check_queries(queries)
-    queries = derive_gn(queries)
-    queries = search_choke_points(queries)
-    # for l in queries:
-    #     for q in l[:-1]:
-    #         print(nx_graph.export_to_adjacency_matrix(q))
-    
-    results = [{} for q in queries]
-    pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
-    # sents = cwb.sentences_iter(args.corpus)
-    # # for testing purposes only:
-    # # sents = helper.sample(sents, 0.0005)
-    # for sentences in helper.grouper_nofill(groupsize, sents):
-    #     r = pool.imap_unordered(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(queries)), 50)
-    #     # r = list(map(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(queries))))
-    #     for result, sensible in r:
-    #         if sensible:
-    #             pareidoscope.query.merge_result(result, results)
-    # write_results(args.output, results)
-
-    sentences = cwb.sentences_iter(args.corpus)
-    r = pool.imap_unordered(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(queries)), 50)
-    for result, sensible in r:
-        if sensible:
-            pareidoscope.query.merge_result(result, results)
-    write_results(args.output, results)
+    main()
