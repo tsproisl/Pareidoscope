@@ -42,7 +42,7 @@ def _extract_stars(graph, vertex, edge_stars, skel_stars, edge_to_skel={}, inclu
         edge_star, order = nx_graph.canonize(edge_star, order=True)
         edge_center = order.index(vertex)
         edge_t = tuple(networkx.generate_edgelist(edge_star, data=["relation"]))
-        edge_string = json.dumps(list(edge_t), ensure_ascii=False)
+        edge_string = json.dumps(list(edge_t), ensure_ascii=False, sort_keys=True)
         edge_star_key = (edge_string, edge_center, pos, wc) if include_pos else (edge_string, edge_center)
         if edge_star_key not in edge_stars:
             edge_stars[edge_star_key] = {"length": length, "degree_sequence": degree_sequence, "sorted_edges": sorted_edges, "star_freq": 1, "center_set": set([vertex])}
@@ -53,7 +53,7 @@ def _extract_stars(graph, vertex, edge_stars, skel_stars, edge_to_skel={}, inclu
         skel_star, order = nx_graph.canonize(skel_star, order=True)
         skel_center = order.index(vertex)
         skel_t = tuple(networkx.generate_edgelist(skel_star))
-        skel_string = json.dumps(list(skel_t), ensure_ascii=False)
+        skel_string = json.dumps(list(skel_t), ensure_ascii=False, sort_keys=True)
         if (skel_string, skel_center) not in skel_stars:
             skel_stars[(skel_string, skel_center)] = {"length": length, "degree_sequence": degree_sequence, "star_freq": 1, "center_set": set([vertex])}
         else:

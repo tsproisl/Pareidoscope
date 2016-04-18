@@ -77,7 +77,7 @@ def get_relevant_subgraphs(args):
         # print(" ".join(l["word"] for v, l in subgraph.nodes(data=True)))
         # local_lemmata = sorted((l["lemma"], l["wc"]) for v, l in subgraph.nodes(data=True))
         # print(local_lemmata)
-        # print(json.dumps(json_graph.node_link_data(subgraph), ensure_ascii=False))
+        # print(json.dumps(json_graph.node_link_data(subgraph), ensure_ascii=False, sort_keys=True))
         # print(nx_graph.export_to_adjacency_matrix(nx_graph.canonize(subgraph)))
         if lemma in local_lemmata:
             for v in subgraph.nodes():

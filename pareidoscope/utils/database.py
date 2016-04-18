@@ -232,7 +232,7 @@ def get_structure_candidates(c, graph):
     candidates = {}
     canonized, order = nx_graph.canonize(skel, order=True)
     length = len(order)
-    subgraph = json.dumps(list(networkx.generate_adjlist(canonized)))
+    subgraph = json.dumps(list(networkx.generate_adjlist(canonized)), ensure_ascii=False, sort_keys=True)
     subgraphid = c.execute("SELECT subgraphid FROM subgraphs WHERE subgraph=?", (subgraph,)).fetchall()
     if subgraphid == []:
         for row in c.execute("SELECT subgraphid, subgraph FROM subgraphs WHERE length=?", (length,)):

@@ -88,7 +88,7 @@ def tupleize(stuple):
     sensible = nx_graph.is_sensible_graph(gs)
     result = {}
     result["tokens"] = {}
-    result["graph"] = json.dumps(json_graph.node_link_data(gs), ensure_ascii=False)
+    result["graph"] = json.dumps(json_graph.node_link_data(gs), ensure_ascii=False, sort_keys=True)
     result["origid"] = origid
     for v in gs.nodes():
         word = gs.node[v]["word"]

@@ -51,7 +51,7 @@ def connect_to_db(filename):
 
 def insert_sentence(c, origid, gs):
     """Insert sentence into database"""
-    graph = json.dumps(json_graph.node_link_data(gs), ensure_ascii=False)
+    graph = json.dumps(json_graph.node_link_data(gs), ensure_ascii=False, sort_keys=True)
     c.execute("INSERT INTO sentences (original_id, graph) VALUES (?, ?)", (origid, graph))
     sid = c.execute("SELECT sentence_id FROM sentences WHERE original_id = ?", (origid, )).fetchall()[0][0]
     token_id = {}
