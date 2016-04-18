@@ -1,0 +1,189 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+import argparse
+import itertools
+import json
+import logging
+import multiprocessing
+import os
+import re
+import sqlite3
+
+from networkx.readwrite import json_graph
+import numpy
+import scipy.stats
+
+from pareidoscope import frequency
+from pareidoscope import subgraph_enumeration
+from pareidoscope import subgraph_isomorphism
+from pareidoscope.utils import cwb
+from pareidoscope.utils import helper
+from pareidoscope.utils import nx_graph
+from pareidoscope.utils import statistics
+
+# logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=logging.INFO)
+logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=logging.DEBUG)
+
+
+def arguments():
+    """"""
+    parser = argparse.ArgumentParser(description="Do a collexeme analysis for the given linguistic structure, i.e. find associated lemmata for a specified slot in the structure")
+    parser.add_argument("-c", "--corpus", type=argparse.FileType("r"), required=True, help="Corpus in CWB format")
+    parser.add_argument("--db", type=os.path.abspath, required=True, help="SQLite3 database for results")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("-w", "--wordforms", help="Find collexeme wordforms", action='store_true')
+    group.add_argument("-l", "--lemmata", help="Find collexeme lemmata", action='store_true')
+    parser.add_argument("QUERY", type=str, help="Query for a linguistic structure")
+    parser.add_argument("INDEX", type=int, help="Index of the collexeme slot")
+    parser.add_argument("WC", type=str, help="Word class of the collexeme slot")
+    args = parser.parse_args()
+    return args
+
+
+def collect_frequencies(args):
+    """Collect all necessary frequencies"""
+    s, query, query_skeleton, choke_point, collexeme_index, lemma, wc = args
+    sentence, sid = s
+    # * frequencies we need
+    # ** collostructional
+    # - lemma in graph (centers)
+    # - lemma (-> db)
+    # - word class in graph
+    # - word class (-> db)
+    gs = nx_graph.create_nx_digraph_from_cwb(sentence)
+    sensible = nx_graph.is_sensible_graph(gs)
+    o11 = {"collostructional": {}}
+    r1 = {"collostructional": {}}
+    c1 = {"collostructional": 0}
+    n = {"collostructional": 0}
+    choke_point_query_set = set()
+    choke_point_skel_set = set()
+    isomorphisms_query_set = set()
+    isomorphisms_skel_set = set()
+    sur_attribute = "word"
+    collexemes = set([])
+    if lemma:
+        sur_attribute = "lemma"
+    if sensible:
+        for v, d in gs.nodes(data=True):
+            if d["wc"] == wc:
+                if d[sur_attribute] not in r1["collostructional"]:
+                    r1["collostructional"][d[sur_attribute]] = 0
+                r1["collostructional"][d[sur_attribute]] += 1
+        for isomorphism in subgraph_isomorphism.get_subgraph_isomorphisms_nx(query, gs):
+            collexeme = gs.node[isomorphism[collexeme_index]][sur_attribute]
+            collexemes.add(collexeme)
+            if collexeme not in o11["collostructional"]:
+                o11["collostructional"][collexeme] = 0
+        for collexeme in collexemes:
+            lexical_query = query.copy()
+            lexical_query.node[collexeme_index][sur_attribute] = re.escape(collexeme)
+            o11["collostructional"][collexeme] += sum(1 for _ in subgraph_enumeration.get_choke_point_matches(lexical_query, gs, choke_point))
+        wc_query = query.copy()
+        wc_query.node[collexeme_index]["wc"] = wc
+        c1["collostructional"] = sum(1 for _ in subgraph_enumeration.get_choke_point_matches(wc_query, gs, choke_point))
+        n["collostructional"] = sum(1 for v, d in gs.nodes(data=True) if d["wc"] == wc)
+    return o11, r1, c1, n
+
+
+def calculate_associations(o11, r1, c1, n, measure=statistics.one_sided_log_likelihood):
+    """"""
+    associations = {}
+    for count_method in o11.keys():
+        f_c1 = c1[count_method]
+        f_n = n[count_method]
+        for collexeme in o11[count_method]:
+            if collexeme not in associations:
+                associations[collexeme] = {}
+            f_o11 = o11[count_method][collexeme]
+            f_r1 = r1[count_method][collexeme]
+            o, e = statistics.get_contingency_table(f_o11, f_r1, f_c1, f_n)
+            associations[collexeme][count_method] = measure(o, e)
+    return associations
+
+
+def calculate_association_strengths_and_correlations(o11, r1, c1, n):
+    """"""
+    dice_associations = calculate_associations(o11, r1, c1, n, statistics.dice)
+    gmean_associations = calculate_associations(o11, r1, c1, n, statistics.geometric_mean)
+    tscore_associations = calculate_associations(o11, r1, c1, n, statistics.t_score)
+    ll_associations = calculate_associations(o11, r1, c1, n, statistics.one_sided_log_likelihood)
+    return dice_associations, gmean_associations, tscore_associations, ll_associations
+
+
+def connect_to_results_db(filename):
+    """"""
+    dirname = os.path.dirname(filename)
+    conn = sqlite3.connect(filename)
+    c = conn.cursor()
+    c.execute("PRAGMA page_size=4096")
+    c.execute("PRAGMA cache_size=100000")
+    c.execute("PRAGMA temp_store=1")
+    c.execute("PRAGMA temp_store_directory='%s'" % dirname)
+    c.execute("CREATE TABLE IF NOT EXISTS queries (queryid INTEGER PRIMARY KEY AUTOINCREMENT, query TEXT, islemma BOOLEAN, collexeme_index INTEGER, wordclass TEXT, UNIQUE (query, islemma, collexeme_index, wordclass))")
+    c.execute("CREATE TABLE IF NOT EXISTS associations (queryid INTEGER, collexeme TEXT, counting_method TEXT, dice REAL, gmean REAL, t_score REAL, log_likelihood REAL, o11 INTEGER, r1 INTEGER, c1 INTEGER, n INTEGER, UNIQUE(queryid, collexeme, counting_method), FOREIGN KEY (queryid) REFERENCES queries)")
+    return conn, c
+
+
+def insert_results_into_database(db_filename, query, islemma, collexeme_index, wordclass, o11, r1, c1, n, dice_associations, gmean_associations, tscore_associations, ll_associations):
+    """"""
+    conn, c = connect_to_results_db(db_filename)
+    c.execute("INSERT OR IGNORE INTO queries (query, islemma, collexeme_index, wordclass) VALUES (?, ?, ?, ?)", (query, islemma, collexeme_index, wordclass))
+    queryid = c.execute("SELECT queryid FROM queries WHERE query=? AND islemma=? AND collexeme_index=? AND wordclass=?", (query, islemma, collexeme_index, wordclass)).fetchall()[0][0]
+    counting_methods = ["collostructional"]
+    get_freq = lambda freq, cm, starid: freq[cm] if cm == "collostructional" else freq[cm][starid]
+    association_tuples = ((queryid, collexeme, counting_method, dice_associations[collexeme][counting_method], gmean_associations[collexeme][counting_method], tscore_associations[collexeme][counting_method], ll_associations[collexeme][counting_method], o11[counting_method][collexeme], r1[counting_method][collexeme], c1[counting_method], n[counting_method]) for collexeme in ll_associations.iterkeys() for counting_method in counting_methods)
+    c.executemany("INSERT OR IGNORE INTO associations (queryid, collexeme, counting_method, dice, gmean, t_score, log_likelihood, o11, r1, c1, n) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", association_tuples)
+    conn.commit()
+    conn.close()
+
+
+def main():
+    """"""
+    args = arguments()
+    query, order = nx_graph.canonize(nx_graph.create_nx_digraph(json.loads(args.QUERY.strip())), order=True)
+    query_skeleton = nx_graph.skeletize(query)
+    query_str = json.dumps(json_graph.node_link_data(query), ensure_ascii=False, , sort_keys=True)
+    query_skel_str = json.dumps(json_graph.node_link_data(query_skeleton), ensure_ascii=False, sort_keys=True)
+    logging.debug("query graph: %s" % query_str)
+    logging.debug("query skeleton: %s" % query_skel_str)
+    choke_point = nx_graph.get_choke_point(query)
+    logging.debug("choke point: %s" % choke_point)
+    collexeme_index = order.index(args.INDEX)
+    logging.debug("collexeme index: %s" % collexeme_index)
+    lemma = args.lemmata
+    logging.debug("collexeme as lemma: %s" % lemma)
+    wc = args.WC
+    logging.debug("collexeme word class: %s" % wc)
+    query.node[collexeme_index]["wc"] = wc
+
+    groupsize = 50 * 10 * multiprocessing.cpu_count()
+
+    pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
+    sents = cwb.sentences_iter(args.corpus, return_id=True)
+
+    o11 = {"collostructional": {}}
+    r1 = {"collostructional": {}}
+    c1 = {"collostructional": 0}
+    n = {"collostructional": 0}
+
+    logging.info("collect frequencies")
+    for sentences in helper.grouper_nofill(groupsize, sents):
+        r = pool.imap_unordered(collect_frequencies, itertools.izip(sentences, itertools.repeat(query), itertools.repeat(query_skeleton), itertools.repeat(choke_point), itertools.repeat(collexeme_index), itertools.repeat(lemma), itertools.repeat(wc)), chunksize=10)
+        # r = map(collect_frequencies, itertools.izip(sentences, itertools.repeat(query), itertools.repeat(query_skeleton), itertools.repeat(choke_point), itertools.repeat(collexeme_index), itertools.repeat(lemma), itertools.repeat(wc)))
+        for o11_local, r1_local, c1_local, n_local in r:
+            frequency.merge_nested_result(o11_local, o11)
+            frequency.merge_nested_result(r1_local, r1)
+            frequency.merge_result(c1_local, c1)
+            frequency.merge_result(n_local, n)
+    logging.info("calculate association strengths and correlations")
+    dice_associations, gmean_associations, tscore_associations, ll_associations = calculate_association_strengths_and_correlations(o11, r1, c1, n)
+    logging.info("insert into database")
+    insert_results_into_database(args.db, query_str, lemma, collexeme_index, wc, o11, r1, c1, n, dice_associations, gmean_associations, tscore_associations, ll_associations)
+    logging.info("done")
+
+
+
+if __name__ == "__main__":
+    main()
