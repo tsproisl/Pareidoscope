@@ -100,6 +100,7 @@ def _frequency_signature(subsumes, args_c, args_a, args_b):
     subsumed_by_gb = subsumes(**args_b)
     o11, r1, c1, n = 0, 0, 0, 0
     n = 1
+    inconsistent = False
     if subsumed_by_gc and subsumed_by_ga and subsumed_by_gb:
         o11 = 1
         r1 = 1
@@ -111,11 +112,12 @@ def _frequency_signature(subsumes, args_c, args_a, args_b):
     elif (not subsumed_by_gc) and subsumed_by_ga and subsumed_by_gb:
         r1 = 0.5
         c1 = 0.5
+        inconsistent = True
     elif (not subsumed_by_gc) and (not subsumed_by_ga) and (not subsumed_by_gb):
         pass
     else:
         raise Exception("Inconsistent classification.")
-    return o11, r1, c1, n
+    return o11, r1, c1, n, inconsistent
 
 
 def isomorphisms(gc, ga, gb, gn, gs, candidates=None):
@@ -131,7 +133,7 @@ def isomorphisms(gc, ga, gb, gn, gs, candidates=None):
 
     """
     # vid_to_gn = {l["vid"]: v for v, l in gn.nodes(data=True)}
-    ct = {x: 0 for x in ["o11", "r1", "c1", "n"]}
+    ct = {x: 0 for x in ["o11", "r1", "c1", "n", "inconsistent"]}
     vs = set(gs.nodes())
     stripped_gc = strip_vid(gc)
     stripped_ga = strip_vid(ga)
@@ -152,11 +154,13 @@ def isomorphisms(gc, ga, gb, gn, gs, candidates=None):
         args_c = {"query_graph": stripped_gc, "vertex_candidates": vert_cand_c}
         args_a = {"query_graph": stripped_ga, "vertex_candidates": vert_cand_a}
         args_b = {"query_graph": stripped_gb, "vertex_candidates": vert_cand_b}
-        o11, r1, c1, n = _frequency_signature(functools.partial(subgraph_enumeration.subsumes_nx, target_graph=gs), args_c, args_a, args_b)
+        o11, r1, c1, n, inconsistent = _frequency_signature(functools.partial(subgraph_enumeration.subsumes_nx, target_graph=gs), args_c, args_a, args_b)
         ct["o11"] += o11
         ct["r1"] += r1
         ct["c1"] += c1
         ct["n"] += n
+        if inconsistent:
+            ct["inconsistent"] += 1
     return ct
 
 
@@ -172,7 +176,7 @@ def subgraphs(gc, ga, gb, gn, gs, candidates=None):
     - `candidates`:
 
     """
-    ct = {x: 0 for x in ["o11", "r1", "c1", "n"]}
+    ct = {x: 0 for x in ["o11", "r1", "c1", "n", "inconsistent"]}
     vid_n = set([l["vid"] for v, l in gn.nodes(data=True)])
     vs = set(gs.nodes())
     stripped_gc = strip_vid(gc)
@@ -193,11 +197,13 @@ def subgraphs(gc, ga, gb, gn, gs, candidates=None):
         args_c = {"query_graph": stripped_gc, "vertex_candidates": vert_cand_c}
         args_a = {"query_graph": stripped_ga, "vertex_candidates": vert_cand_a}
         args_b = {"query_graph": stripped_gb, "vertex_candidates": vert_cand_b}
-        o11, r1, c1, n = _frequency_signature(functools.partial(subgraph_enumeration.subsumes_nx, target_graph=gs), args_c, args_a, args_b)
+        o11, r1, c1, n, inconsistent = _frequency_signature(functools.partial(subgraph_enumeration.subsumes_nx, target_graph=gs), args_c, args_a, args_b)
         ct["o11"] += o11
         ct["r1"] += r1
         ct["c1"] += c1
         ct["n"] += n
+        if inconsistent:
+            ct["inconsistent"] += 1
     return ct
 
 
@@ -213,7 +219,8 @@ def choke_points(gc, ga, gb, gn, gs, choke_point):
     - `choke_point`:
 
     """
-    ct = {x: 0 for x in ["o11", "r1", "c1", "n"]}
+    ct = {x: 0 for x in ["o11", "r1", "c1", "n", "inconsistent"]}
+    inconsistencies = 0
     stripped_gc = strip_vid(gc)
     stripped_ga = strip_vid(ga)
     stripped_gb = strip_vid(gb)
@@ -232,11 +239,13 @@ def choke_points(gc, ga, gb, gn, gs, choke_point):
         args_c = {"query_graph": stripped_gc, "choke_point": choke_c, "vertex_candidates": normal_cand_c}
         args_a = {"query_graph": stripped_ga, "choke_point": choke_a, "vertex_candidates": normal_cand_a}
         args_b = {"query_graph": stripped_gb, "choke_point": choke_b, "vertex_candidates": normal_cand_b}
-        o11, r1, c1, n = _frequency_signature(functools.partial(subgraph_enumeration.choke_point_subsumes_nx, target_graph=gs, choke_point_candidate=choke_point_vertex), args_c, args_a, args_b)
+        o11, r1, c1, n, inconsistent = _frequency_signature(functools.partial(subgraph_enumeration.choke_point_subsumes_nx, target_graph=gs, choke_point_candidate=choke_point_vertex), args_c, args_a, args_b)
         ct["o11"] += o11
         ct["r1"] += r1
         ct["c1"] += c1
         ct["n"] += n
+        if inconsistent:
+            ct["inconsistent"] += 1
     return ct
 
 
@@ -252,17 +261,20 @@ def sentences(gc, ga, gb, gn, gs, candidates=None):
     - `candidates`:
 
     """
-    ct = {x: 0 for x in ["o11", "r1", "c1", "n"]}
+    ct = {x: 0 for x in ["o11", "r1", "c1", "n", "inconsistent"]}
+    inconsistencies = 0
     subsumed_by_n = subgraph_enumeration.subsumes_nx(strip_vid(gn), gs, vertex_candidates=candidates)
     if subsumed_by_n:
         args_c = {"query_graph": strip_vid(gc)}
         args_a = {"query_graph": strip_vid(ga)}
         args_b = {"query_graph": strip_vid(gb)}
-        o11, r1, c1, n = _frequency_signature(functools.partial(subgraph_enumeration.subsumes_nx, target_graph=gs, vertex_candidates=candidates), args_c, args_a, args_b)
+        o11, r1, c1, n, inconsistent = _frequency_signature(functools.partial(subgraph_enumeration.subsumes_nx, target_graph=gs, vertex_candidates=candidates), args_c, args_a, args_b)
         ct["o11"] += o11
         ct["r1"] += r1
         ct["c1"] += c1
         ct["n"] += n
+        if inconsistent:
+            ct["inconsistent"] += 1
     return ct
 
 
@@ -293,7 +305,6 @@ def run_queries(args):
             # we could also append gziped JSON strings if full data
             # structures need too much memory
             result.append({"iso_ct": iso_ct, "sub_ct": sub_ct, "choke_point_ct": choke_point_ct, "sent_ct": sent_ct})
-            # result.append({"choke_point_ct": choke_point_ct})
     return result, sensible
 
 
