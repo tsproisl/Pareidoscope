@@ -83,7 +83,7 @@ def write_results(prefix, results):
 def main():
     """"""
     args = arguments()
-    queries = list(read_queries(args.QUERIES))[:1]
+    queries = read_queries(args.QUERIES)
     queries = [extract_graphs(q) for q in queries]
     queries = [add_focus_point(q) for q in queries]
     # print(queries)
@@ -106,8 +106,8 @@ def main():
     # write_results(args.output, results)
 
     sentences = cwb.sentences_iter(args.corpus)
-    # r = pool.imap_unordered(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(queries)), 50)
-    r = map(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(queries)))
+    r = pool.imap_unordered(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(queries)), 50)
+    # r = map(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(queries)))
     for result, sensible in r:
         if sensible:
             pareidoscope.query.merge_result(result, results)
