@@ -220,7 +220,6 @@ def choke_points(gc, ga, gb, gn, gs, choke_point):
 
     """
     ct = {x: 0 for x in ["o11", "r1", "c1", "n", "inconsistent"]}
-    inconsistencies = 0
     stripped_gc = strip_vid(gc)
     stripped_ga = strip_vid(ga)
     stripped_gb = strip_vid(gb)
@@ -262,7 +261,6 @@ def sentences(gc, ga, gb, gn, gs, candidates=None):
 
     """
     ct = {x: 0 for x in ["o11", "r1", "c1", "n", "inconsistent"]}
-    inconsistencies = 0
     subsumed_by_n = subgraph_enumeration.subsumes_nx(strip_vid(gn), gs, vertex_candidates=candidates)
     if subsumed_by_n:
         args_c = {"query_graph": strip_vid(gc)}
@@ -290,7 +288,9 @@ def run_queries(args):
     gs = nx_graph.create_nx_digraph_from_cwb(sentence)
     sensible = nx_graph.is_sensible_graph(gs)
     if sensible:
-        for qline in queries:
+        # for qline in queries:
+        for i, qline in enumerate(queries):
+            print("query %i")
             gc, ga, gb, gn, choke_point = qline
             # isomorphisms
             iso_ct = isomorphisms(gc, ga, gb, gn, gs)
