@@ -284,13 +284,12 @@ def run_queries(args):
     - `args`:
     """
     sentence, queries = args
+    print("new sentence")
     result = []
     gs = nx_graph.create_nx_digraph_from_cwb(sentence)
     sensible = nx_graph.is_sensible_graph(gs)
     if sensible:
-        # for qline in queries:
-        for i, qline in enumerate(queries):
-            print("query %i" % i)
+        for qline in queries:
             gc, ga, gb, gn, choke_point = qline
             # isomorphisms
             iso_ct = isomorphisms(gc, ga, gb, gn, gs)
