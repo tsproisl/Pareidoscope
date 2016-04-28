@@ -284,7 +284,6 @@ def run_queries(args):
     - `args`:
     """
     sentence, queries = args
-    print("new sentence")
     result = []
     gs = nx_graph.create_nx_digraph_from_cwb(sentence)
     sensible = nx_graph.is_sensible_graph(gs)
