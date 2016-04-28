@@ -4,17 +4,18 @@
 import argparse
 import itertools
 import json
+import logging
 import math
 import multiprocessing
-import random
 
-import networkx
 from networkx.readwrite import json_graph
 
 import pareidoscope.query
 from pareidoscope.utils import cwb
 from pareidoscope.utils import helper
 from pareidoscope.utils import nx_graph
+
+logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=logging.INFO)
 
 
 def arguments():
@@ -48,13 +49,13 @@ def extract_graphs(query):
 def add_focus_point(query):
     """Search for choke point vertices"""
     focus_point_vertex = nx_graph.get_choke_point(query[3])
-    focus_point_vid = query[3].node[focus_point_vertex]["vid"]
+    # focus_point_vid = query[3].node[focus_point_vertex]["vid"]
     return query + [focus_point_vertex]
 
 
 def write_results(prefix, results):
     """Write results to files
-    
+
     Arguments:
     - `prefix`:
     - `results`:
@@ -88,32 +89,33 @@ def main():
     queries = [add_focus_point(q) for q in queries]
     # print(queries)
     # print([[json.dumps(json_graph.node_link_data(g)) for g in q[:3]] for q in queries])
-    
+
     groupsize = 5 * 50 * multiprocessing.cpu_count()
-    
-    
+
     results = [{} for q in queries]
     pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
-    # sents = cwb.sentences_iter(args.corpus)
-    # # for testing purposes only:
-    # # sents = helper.sample(sents, 0.0005)
-    # for sentences in helper.grouper_nofill(groupsize, sents):
-    #     r = pool.imap_unordered(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(queries)), 50)
-    #     # r = list(map(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(queries))))
-    #     for result, sensible in r:
-    #         if sensible:
-    #             pareidoscope.query.merge_result(result, results)
-    # write_results(args.output, results)
-
-    sentences = cwb.sentences_iter(args.corpus)
-    r = pool.imap_unordered(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(queries)), 50)
-    # r = map(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(queries)))
-    for result, sensible in r:
-        if sensible:
-            pareidoscope.query.merge_result(result, results)
+    sents = cwb.sentences_iter(args.corpus)
+    # for testing purposes only:
+    # sents = helper.sample(sents, 0.0005)
+    i = 0
+    for sentences in helper.grouper_nofill(groupsize, sents):
+        i += 1
+        logging.info("slice no. %d" % i)
+        r = pool.imap_unordered(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(queries)), 50)
+        # r = map(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(queries)))
+        for result, sensible in r:
+            if sensible:
+                pareidoscope.query.merge_result(result, results)
     write_results(args.output, results)
 
-                
+    # sentences = cwb.sentences_iter(args.corpus)
+    # r = pool.imap_unordered(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(queries)), 50)
+    # # r = map(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(queries)))
+    # for result, sensible in r:
+    #     if sensible:
+    #         pareidoscope.query.merge_result(result, results)
+    # write_results(args.output, results)
+
 
 if __name__ == "__main__":
     main()
