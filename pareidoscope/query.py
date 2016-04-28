@@ -290,7 +290,7 @@ def run_queries(args):
     if sensible:
         # for qline in queries:
         for i, qline in enumerate(queries):
-            print("query %i")
+            print("query %i" % i)
             gc, ga, gb, gn, choke_point = qline
             # isomorphisms
             iso_ct = isomorphisms(gc, ga, gb, gn, gs)
