@@ -114,8 +114,8 @@ def _create_sql_query(graph, v):
     - `v`:
 
     """
-    query_select = "SELECT DISTINCT tok.sentid, tok.position"
-    query_from = "FROM tokens as tok INNER JOIN types as t USING (typeid)"
+    query_select = "SELECT DISTINCT tok.sentence_id, tok.position"
+    query_from = "FROM tokens as tok"
     query_where = []
     arguments = []
     pos_lexical = set(["word", "pos", "lemma", "wc", "root"])
@@ -126,67 +126,66 @@ def _create_sql_query(graph, v):
         if key in pos_lexical:
             if might_contain_re(value):
                 if value not in match_all:
-                    query_where.append("t.%s REGEXP ?" % key)
+                    query_where.append("tok.%s REGEXP ?" % key)
                     arguments.append("^%s$" % value)
             else:
-                query_where.append("t.%s=?" % key)
+                query_where.append("tok.%s=?" % key)
                 arguments.append(value)
         elif key in neg_lexical:
             if might_contain_re(value):
-                query_where.append("t.%s NOT REGEXP ?" % key)
+                query_where.append("tok.%s NOT REGEXP ?" % key)
                 arguments.append("^%s$" % value)
             else:
-                query_where.append("t.%s!=?" % key)
+                query_where.append("tok.%s!=?" % key)
                 arguments.append(value)
         elif key == "not_indep":
             relations = value.split("|")
             for rel in relations:
-                query_where.append("? NOT IN (SELECT indep FROM indeps WHERE indeps.typeid=t.typeid)")
+                query_where.append("? NOT IN (SELECT relation FROM dependencies WHERE dependencies.dependent_id=tok.token_id)")
                 arguments.append(rel)
         elif key == "not_outdep":
             relations = value.split("|")
             for rel in relations:
-                query_where.append("? NOT IN (SELECT outdep FROM outdeps WHERE outdeps.typeid=t.typeid)")
+                query_where.append("? NOT IN (SELECT relation FROM dependencies WHERE dependencies.governor_id=tok.token_id)")
                 arguments.append(rel)
         else:
             raise Exception("Unsupported key: %s" % key)
-    query_where.append("t.indeg>=?")
+    query_where.append("tok.indegree>=?")
     arguments.append(graph.in_degree(v))
-    query_where.append("t.outdeg>=?")
+    query_where.append("tok.outdegree>=?")
     arguments.append(graph.out_degree(v))
     # dependency relations only support alternations, e.g. "dobj|iobj"
     # to express any object
-    incounter = 0
+    depcounter = 0
     for s, t, l in graph.in_edges(v, data=True):
         for key, value in l.items():
             if key == "relation":
                 if value in match_all:
                     continue
-                incounter += 1
-                query_from += " INNER JOIN indeps AS o%d USING (typeid)" % incounter
+                depcounter += 1
+                query_from += " INNER JOIN dependencies AS o%d ON o%d.dependent_id=tok.token_id" % (depcounter, depcounter)
                 relations = value.split("|")
                 if len(relations) == 1:
-                    query_where.append("o%d.indep=?" % incounter)
+                    query_where.append("o%d.relation=?" % depcounter)
                     arguments.append(value)
                 else:
-                    query_where.append("o%d.indep IN (%s)" % (incounter, ", ".join(["?"] * len(relations))))
+                    query_where.append("o%d.relation IN (%s)" % (depcounter, ", ".join(["?"] * len(relations))))
                     arguments.extend(relations)
             else:
                 raise Exception("Unsupported key: %s" % key)
-    outcounter = 0
     for s, t, l in graph.out_edges(v, data=True):
         for key, value in l.items():
             if key == "relation":
                 if value in match_all:
                     continue
-                outcounter += 1
-                query_from += " INNER JOIN outdeps AS o%d USING (typeid)" % outcounter
+                depcounter += 1
+                query_from += " INNER JOIN dependencies AS o%d ON o%d.governor_id=tok.token_id" % (depcounter, depcounter)
                 relations = value.split("|")
                 if len(relations) == 1:
-                    query_where.append("o%d.outdep=?" % outcounter)
+                    query_where.append("o%d.relation=?" % depcounter)
                     arguments.append(value)
                 else:
-                    query_where.append("o%d.outdep IN (%s)" % (outcounter, ", ".join(["?"] * len(relations))))
+                    query_where.append("o%d.relation IN (%s)" % (depcounter, ", ".join(["?"] * len(relations))))
                     arguments.extend(relations)
             else:
                 raise Exception("Unsupported key: %s" % key)
