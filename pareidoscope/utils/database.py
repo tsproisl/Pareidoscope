@@ -2,16 +2,11 @@
 # -*- coding: utf-8 -*-
 
 import functools
-import json
 import re
 import sqlite3
 
-import networkx
 
-from pareidoscope.utils import nx_graph
-
-
-def connect_to_database(filename):
+def connect_to_database(filename, re=False):
     """Connect to database and return connection and cursor."""
     conn = sqlite3.connect(filename)
     # For the PCRE extension:
@@ -20,6 +15,8 @@ def connect_to_database(filename):
     c = conn.cursor()
     c.execute("PRAGMA page_size=4096")
     c.execute("PRAGMA cache_size=100000")
+    if re:
+        conn.create_function("REGEXP", 2, regexp)
     return conn, c
 
 
