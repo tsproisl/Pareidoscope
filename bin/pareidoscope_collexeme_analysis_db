@@ -158,28 +158,6 @@ def calculate_association_strengths_and_correlations(o11, r1, c1, n):
     return dice_associations, gmean_associations, tscore_associations, ll_associations, dice_correlations, gmean_correlations, tscore_correlations, ll_correlations
 
 
-def aggregate_sentences(c, query, query_args):
-    """Aggregate sentences, returning sentence id, sentence graph, and
-    sets of candidates."""
-    old_sentence_id = None
-    candidates = None
-    old_graph = None
-    for row in c.execute(query, query_args):
-        sentence_id = row[0]
-        graph = row[1]
-        token_positions = row[2:]
-        if sentence_id != old_sentence_id and old_sentence_id is not None:
-            yield old_sentence_id, old_graph, candidates
-            candidates = None
-        if candidates is None:
-            candidates = [set([t]) for t in token_positions]
-        else:
-            for i, t in enumerate(token_positions):
-                candidates[i].add(t)
-        old_sentence_id = sentence_id
-        old_graph = graph
-
-
 def main():
     """"""
     args = arguments()
@@ -220,7 +198,7 @@ def main():
     n["collostructional"] = c.execute("SELECT count(*) FROM tokens WHERE wc=?", (wc,)).fetchall()[0][0]
 
     logging.info("collect frequencies")
-    sents_and_candidates = aggregate_sentences(c, query_skel_sql, args_skel_sql)
+    sents_and_candidates = database.aggregate_sentences(c, query_skel_sql, args_skel_sql)
     for sentences in helper.grouper_nofill(groupsize, sents_and_candidates):
         r = pool.imap_unordered(collect_frequencies, itertools.izip(sentences, itertools.repeat(query), itertools.repeat(query_skeleton), itertools.repeat(choke_point), itertools.repeat(collexeme_index), itertools.repeat(lemma), itertools.repeat(wc)), chunksize=10)
         # r = map(collect_frequencies, itertools.izip(sentences, itertools.repeat(query), itertools.repeat(query_skeleton), itertools.repeat(choke_point), itertools.repeat(collexeme_index), itertools.repeat(lemma), itertools.repeat(wc)))

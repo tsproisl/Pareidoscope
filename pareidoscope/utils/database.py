@@ -212,3 +212,25 @@ def regexp(expression, item):
     """
     reg = re.compile(expression)
     return reg.search(item) is not None
+
+
+def aggregate_sentences(c, query, query_args):
+    """Aggregate sentences, returning sentence id, sentence graph, and
+    sets of candidates."""
+    old_sentence_id = None
+    candidates = None
+    old_graph = None
+    for row in c.execute(query, query_args):
+        sentence_id = row[0]
+        graph = row[1]
+        token_positions = row[2:]
+        if sentence_id != old_sentence_id and old_sentence_id is not None:
+            yield old_sentence_id, old_graph, candidates
+            candidates = None
+        if candidates is None:
+            candidates = [set([t]) for t in token_positions]
+        else:
+            for i, t in enumerate(token_positions):
+                candidates[i].add(t)
+        old_sentence_id = sentence_id
+        old_graph = graph
