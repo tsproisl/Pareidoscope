@@ -100,24 +100,25 @@ def main():
     results = [{} for q in queries]
     cpu_count = multiprocessing.cpu_count()
     processes = min(max(1, int(cpu_count * args.cpu / 100)), cpu_count)
-    with multiprocessing.Pool(processes=processes) as pool:
-        for i, qline in enumerate(queries):
-            logging.info("query no. %d" % i)
-            gc, ga, gb, gn, choke_point = qline
-            # print(json.dumps(json_graph.node_link_data(gn)))
-            # find candidates for gn
-            query_sql, args_sql = database.create_sql_query(pareidoscope.query.strip_vid(gn))
-            sents_and_candidates = database.aggregate_sentences(c, query_sql, args_sql)
-            for sentences in helper.grouper_nofill(groupsize, sents_and_candidates):
-                # remove sentence ids
-                sentences = [s[1:] for s in sentences]
-                query_args = (itertools.chain.from_iterable(a) for a in zip(itertools.repeat(qline), sentences))
-                r = pool.imap_unordered(pareidoscope.query.run_queries_db, query_args, 10)
-                # r = map(pareidoscope.query.run_queries_db, query_args)
-                for result in r:
-                    pareidoscope.query.merge_result_db(result, i, results)
-            logging.info(results[i])
-        write_results(args.output, results)
+    pool = multiprocessing.Pool(processes=processes)
+    # with multiprocessing.Pool(processes=processes) as pool:
+    for i, qline in enumerate(queries):
+        logging.info("query no. %d" % i)
+        gc, ga, gb, gn, choke_point = qline
+        # print(json.dumps(json_graph.node_link_data(gn)))
+        # find candidates for gn
+        query_sql, args_sql = database.create_sql_query(pareidoscope.query.strip_vid(gn))
+        sents_and_candidates = database.aggregate_sentences(c, query_sql, args_sql)
+        for sentences in helper.grouper_nofill(groupsize, sents_and_candidates):
+            # remove sentence ids
+            sentences = [s[1:] for s in sentences]
+            query_args = (itertools.chain.from_iterable(a) for a in zip(itertools.repeat(qline), sentences))
+            r = pool.imap_unordered(pareidoscope.query.run_queries_db, query_args, 10)
+            # r = map(pareidoscope.query.run_queries_db, query_args)
+            for result in r:
+                pareidoscope.query.merge_result_db(result, i, results)
+        logging.info(results[i])
+    write_results(args.output, results)
 
 
 if __name__ == "__main__":
