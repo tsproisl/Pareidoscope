@@ -207,7 +207,7 @@ def subgraphs(gc, ga, gb, gn, gs, candidates=None):
     return ct
 
 
-def choke_points(gc, ga, gb, gn, gs, choke_point):
+def choke_points(gc, ga, gb, gn, gs, choke_point, candidates=None):
     """Count choke points
 
     Arguments:
@@ -228,7 +228,7 @@ def choke_points(gc, ga, gb, gn, gs, choke_point):
     choke_a = [v for v, l in ga.nodes(data=True) if l["vid"] == choke_vid][0]
     choke_b = [v for v, l in gb.nodes(data=True) if l["vid"] == choke_vid][0]
     normal_cand_c, normal_cand_a, normal_cand_b = None, None, None
-    for choke_point_vertex in subgraph_enumeration.get_choke_point_matches(strip_vid(gn), gs, choke_point):
+    for choke_point_vertex in subgraph_enumeration.get_choke_point_matches(strip_vid(gn), gs, choke_point, vertex_candidates=candidates):
         if normal_cand_c is None:
             normal_cand_c = nx_graph.get_vertex_candidates(stripped_gc, gs)
         if normal_cand_a is None:
@@ -266,7 +266,7 @@ def sentences(gc, ga, gb, gn, gs, candidates=None):
         args_c = {"query_graph": strip_vid(gc)}
         args_a = {"query_graph": strip_vid(ga)}
         args_b = {"query_graph": strip_vid(gb)}
-        o11, r1, c1, n, inconsistent = _frequency_signature(functools.partial(subgraph_enumeration.subsumes_nx, target_graph=gs, vertex_candidates=candidates), args_c, args_a, args_b)
+        o11, r1, c1, n, inconsistent = _frequency_signature(functools.partial(subgraph_enumeration.subsumes_nx, target_graph=gs), args_c, args_a, args_b)
         ct["o11"] += o11
         ct["r1"] += r1
         ct["c1"] += c1
@@ -313,17 +313,21 @@ def run_queries_db(args):
     Arguments:
     - `args`:
     """
-    go11, gr1, gc1, gn, sentence, candidates = args
+    gc, ga, gb, gn, choke_point, sentence, candidates = args
     gs = json_graph.node_link_graph(json.loads(sentence))
     # isomorphisms
-    iso_ct = isomorphisms(go11, gr1, gc1, gn, gs, candidates)
+    iso_ct = isomorphisms(gc, ga, gb, gn, gs, candidates)
     # subgraphs (contingency table)
-    sub_ct = subgraphs(go11, gr1, gc1, gn, gs, candidates)
+    sub_ct = subgraphs(gc, ga, gb, gn, gs, candidates)
+    # choke_points (contingency table)
+    choke_point_ct = {}
+    if choke_point is not None:
+        choke_point_ct = choke_points(gc, ga, gb, gn, gs, choke_point, candidates)
     # sentences (contingency table)
-    sent_ct = sentences(go11, gr1, gc1, gn, gs, candidates)
+    sent_ct = sentences(gc, ga, gb, gn, gs, candidates)
     # we could also append gziped JSON strings if full data
     # structures need too much memory
-    result = {"iso_ct": iso_ct, "sub_ct": sub_ct, "sent_ct": sent_ct}
+    result = {"iso_ct": iso_ct, "sub_ct": sub_ct, "choke_point_ct": choke_point_ct, "sent_ct": sent_ct}
     return result
 
 
