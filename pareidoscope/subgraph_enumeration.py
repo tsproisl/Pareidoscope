@@ -18,8 +18,10 @@ def get_subgraphs_nx(query_graph, target_graph, vertex_candidates=None):
     bfo_graph, bfo_to_raw = get_bfo(target_graph)
     if vertex_candidates is None:
         vertex_candidates = nx_graph.get_vertex_candidates(query_graph, bfo_graph)
-    # if any([len(cands) == 0 for cands in vertex_candidates]):
-    #     return
+    else:
+        # convert candidates to bfo_graph
+        raw_to_bfo = {v: k for k, v in bfo_to_raw.items()}
+        vertex_candidates = [set([raw_to_bfo[vc] for vc in vcs]) for vcs in vertex_candidates]
     vertex_candidates = functools.reduce(lambda x, y: x.union(y), vertex_candidates)
     for subgraph in enumerate_connected_subgraphs(bfo_graph, bfo_to_raw, query_graph.number_of_nodes(), query_graph.number_of_edges(), vertex_candidates):
         vc = nx_graph.get_vertex_candidates(query_graph, subgraph)
