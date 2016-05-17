@@ -29,12 +29,12 @@ def sample(iterable, p):
 
 def get_int_bins(min_value, max_value, nr_of_bins=10):
     """Find integer bin edges such that the bins are of equal size.
-    
+
     Arguments:
         min_value:
         max_value:
         nr_of_bins:
-    
+
     Returns:
         A list of bin edges.
 
