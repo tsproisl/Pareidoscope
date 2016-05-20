@@ -63,36 +63,35 @@ def sentence_candidates(c, g):
 
     """
     sentence_ids = []
-    for vertex in query_graph.nodes():
+    for vertex in g.nodes():
         sql_query = "SELECT sentence_id FROM tokens WHERE "
         pos_lexical = set(["word", "pos", "lemma", "wc", "root"])
         neg_lexical = set(["not_%s" % pl for pl in pos_lexical])
-        for vertex in query_graph.nodes():
-            indegree = query_graph.in_degree(vertex)
-            outdegree = query_graph.out_degree(vertex)
-            if indegree > 0:
-                where.append("indegree >= ?")
-                arguments.append(indegree)
-            if outdegree > 0:
-                where.append("outdegree >= ?")
-                arguments.append(outdegree)
-            for k, v in query_graph.node[vertex].items():
-                if k in pos_lexical:
-                    where.append("%s = ?" % vertex)
-                    if k == "root":
-                        arguments.append(v == "root")
-                    else:
-                        arguments.append(v)
-                elif k in neg_lexical:
-                    where.append("%s != ?" % k)
-                    if k == "root":
-                        arguments.append(v == "root")
-                    else:
-                        arguments.append(v)
-                elif k == "not_indep" or k == "not_outdep":
-                    pass
+        indegree = g.in_degree(vertex)
+        outdegree = g.out_degree(vertex)
+        if indegree > 0:
+            where.append("indegree >= ?")
+            arguments.append(indegree)
+        if outdegree > 0:
+            where.append("outdegree >= ?")
+            arguments.append(outdegree)
+        for k, v in g.node[vertex].items():
+            if k in pos_lexical:
+                where.append("%s = ?" % vertex)
+                if k == "root":
+                    arguments.append(v == "root")
                 else:
-                    raise Exception("Unsupported key: %s" % k)
+                    arguments.append(v)
+            elif k in neg_lexical:
+                where.append("%s != ?" % k)
+                if k == "root":
+                    arguments.append(v == "root")
+                else:
+                    arguments.append(v)
+            elif k == "not_indep" or k == "not_outdep":
+                pass
+            else:
+                raise Exception("Unsupported key: %s" % k)
         sql_query += " AND ".join(where)
         sentence_ids.append(set([r[0] for r in c.execute(sql_query, arguments).fetchall()]))
     candidate_ids = functools.reduce(lambda x, y: x.intersection(y), sentence_ids)
