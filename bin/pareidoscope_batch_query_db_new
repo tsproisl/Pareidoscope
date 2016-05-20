@@ -65,6 +65,7 @@ def sentence_candidates(c, g):
     sentence_ids = []
     for vertex in g.nodes():
         sql_query = "SELECT sentence_id FROM tokens WHERE "
+        where = []
         pos_lexical = set(["word", "pos", "lemma", "wc", "root"])
         neg_lexical = set(["not_%s" % pl for pl in pos_lexical])
         indegree = g.in_degree(vertex)
