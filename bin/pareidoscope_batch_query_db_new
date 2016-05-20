@@ -66,35 +66,36 @@ def sentence_candidates(c, g):
     for vertex in g.nodes():
         sql_query = "SELECT sentence_id FROM tokens WHERE "
         where = []
+        args = []
         pos_lexical = set(["word", "pos", "lemma", "wc", "root"])
         neg_lexical = set(["not_%s" % pl for pl in pos_lexical])
         indegree = g.in_degree(vertex)
         outdegree = g.out_degree(vertex)
         if indegree > 0:
             where.append("indegree >= ?")
-            arguments.append(indegree)
+            args.append(indegree)
         if outdegree > 0:
             where.append("outdegree >= ?")
-            arguments.append(outdegree)
+            args.append(outdegree)
         for k, v in g.node[vertex].items():
             if k in pos_lexical:
                 where.append("%s = ?" % vertex)
                 if k == "root":
-                    arguments.append(v == "root")
+                    args.append(v == "root")
                 else:
-                    arguments.append(v)
+                    args.append(v)
             elif k in neg_lexical:
                 where.append("%s != ?" % k)
                 if k == "root":
-                    arguments.append(v == "root")
+                    args.append(v == "root")
                 else:
-                    arguments.append(v)
+                    args.append(v)
             elif k == "not_indep" or k == "not_outdep":
                 pass
             else:
                 raise Exception("Unsupported key: %s" % k)
         sql_query += " AND ".join(where)
-        sentence_ids.append(set([r[0] for r in c.execute(sql_query, arguments).fetchall()]))
+        sentence_ids.append(set([r[0] for r in c.execute(sql_query, args).fetchall()]))
     candidate_ids = functools.reduce(lambda x, y: x.intersection(y), sentence_ids)
     candidate_sentences = [r[0] for r in c.execute("SELECT graph FROM sentences WHERE sentence_id IN (%s)" % ", ".join(candidate_ids)).fetchall()]
     return candidate_sentences
