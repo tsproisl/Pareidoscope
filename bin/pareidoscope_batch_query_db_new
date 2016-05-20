@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import argparse
+import functools
 import itertools
 import json
 import logging
@@ -56,6 +57,49 @@ def add_focus_point(query):
     return query + [focus_point_vertex]
 
 
+def sentence_candidates(c, g):
+    """Get candidate sentences (no token candidates!) for the query
+    graph.
+
+    """
+    sentence_ids = []
+    for vertex in query_graph.nodes():
+        sql_query = "SELECT sentence_id FROM tokens WHERE "
+        pos_lexical = set(["word", "pos", "lemma", "wc", "root"])
+        neg_lexical = set(["not_%s" % pl for pl in pos_lexical])
+        for vertex in query_graph.nodes():
+            indegree = query_graph.in_degree(vertex)
+            outdegree = query_graph.out_degree(vertex)
+            if indegree > 0:
+                where.append("indegree >= ?")
+                arguments.append(indegree)
+            if outdegree > 0:
+                where.append("outdegree >= ?")
+                arguments.append(outdegree)
+            for k, v in query_graph.node[vertex].items():
+                if k in pos_lexical:
+                    where.append("%s = ?" % vertex)
+                    if k == "root":
+                        arguments.append(v == "root")
+                    else:
+                        arguments.append(v)
+                elif k in neg_lexical:
+                    where.append("%s != ?" % k)
+                    if k == "root":
+                        arguments.append(v == "root")
+                    else:
+                        arguments.append(v)
+                elif k == "not_indep" or k == "not_outdep":
+                    pass
+                else:
+                    raise Exception("Unsupported key: %s" % k)
+        sql_query += " AND ".join(where)
+        sentence_ids.append(set([r[0] for r in c.execute(sql_query, arguments).fetchall()]))
+    candidate_ids = functools.reduce(lambda x, y: x.intersection(y), sentence_ids)
+    candidate_sentences = [r[0] for r in c.execute("SELECT graph FROM sentences WHERE sentence_id IN (%s)" % ", ".join(candidate_ids)).fetchall()]
+    return candidate_sentences
+    
+
 def write_results(prefix, results):
     """Write results to files
 
@@ -107,14 +151,17 @@ def main():
         gc, ga, gb, gn, choke_point = qline
         # print(json.dumps(json_graph.node_link_data(gn)))
         # find candidates for gn
-        query_sql, args_sql = database.create_sql_query(pareidoscope.query.strip_vid(gn))
-        sents_and_candidates = database.aggregate_sentences(c, query_sql, args_sql)
-        for sentences in helper.grouper_nofill(groupsize, sents_and_candidates):
+        # query_sql, args_sql = database.create_sql_query(pareidoscope.query.strip_vid(gn))
+        # sents_and_candidates = database.aggregate_sentences(c, query_sql, args_sql)
+        sents = sentence_candidates(c, pareidoscope.query.strip_vid(gn))
+        # for sentences in helper.grouper_nofill(groupsize, sents_and_candidates):
+        for sentences in helper.grouper_nofill(groupsize, sents):
             # remove sentence ids
-            sentences = [s[1:] for s in sentences]
-            query_args = (itertools.chain.from_iterable(a) for a in zip(itertools.repeat(qline), sentences))
-            r = pool.imap_unordered(pareidoscope.query.run_queries_db, query_args, 10)
-            # r = map(pareidoscope.query.run_queries_db, query_args)
+            # sentences = [s[1:] for s in sentences]
+            # query_args = (itertools.chain.from_iterable(a) for a in zip(itertools.repeat(qline), sentences))
+            # r = pool.imap_unordered(pareidoscope.query.run_queries_db, query_args, 10)
+            # r = pool.imap_unordered(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(qline)), 10)
+            r = map(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(qline)))
             for result in r:
                 pareidoscope.query.merge_result_db(result, i, results)
         logging.info(results[i])
