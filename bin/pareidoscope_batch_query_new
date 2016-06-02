@@ -23,6 +23,7 @@ def arguments():
     parser = argparse.ArgumentParser(description='Run a batch of queries against a corpus')
     parser.add_argument("-c", "--corpus", type=argparse.FileType("r"), required=True, help="Corpus in CWB format")
     parser.add_argument("-o", "--output", type=str, required=True, help="Output prefix")
+    parser.add_argument("-p", "--cpu", type=int, default=25, help="Percentage of CPUs to use (0-100; default: 25)")
     parser.add_argument("QUERIES", type=argparse.FileType("r"), help="Queries file with one graph per line and vertices marked as belonging to A, B or both (AB)")
     return parser.parse_args()
 
@@ -93,20 +94,40 @@ def main():
     groupsize = 10 * 10 * multiprocessing.cpu_count()
 
     results = [{} for q in queries]
-    pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
-    sents = cwb.sentences_iter(args.corpus)
-    # for testing purposes only:
-    # sents = helper.sample(sents, 0.0005)
-    i = 0
-    for sentences in helper.grouper_nofill(groupsize, sents):
-        i += 1
-        logging.info("slice no. %d" % i)
-        r = pool.imap_unordered(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(queries)), 10)
-        # r = map(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(queries)))
-        for result, sensible in r:
-            if sensible:
-                pareidoscope.query.merge_result(result, results)
+    cpu_count = multiprocessing.cpu_count()
+    processes = min(max(1, int(cpu_count * args.cpu / 100)), cpu_count)
+    pool = multiprocessing.Pool(processes=processes)
+
+    for i, qline in enumerate(queries):
+        logging.info("query no. %d" % i)
+        gc, ga, gb, gn, choke_point = qline
+        # TODO: remove this loop!!!
+        for v in gn.nodes():
+            del gn.node[v]["word"]
+            del gn.node[v]["lemma"]
+        args.corpus.seek(0)
+        sents = cwb.sentences_iter(args.corpus)
+        for sentences in helper.grouper_nofill(groupsize, sents):
+            r = pool.imap_unordered(pareidoscope.query.run_queries, zip(sentences, itertools.repeat([qline])), 10)
+            for result, sensible in r:
+                if sensible:
+                    pareidoscope.query.merge_result_db(result[0], i, results)
+        logging.info(results[i])
     write_results(args.output, results)
+
+    # sents = cwb.sentences_iter(args.corpus)
+    # # for testing purposes only:
+    # # sents = helper.sample(sents, 0.0005)
+    # i = 0
+    # for sentences in helper.grouper_nofill(groupsize, sents):
+    #     i += 1
+    #     logging.info("slice no. %d" % i)
+    #     r = pool.imap_unordered(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(queries)), 10)
+    #     # r = map(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(queries)))
+    #     for result, sensible in r:
+    #         if sensible:
+    #             pareidoscope.query.merge_result(result, results)
+    # write_results(args.output, results)
 
     # sentences = cwb.sentences_iter(args.corpus)
     # r = pool.imap_unordered(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(queries)), 50)
