@@ -22,6 +22,8 @@ def get_subgraphs_nx(query_graph, target_graph, vertex_candidates=None):
         # convert candidates to bfo_graph
         raw_to_bfo = {v: k for k, v in bfo_to_raw.items()}
         vertex_candidates = [set([raw_to_bfo[vc] for vc in vcs]) for vcs in vertex_candidates]
+    if any([len(vc) == 0 for vc in vertex_candidates]):
+        return
     vertex_candidates = functools.reduce(lambda x, y: x.union(y), vertex_candidates)
     for subgraph in enumerate_connected_subgraphs(bfo_graph, bfo_to_raw, query_graph.number_of_nodes(), query_graph.number_of_edges(), vertex_candidates):
         vc = nx_graph.get_vertex_candidates(query_graph, subgraph)
@@ -80,6 +82,8 @@ def get_choke_point_matches(query_graph, target_graph, choke_point, vertex_candi
     """
     if vertex_candidates is None:
         vertex_candidates = nx_graph.get_vertex_candidates(query_graph, target_graph)
+    if any([len(vc) == 0 for vc in vertex_candidates]):
+        return
     for choke_point_candidate in vertex_candidates[choke_point]:
         local_candidates = copy.deepcopy(vertex_candidates)
         local_candidates[choke_point] = set([choke_point_candidate])

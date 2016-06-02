@@ -12,6 +12,8 @@ def get_subgraph_isomorphisms_nx(query_graph, target_graph, vertex_candidates=No
     subgraph_isomorphisms = None
     if vertex_candidates is None:
         vertex_candidates = nx_graph.get_vertex_candidates(query_graph, target_graph)
+    if any([len(vc) == 0 for vc in vertex_candidates]):
+        return iter(())
     if nx_graph.is_purely_structural(query_graph):
         subgraph_isomorphisms = match_structural(query_graph, target_graph, vertex_candidates, 0)
     else:
