@@ -21,10 +21,10 @@ logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=loggi
 def arguments():
     """"""
     parser = argparse.ArgumentParser(description='Run a batch of queries against a corpus')
-    parser.add_argument("-c", "--corpus", type=argparse.FileType("r"), required=True, help="Corpus in CWB format")
+    parser.add_argument("-c", "--corpus", type=argparse.FileType("r", encoding="utf-8"), required=True, help="Corpus in CWB format")
     parser.add_argument("-o", "--output", type=str, required=True, help="Output prefix")
     parser.add_argument("-p", "--cpu", type=int, default=25, help="Percentage of CPUs to use (0-100; default: 25)")
-    parser.add_argument("QUERIES", type=argparse.FileType("r"), help="Queries file with one graph per line and vertices marked as belonging to A, B or both (AB)")
+    parser.add_argument("QUERIES", type=argparse.FileType("r", encoding="utf-8"), help="Queries file with one graph per line and vertices marked as belonging to A, B or both (AB)")
     return parser.parse_args()
 
 
