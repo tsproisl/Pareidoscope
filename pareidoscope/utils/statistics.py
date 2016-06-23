@@ -3,10 +3,11 @@
 
 import math
 
+
 def get_contingency_table(o11, r1, c1, n):
     """Fill in the values for O11, O12, O21 and O22 and E11, E12, E21 and
     E22.
-    
+
     Args:
         o11:
         r1:
@@ -86,7 +87,7 @@ def one_sided_chi_squared(o, e):
         return -1.0 * chi_squared(o, e)
     else:
         return chi_squared(o, e)
-        
+
 
 def log_likelihood(o, e):
     """Calculate the log-likelihood measure
@@ -118,7 +119,7 @@ def one_sided_log_likelihood(o, e):
         return -1.0 * log_likelihood(o, e)
     else:
         return log_likelihood(o, e)
-    
+
 
 def mutual_information(o, e):
     """Calculate the mutual information measure
