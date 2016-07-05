@@ -78,10 +78,22 @@ def main():
                 del g.node[v]["word"]
                 del g.node[v]["lemma"]
         return g
+    def delexicalize_smaller_part(g):
+        v_a = len([v for v in g.nodes() if g.node[v]["query"] == "A"])
+        v_b = len([v for v in g.nodes() if g.node[v]["query"] == "B"])
+        part = "A"
+        if v_b < v_a:
+            part = "B"
+        for v in g.nodes():
+            if g.node[v]["query"] == part:
+                del g.node[v]["word"]
+                del g.node[v]["lemma"]
+        return g
 
     global queries
     queries = read_queries(args.QUERIES)
     queries = [delexicalize_overlap(q) for q in queries]
+    queries = [delexicalize_smaller_part(q) for q in queries]
     queries = [extract_graphs(q) for q in queries]
     queries = [add_focus_point(q) for q in queries]
     # print(queries)
