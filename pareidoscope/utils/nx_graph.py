@@ -229,12 +229,12 @@ def _get_vertex_tuple(nx_graph, vertex):
         choke_point = True
     else:
         choke_point = all((networkx.has_path(nx_graph, vertex, x) or networkx.has_path(nx_graph, x, vertex) for x in other_vertices))
-    label = tuple(sorted(nx_graph.node[vertex].items()))
     indegree = nx_graph.in_degree(vertex)
     outdegree = nx_graph.out_degree(vertex)
+    label = tuple(sorted(nx_graph.node[vertex].items()))
     inedgelabels = tuple(sorted([tuple(sorted(nx_graph.edge[s][t].items())) for s, t in nx_graph.in_edges(vertex)]))
     outedgelabels = tuple(sorted([tuple(sorted(nx_graph.edge[s][t].items())) for s, t in nx_graph.out_edges(vertex)]))
-    return (root, antiroot, star_center, choke_point, label, indegree, outdegree, inedgelabels, outedgelabels)
+    return (root, antiroot, star_center, choke_point, indegree, outdegree, label, inedgelabels, outedgelabels)
 
 
 def _dfs(nx_graph, vertex, vtuples, return_ids=False, blacklist=[]):
