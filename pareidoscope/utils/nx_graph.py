@@ -359,9 +359,9 @@ def is_star(nx_graph, return_centers=False):
         return any((set([v] + nx_graph.predecessors(v) + nx_graph.successors(v)) == vertices for v in vertices))
 
 
-def is_star_of_vertex(nx_graph, v):
-    """Check if the graph is a star of vertex v, i.e. if v is adjacent to
-    all other vertices.
+def is_star_center(nx_graph, v):
+    """Check if the graph is a star and the vertex v is its center, i.e.
+    if v is adjacent to all other vertices.
 
     """
     vertices = set(nx_graph.nodes())
