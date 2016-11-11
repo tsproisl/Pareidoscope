@@ -272,8 +272,8 @@ def _get_unique_order(nx_graph, sorted_vertices, vtuples, blacklist=[]):
             raise Exception("Group should not be empty!")
         else:
             # We need more criteria for sorting
-            vtuples_dfs = {v: tuple(_dfs(nx_graph, v, vtuples, blacklist=blacklist) + [v]) for v in group}
-            keyfunc_dfs = lambda v: vtuples_dfs[v]
+            vtuples_dfs = {v: tuple(_dfs(nx_graph, v, vtuples, blacklist=blacklist)) for v in group}
+            keyfunc_dfs = lambda v: (vtuples_dfs[v], v)
             order.extend(sorted(group, key=keyfunc_dfs))
     return order
 
