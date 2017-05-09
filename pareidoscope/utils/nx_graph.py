@@ -66,7 +66,7 @@ def create_nx_digraph_from_conllu(conllu, origid=None):
     for i, line in enumerate(conllu):
         if line[8] != "_":
             for rel in line[8].split("|"):
-                gov, relation = rel.split(":")
+                gov, relation = rel.split(":", maxsplit=1)
                 governor = id_to_enumeration[gov]
                 # ignore root relation and relations for punctuation
                 if relation == "root" or relation == "punct":
