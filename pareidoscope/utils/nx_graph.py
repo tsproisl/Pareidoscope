@@ -52,6 +52,42 @@ def create_nx_digraph_from_cwb(cwb, origid=None):
     return dg
 
 
+def create_nx_digraph_from_conllu(conllu, origid=None):
+    """Return a networkx.DiGraph object of the CoNLL-U representation."""
+    dg = networkx.DiGraph()
+    if origid is not None:
+        dg.graph["origid"] = origid
+    attributes = lambda l: {"word": l[1], "lemma": l[2], "wc": l[3], "pos": l[4]}
+    dg.add_nodes_from([(l, attributes(conllu[l])) for l in range(len(conllu))])
+    id_to_enumeration = {conllu[l][0]: l for l in range(len(conllu))}
+    for l in range(len(conllu)):
+        if conllu[l][7] == "root":
+            dg.node[l]["root"] = "root"
+    for i, line in enumerate(conllu):
+        if line[8] != "_":
+            for rel in line[8].split("|"):
+                gov, relation = rel.split(":")
+                governor = id_to_enumeration[gov]
+                # ignore root relation and relations for punctuation
+                if relation == "root" or relation == "punct":
+                    continue
+                dg.add_edge(governor, i, {"relation": relation})
+        else:
+            relation = line[7]
+            governor = id_to_enumeration[line[6]]
+            # ignore root relation and relations for punctuation
+            if relation == "root" or relation == "punct":
+                continue
+            dg.add_edge(governor, i, {"relation": relation})
+    # remove unconnected vertices, e.g. punctuation in the SD model
+    for v, l in dg.nodes(data=True):
+        if "root" not in l and dg.degree(v) == 0:
+            dg.remove_node(v)
+    # make sure that the remaining vertices are consecutively labeled
+    dg = ensure_consecutive_vertices(dg)
+    return dg
+
+
 def is_sensible_graph(nx_graph):
     """Check if graph is a sensible syntactic representation of a
     sentence, i.e. rooted, connected, sensible outdegree, sensible
