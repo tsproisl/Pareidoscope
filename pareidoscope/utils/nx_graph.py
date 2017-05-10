@@ -331,7 +331,7 @@ def canonize(nx_graph, order=False):
     """Return canonized copy of nx_graph"""
     co = canonical_order(nx_graph)
     mapping = {v: i for i, v in enumerate(co)}
-    canonized = networkx.DiGraph()
+    canonized = networkx.DiGraph(**nx_graph.graph)
     for v, l in nx_graph.nodes(data=True):
         canonized.add_node(mapping[v], l)
     for s, t, l in nx_graph.edges(data=True):
@@ -344,7 +344,7 @@ def canonize(nx_graph, order=False):
 
 def skeletize(nx_graph, only_vertices=False):
     """Return skeleton copy of nx_graph"""
-    skeleton = networkx.DiGraph()
+    skeleton = networkx.DiGraph(**nx_graph.graph)
     for s, t, l in nx_graph.edges(data=True):
         if only_vertices:
             skeleton.add_edge(s, t, {k: v for k, v in l.items()})
@@ -411,7 +411,7 @@ def ensure_consecutive_vertices(graph):
         return graph
     else:
         mapping = {v: i for i, v in enumerate(sorted(graph.nodes()))}
-        new_graph = networkx.DiGraph()
+        new_graph = networkx.DiGraph(**graph.graph)
         for vertex, label in graph.nodes(data=True):
             new_graph.add_node(mapping[vertex], label)
         for s, t, l in graph.edges(data=True):
