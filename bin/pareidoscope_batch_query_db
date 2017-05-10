@@ -6,14 +6,12 @@ import functools
 import itertools
 import json
 import logging
-import math
 import multiprocessing
 import os
 
 from networkx.readwrite import json_graph
 
 import pareidoscope.query
-from pareidoscope.utils import cwb
 from pareidoscope.utils import database
 from pareidoscope.utils import helper
 from pareidoscope.utils import nx_graph
@@ -27,7 +25,7 @@ def arguments():
     parser.add_argument("-c", "--corpus", type=os.path.abspath, required=True, help="SQLite3 corpus database as created by pareidoscope_cwb_to_sqlite")
     parser.add_argument("-o", "--output", type=str, required=True, help="Output prefix")
     parser.add_argument("-p", "--cpu", type=int, default=25, help="Percentage of CPUs to use (0-100; default: 25)")
-    parser.add_argument("QUERIES", type=argparse.FileType("r"), help="Queries file with one graph per line and vertices marked as belonging to A, B or both (AB)")
+    parser.add_argument("QUERIES", type=argparse.FileType("r", encoding="utf-8"), help="Queries file with one graph per line and vertices marked as belonging to A, B or both (AB)")
     return parser.parse_args()
 
 
@@ -99,7 +97,7 @@ def sentence_candidates(c, g):
     candidate_ids = functools.reduce(lambda x, y: x.intersection(y), sentence_ids)
     candidate_sentences = [r[0] for r in c.execute("SELECT graph FROM sentences WHERE sentence_id IN (%s)" % ", ".join([str(_) for _ in candidate_ids])).fetchall()]
     return candidate_sentences
-    
+
 
 def write_results(prefix, results):
     """Write results to files
@@ -139,7 +137,7 @@ def main():
     # print([[json.dumps(json_graph.node_link_data(g)) for g in q[:3]] for q in queries])
 
     conn, c = database.connect_to_database(args.corpus)
-    
+
     groupsize = 10 * 10 * multiprocessing.cpu_count()
 
     results = [{} for q in queries]

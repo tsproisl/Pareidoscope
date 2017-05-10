@@ -277,11 +277,11 @@ def sentences(gc, ga, gb, gn, gs, candidates=None):
 
 
 def run_queries(args):
-    """Run queries on graphs from input_queue and write output to
-    output_queue.
+    """Run all queries on a single sentence.
 
     Arguments:
     - `args`:
+
     """
     sentence, queries = args
     result = []
@@ -291,31 +291,24 @@ def run_queries(args):
         for qline in queries:
             gc, ga, gb, gn, choke_point = qline
             candidates = nx_graph.get_vertex_candidates(strip_vid(gn), gs)
-            # isomorphisms
-            iso_ct = isomorphisms(gc, ga, gb, gn, gs, candidates)
-            # subgraphs (contingency table)
-            sub_ct = subgraphs(gc, ga, gb, gn, gs, candidates)
-            # choke_points (contingency table)
-            choke_point_ct = {}
-            if choke_point is not None:
-                choke_point_ct = choke_points(gc, ga, gb, gn, gs, choke_point, candidates)
-            # sentences (contingency table)
-            sent_ct = sentences(gc, ga, gb, gn, gs, candidates)
-            # we could also append gziped JSON strings if full data
-            # structures need too much memory
-            result.append({"iso_ct": iso_ct, "sub_ct": sub_ct, "choke_point_ct": choke_point_ct, "sent_ct": sent_ct})
+            result.append(_run_query(gc, ga, gb, gn, gs, choke_point, candidates))
     return result, sensible
 
 
 def run_queries_db(args):
-    """Run queries on graphs from input_queue and write output to
-    output_queue.
+    """Run a query on a single sentence from the database.
 
     Arguments:
     - `args`:
+
     """
     gc, ga, gb, gn, choke_point, sentence, candidates = args
     gs = json_graph.node_link_graph(json.loads(sentence))
+    return _run_query(gc, ga, gb, gn, gs, choke_point, candidates)
+
+
+def _run_query(gc, ga, gb, gn, gs, choke_point, candidates):
+    """Run a single query on a single graph"""
     # isomorphisms
     iso_ct = isomorphisms(gc, ga, gb, gn, gs, candidates)
     # subgraphs (contingency table)
@@ -326,10 +319,7 @@ def run_queries_db(args):
         choke_point_ct = choke_points(gc, ga, gb, gn, gs, choke_point, candidates)
     # sentences (contingency table)
     sent_ct = sentences(gc, ga, gb, gn, gs, candidates)
-    # we could also append gziped JSON strings if full data
-    # structures need too much memory
-    result = {"iso_ct": iso_ct, "sub_ct": sub_ct, "choke_point_ct": choke_point_ct, "sent_ct": sent_ct}
-    return result
+    return {"iso_ct": iso_ct, "sub_ct": sub_ct, "choke_point_ct": choke_point_ct, "sent_ct": sent_ct}
 
 
 def merge_result(result, results):

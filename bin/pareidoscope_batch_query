@@ -5,8 +5,7 @@ import argparse
 import itertools
 import json
 import logging
-import math
-import multiprocessing
+# import multiprocessing
 
 from networkx.readwrite import json_graph
 from scoop import futures
@@ -19,6 +18,7 @@ from pareidoscope.utils import nx_graph
 logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=logging.INFO)
 
 queries = []
+
 
 def arguments():
     """"""
@@ -72,12 +72,14 @@ def write_results(prefix, results):
 def main():
     """"""
     args = arguments()
+
     def delexicalize_overlap(g):
         for v in g.nodes():
             if g.node[v]["query"] == "AB":
                 del g.node[v]["word"]
                 del g.node[v]["lemma"]
         return g
+
     def delexicalize_smaller_part(g):
         v_a = len([v for v in g.nodes() if g.node[v]["query"] == "A"])
         v_b = len([v for v in g.nodes() if g.node[v]["query"] == "B"])
@@ -92,23 +94,23 @@ def main():
 
     global queries
     queries = read_queries(args.QUERIES)
-    queries = [delexicalize_overlap(q) for q in queries]
-    queries = [delexicalize_smaller_part(q) for q in queries]
+    # queries = [delexicalize_overlap(q) for q in queries]
+    # queries = [delexicalize_smaller_part(q) for q in queries]
     queries = [extract_graphs(q) for q in queries]
     queries = [add_focus_point(q) for q in queries]
     # print(queries)
     # print([[json.dumps(json_graph.node_link_data(g)) for g in q[:3]] for q in queries])
 
     results = [{} for q in queries]
-    cpu_count = multiprocessing.cpu_count()
+    # cpu_count = multiprocessing.cpu_count()
     # processes = min(max(1, int(cpu_count * args.cpu / 100)), cpu_count)
     # pool = multiprocessing.Pool(processes=processes)
     # logging.info("using %d cpus" % processes)
-    
+
     # groupsize = 10 * 10 * processes
 
     groupsize = 600
-    
+
     i = 0
     sents = cwb.sentences_iter(args.corpus)
     sent_chunks = helper.grouper_nofill(groupsize, sents)
