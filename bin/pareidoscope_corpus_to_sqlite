@@ -7,9 +7,9 @@ import logging
 import os
 import sqlite3
 
-import networkx
 from networkx.readwrite import json_graph
 
+from pareidoscope.utils import conllu
 from pareidoscope.utils import cwb
 from pareidoscope.utils import nx_graph
 
@@ -18,10 +18,11 @@ logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=loggi
 
 def arguments():
     """"""
-    parser = argparse.ArgumentParser(description="Convert a corpus in CWB format into a corresponding SQLite database")
+    parser = argparse.ArgumentParser(description="Convert a corpus in CoNLL-U or CWB-treebank format into a corresponding SQLite database")
     parser.add_argument("--db", type=os.path.abspath, required=True, help="SQLite3 database for results")
     parser.add_argument("--no-id", action="store_true", help="Corpus has no unique sentence IDs, create them on the fly")
-    parser.add_argument("CORPUS", type=argparse.FileType("r"), help="Corpus in CWB format")
+    parser.add_argument("--format", choices=["conllu", "cwb"], required=True, help="Input format of the corpus: CoNLL-U or CWB-treebank")
+    parser.add_argument("CORPUS", type=argparse.FileType("r"), help="The input corpus")
     args = parser.parse_args()
     return args
 
@@ -72,18 +73,22 @@ def main():
     args = arguments()
     conn, c = connect_to_db(args.db)
     i = 1
-    sents = cwb.sentences_iter(args.CORPUS, return_id=True)
+    if args.format == "cwb":
+        sents = cwb.sentences_iter(args.CORPUS, return_id=True)
+        create_digraph = nx_graph.create_nx_digraph_from_cwb
+    elif args.format == "conllu":
+        sents = conllu.sentences_iter(args.CORPUS, return_id=True)
+        create_digraph = nx_graph.create_nx_digraph_from_conllu
     for sentence, origid in sents:
         if args.no_id:
             origid = "s-%d" % i
             i += 1
-        gs = nx_graph.create_nx_digraph_from_cwb(sentence)
+        gs = create_digraph(sentence, origid)
         sensible = nx_graph.is_sensible_graph(gs)
         if sensible:
             insert_sentence(c, origid, gs)
     conn.commit()
     conn.close()
-
 
 
 if __name__ == "__main__":

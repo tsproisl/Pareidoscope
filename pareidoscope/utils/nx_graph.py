@@ -64,18 +64,16 @@ def create_nx_digraph_from_conllu(conllu, origid=None):
         if conllu[l][7] == "root":
             dg.node[l]["root"] = "root"
     for i, line in enumerate(conllu):
+        relations = set()
+        if line[7] != "root" and line[7] != "_":
+            relations.add((id_to_enumeration[line[6]], line[7]))
         if line[8] != "_":
             for rel in line[8].split("|"):
                 gov, relation = rel.split(":", maxsplit=1)
                 governor = id_to_enumeration[gov]
-                # ignore root relation and relations for punctuation
-                if relation == "root" or relation == "punct":
-                    continue
-                dg.add_edge(governor, i, {"relation": relation})
-        else:
-            relation = line[7]
-            governor = id_to_enumeration[line[6]]
-            # ignore root relation and relations for punctuation
+                if relation != "root":
+                    relations.add((governor, relation))
+        for governor, relation in relations:
             if relation == "root" or relation == "punct":
                 continue
             dg.add_edge(governor, i, {"relation": relation})
