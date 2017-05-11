@@ -153,7 +153,15 @@ def dictionary_match(query_dictionary, target_dictionary):
     query_vertex in target_vertex and if yes, are their values equal?
 
     """
-    return all([label in target_dictionary and query_dictionary[label] == target_dictionary[label] for label in query_dictionary])
+    results = []
+    for label in query_dictionary:
+        if label.startswith("not_"):
+            if label == "not_indep" or label == "not_outdep":
+                continue
+            results.append(label in target_dictionary and query_dictionary[label] != target_dictionary[label])
+        else:
+            results.append(label in target_dictionary and query_dictionary[label] == target_dictionary[label])
+    return all(results)
     # return all([label in target_dictionary and (query_dictionary[label] == target_dictionary[label] or re.search(r"^" + str(query_dictionary[label]) + r"$", str(target_dictionary[label]))) for label in query_dictionary])
 
 
