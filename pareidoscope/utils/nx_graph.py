@@ -153,8 +153,8 @@ def dictionary_match(query_dictionary, target_dictionary):
     query_vertex in target_vertex and if yes, are their values equal?
 
     """
-    return all([label in target_dictionary and (query_dictionary[label] == target_dictionary[label] or re.search(r"^" + str(query_dictionary[label]) + r"$", str(target_dictionary[label]))) for label in query_dictionary])
-    # return all([label in target_dictionary and (query_dictionary[label] == ".+" or query_dictionary[label] == ".*" or query_dictionary[label] == target_dictionary[label]) for label in query_dictionary])
+    return all([label in target_dictionary and query_dictionary[label] == target_dictionary[label] for label in query_dictionary])
+    # return all([label in target_dictionary and (query_dictionary[label] == target_dictionary[label] or re.search(r"^" + str(query_dictionary[label]) + r"$", str(target_dictionary[label]))) for label in query_dictionary])
 
 
 def export_to_adjacency_matrix(nx_graph, canonical=False):
