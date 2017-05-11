@@ -135,11 +135,11 @@ def get_vertex_candidates(query_graph, target_graph):
         query_out = query_graph.out_degree(vertex)
         candidates[vertex] = [tv for tv in candidates[vertex] if (query_in <= target_graph.in_degree(tv)) and (query_out <= target_graph.out_degree(tv))]
         # negated edges
-        not_indep = query_graph.node[vertex].get("indep")
+        not_indep = query_graph.node[vertex].get("not_indep")
         if not_indep is not None:
             not_indep = set(not_indep)
             candidates[vertex] = [tv for tv in candidates[vertex] if len(not_indep & set([l["relation"] for s, t, l in target_graph.in_edges(tv, data=True)])) == 0]
-        not_outdep = query_graph.node[vertex].get("outdep")
+        not_outdep = query_graph.node[vertex].get("not_outdep")
         if not_outdep is not None:
             not_outdep = set(not_outdep)
             candidates[vertex] = [tv for tv in candidates[vertex] if len(not_outdep & set([l["relation"] for s, t, l in target_graph.out_edges(tv, data=True)])) == 0]
