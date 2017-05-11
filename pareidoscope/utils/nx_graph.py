@@ -133,7 +133,17 @@ def get_vertex_candidates(query_graph, target_graph):
             candidates[vertex] = [tv for tv in target_graph.nodes() if dictionary_match(query_graph.node[vertex], target_graph.node[tv])]
         query_in = query_graph.in_degree(vertex)
         query_out = query_graph.out_degree(vertex)
-        candidates[vertex] = set([tv for tv in candidates[vertex] if (query_in <= target_graph.in_degree(tv)) and (query_out <= target_graph.out_degree(tv))])
+        candidates[vertex] = [tv for tv in candidates[vertex] if (query_in <= target_graph.in_degree(tv)) and (query_out <= target_graph.out_degree(tv))]
+        # negated edges
+        not_indep = query_graph.node[vertex].get("indep")
+        if not_indep is not None:
+            not_indep = set(not_indep)
+            candidates[vertex] = [tv for tv in candidates[vertex] if len(not_indep & set([l["relation"] for s, t, l in target_graph.in_edges(tv, data=True)])) == 0]
+        not_outdep = query_graph.node[vertex].get("outdep")
+        if not_outdep is not None:
+            not_outdep = set(not_outdep)
+            candidates[vertex] = [tv for tv in candidates[vertex] if len(not_outdep & set([l["relation"] for s, t, l in target_graph.out_edges(tv, data=True)])) == 0]
+        candidates[vertex] = set(candidates[vertex])
     # verify adjacency and edge labels
     for s, t, l in query_graph.edges(data=True):
         source_candidates = set([])
@@ -158,7 +168,8 @@ def dictionary_match(query_dictionary, target_dictionary):
         if label.startswith("not_"):
             if label == "not_indep" or label == "not_outdep":
                 continue
-            results.append(label in target_dictionary and query_dictionary[label] != target_dictionary[label])
+            pos_label = label[4:]
+            results.append(pos_label in target_dictionary and query_dictionary[label] != target_dictionary[pos_label])
         else:
             results.append(label in target_dictionary and query_dictionary[label] == target_dictionary[label])
     return all(results)
