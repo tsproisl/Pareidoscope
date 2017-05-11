@@ -120,7 +120,7 @@ def main():
         #     break
         # logging.info("slice no. %d" % i)
         print("slice no. %d" % i)
-        r = futures.map_as_completed(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(queries)))
+        r = futures.map_as_completed(pareidoscope.query.run_queries, zip(sentences, itertools.repeat("cwb"), itertools.repeat(queries)))
         # r = pool.imap_unordered(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(queries)), 10)
         # r = map(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(queries)))
         for result, sensible in r:
