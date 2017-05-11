@@ -283,7 +283,7 @@ def run_queries(args):
     - `args`:
 
     """
-    sentence, input_format, queries = args
+    sentence, input_format, queries, all_counting_methods = args
     result = []
     if input_format == "cwb":
         gs = nx_graph.create_nx_digraph_from_cwb(sentence)
@@ -294,7 +294,7 @@ def run_queries(args):
         for qline in queries:
             gc, ga, gb, gn, choke_point = qline
             candidates = nx_graph.get_vertex_candidates(strip_vid(gn), gs)
-            result.append(_run_query(gc, ga, gb, gn, gs, choke_point, candidates))
+            result.append(_run_query(gc, ga, gb, gn, gs, choke_point, candidates, all_counting_methods))
     return result, sensible
 
 
@@ -305,25 +305,31 @@ def run_queries_db(args):
     - `args`:
 
     """
-    gc, ga, gb, gn, choke_point, sentence = args
+    gc, ga, gb, gn, choke_point, sentence, all_counting_methods = args
     gs = json_graph.node_link_graph(json.loads(sentence))
     candidates = nx_graph.get_vertex_candidates(strip_vid(gn), gs)
-    return _run_query(gc, ga, gb, gn, gs, choke_point, candidates)
+    return _run_query(gc, ga, gb, gn, gs, choke_point, candidates, all_counting_methods)
 
 
-def _run_query(gc, ga, gb, gn, gs, choke_point, candidates):
+def _run_query(gc, ga, gb, gn, gs, choke_point, candidates, all_counting_methods=True):
     """Run a single query on a single graph"""
-    # isomorphisms
-    iso_ct = isomorphisms(gc, ga, gb, gn, gs, candidates)
-    # subgraphs (contingency table)
-    sub_ct = subgraphs(gc, ga, gb, gn, gs, candidates)
+    result = {}
     # choke_points (contingency table)
     choke_point_ct = {}
     if choke_point is not None:
         choke_point_ct = choke_points(gc, ga, gb, gn, gs, choke_point, candidates)
-    # sentences (contingency table)
-    sent_ct = sentences(gc, ga, gb, gn, gs, candidates)
-    return {"iso_ct": iso_ct, "sub_ct": sub_ct, "choke_point_ct": choke_point_ct, "sent_ct": sent_ct}
+        result["choke_points"] = choke_point_ct
+    if all_counting_methods:
+        # isomorphisms
+        iso_ct = isomorphisms(gc, ga, gb, gn, gs, candidates)
+        result["isomorphisms"] = iso_ct
+        # subgraphs (contingency table)
+        sub_ct = subgraphs(gc, ga, gb, gn, gs, candidates)
+        result["subgraphs"] = sub_ct
+        # sentences (contingency table)
+        sent_ct = sentences(gc, ga, gb, gn, gs, candidates)
+        result["sentences"] = sent_ct
+    return result
 
 
 def merge_result(result, results):
