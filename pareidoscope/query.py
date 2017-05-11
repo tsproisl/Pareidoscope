@@ -283,9 +283,12 @@ def run_queries(args):
     - `args`:
 
     """
-    sentence, queries = args
+    sentence, input_format, queries = args
     result = []
-    gs = nx_graph.create_nx_digraph_from_cwb(sentence)
+    if input_format == "cwb":
+        gs = nx_graph.create_nx_digraph_from_cwb(sentence)
+    elif input_format == "conllu":
+        gs = nx_graph.create_nx_digraph_from_conllu(sentence)
     sensible = nx_graph.is_sensible_graph(gs)
     if sensible:
         for qline in queries:
@@ -302,8 +305,9 @@ def run_queries_db(args):
     - `args`:
 
     """
-    gc, ga, gb, gn, choke_point, sentence, candidates = args
+    gc, ga, gb, gn, choke_point, sentence = args
     gs = json_graph.node_link_graph(json.loads(sentence))
+    candidates = nx_graph.get_vertex_candidates(strip_vid(gn), gs)
     return _run_query(gc, ga, gb, gn, gs, choke_point, candidates)
 
 
