@@ -21,8 +21,8 @@ def arguments():
     parser = argparse.ArgumentParser(description="Convert a corpus in CoNLL-U or CWB-treebank format into a corresponding SQLite database")
     parser.add_argument("--db", type=os.path.abspath, required=True, help="SQLite3 database for results")
     parser.add_argument("--no-id", action="store_true", help="Corpus has no unique sentence IDs, create them on the fly")
-    parser.add_argument("--format", choices=["conllu", "cwb"], required=True, help="Input format of the corpus: CoNLL-U or CWB-treebank")
-    parser.add_argument("CORPUS", type=argparse.FileType("r"), help="The input corpus")
+    parser.add_argument("-f", "--format", choices=["conllu", "cwb"], required=True, help="Input format of the corpus: CoNLL-U or CWB-treebank")
+    parser.add_argument("CORPUS", type=argparse.FileType("r", encoding="utf-8"), help="The input corpus")
     args = parser.parse_args()
     return args
 
@@ -44,8 +44,8 @@ def connect_to_db(filename):
     c.execute("CREATE INDEX indegree_idx ON tokens (indegree)")
     c.execute("CREATE INDEX outdegree_idx ON tokens (outdegree)")
     c.execute("CREATE INDEX root_idx ON tokens (root)")
-    c.execute("CREATE INDEX governor_id_idx ON dependencies (governor_id)")
-    c.execute("CREATE INDEX dependent_id_idx ON dependencies (dependent_id)")
+    c.execute("CREATE INDEX governor_id_relation_idx ON dependencies (governor_id, relation)")
+    c.execute("CREATE INDEX dependent_id_relation_idx ON dependencies (dependent_id, relation)")
     c.execute("CREATE INDEX relation_idx ON dependencies (relation)")
     return conn, c
 
