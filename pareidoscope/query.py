@@ -269,11 +269,11 @@ def _run_query(gc, ga, gb, gn, gs, choke_point, candidates, all_counting_methods
     choke_point_ct = {}
     if choke_point is not None:
         choke_point_ct = choke_points(gc, ga, gb, gn, gs, choke_point, candidates)
-        result["choke_points"] = choke_point_ct
+        result["focus_points"] = choke_point_ct
     if all_counting_methods:
         # isomorphisms
         iso_ct = isomorphisms(gc, ga, gb, gn, gs, candidates)
-        result["isomorphisms"] = iso_ct
+        result["embeddings"] = iso_ct
         # subgraphs (contingency table)
         sub_ct = subgraphs(gc, ga, gb, gn, gs, candidates)
         result["subgraphs"] = sub_ct
