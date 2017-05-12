@@ -32,19 +32,8 @@ def arguments():
     parser.add_argument("-o", "--output", type=str, required=True, help="Output prefix")
     parser.add_argument("-p", "--cpu", type=int, default=25, help="Percentage of CPUs to use (0-100; default: 25)")
     parser.add_argument("CORPUS", type=os.path.abspath, help="Input corpus")
-    parser.add_argument("QUERIES", type=argparse.FileType("r", encoding="utf-8"), help="Queries file with one graph per line and vertices marked as belonging to A, B or both (AB)")
+    parser.add_argument("QUERIES", type=argparse.FileType("r", encoding="utf-8"), help="Queries file as JSON list")
     return parser.parse_args()
-
-
-def read_queries(queries_file):
-    """Read all queries."""
-    queries = json.load(queries_file)
-    for query in queries:
-        yield json_graph.node_link_graph(query, directed=True, multigraph=False)
-    # for line in queries_file:
-    #     if line.startswith("#") or line == "\n":
-    #         continue
-    #     yield json_graph.node_link_graph(json.loads(line))
 
 
 def remove_auxiliary_attributes(graph, abcn):
@@ -82,61 +71,6 @@ def extract_graphs(query):
     return [nx_graph.ensure_consecutive_vertices(g) for g in (gc, ga, gb, gn)]
 
 
-def sentence_candidates(c, g):
-    """Get candidate sentences (no token candidates!) for the query
-    graph.
-
-    """
-    sentence_ids = []
-    for vertex in g.nodes():
-        sql_query = "SELECT DISTINCT sentence_id FROM tokens WHERE "
-        where = []
-        args = []
-        pos_lexical = set(["word", "pos", "lemma", "wc", "root"])
-        neg_lexical = set(["not_%s" % pl for pl in pos_lexical])
-        indegree = g.in_degree(vertex)
-        outdegree = g.out_degree(vertex)
-        if indegree > 0:
-            where.append("indegree >= ?")
-            args.append(indegree)
-        if outdegree > 0:
-            where.append("outdegree >= ?")
-            args.append(outdegree)
-        for k, v in g.node[vertex].items():
-            if k in pos_lexical:
-                where.append("%s = ?" % k)
-                if k == "root":
-                    args.append(v == "root")
-                else:
-                    args.append(v)
-            elif k in neg_lexical:
-                k = k[4:]
-                where.append("%s != ?" % k)
-                if k == "root":
-                    args.append(v == "root")
-                else:
-                    args.append(v)
-            elif k == "not_indep":
-                relations = []
-                for rel in v:
-                    relations.append("relation = ?")
-                    args.append(rel)
-                where.append("NOT EXISTS (SELECT 1 FROM dependencies WHERE dependent_id = token_id AND (%s))" % " OR ".join(relations))
-            elif k == "not_outdep":
-                relations = []
-                for rel in v:
-                    relations.append("relation = ?")
-                    args.append(rel)
-                where.append("NOT EXISTS (SELECT 1 FROM dependencies WHERE governor_id = token_id AND (%s))" % " OR ".join(relations))
-            else:
-                raise Exception("Unsupported key: %s" % k)
-        sql_query += " AND ".join(where)
-        sentence_ids.append(set([r[0] for r in c.execute(sql_query, args).fetchall()]))
-    candidate_ids = functools.reduce(lambda x, y: x.intersection(y), sentence_ids)
-    candidate_sentences = [r[0] for r in c.execute("SELECT graph FROM sentences WHERE sentence_id IN (%s)" % ", ".join([str(_) for _ in candidate_ids])).fetchall()]
-    return candidate_sentences
-
-
 def add_focus_point(query):
     """Search for choke point vertices"""
     gc, ga, gb, gn = query
@@ -165,7 +99,7 @@ def write_results(prefix, results):
 def main():
     """"""
     args = arguments()
-    queries = read_queries(args.QUERIES)
+    queries = pareidoscope.query.read_queries(args.QUERIES)
     queries = [extract_graphs(q) for q in queries]
     queries = [add_focus_point(q) for q in queries]
     results = [{} for q in queries]
@@ -179,7 +113,7 @@ def main():
             for i, qline in enumerate(queries):
                 logging.info("query no. %d" % i)
                 gc, ga, gb, gn, choke_point = qline
-                sents = sentence_candidates(c, pareidoscope.query.strip_vid(gn))
+                sents = database.sentence_candidates(c, pareidoscope.query.strip_vid(gn))
                 logging.info("%d candidate sentences" % len(sents))
                 for sentences in helper.grouper_nofill(groupsize, sents):
                     query_args = (itertools.chain.from_iterable(a) for a in zip(itertools.repeat(qline), ((s,) for s in sentences), ((a,) for a in itertools.repeat(args.a))))
