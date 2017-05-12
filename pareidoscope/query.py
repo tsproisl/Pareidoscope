@@ -17,6 +17,7 @@ def read_queries(queries_file):
     queries = json.load(queries_file)
     for query in queries:
         graph = json_graph.node_link_graph(query, directed=True, multigraph=False)
+        graph = nx_graph.ensure_consecutive_vertices(graph)
         for v, l in graph.nodes(data=True):
             l["vid"] = v
         yield graph
