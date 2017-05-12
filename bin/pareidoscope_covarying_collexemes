@@ -25,6 +25,13 @@ collocate and their combinations
 """
 
 import argparse
+import collections
+
+import pareidoscope.query
+from pareidoscpe import subgraph_isomorphism
+from pareidoscope.utils import database
+from pareidoscope.utils import statistics
+from pareidoscope.utils import nx_graph
 
 
 def arguments():
@@ -38,10 +45,61 @@ def arguments():
     return parser.parse_args()
 
 
+def identify_collo_items(graph):
+    """Search for collo_A and collo_B"""
+    collo_a, collo_b, focus_point = None, None, None
+    for v, l in graph.nodes(data=True):
+        if "collo_A" in l:
+            collo_a = v
+            del l["collo_A"]
+        if "collo_B" in l:
+            collo_b = v
+            del l["collo_B"]
+        if "focus_point" in l:
+            focus_point = v
+            del l["focus_point"]
+    if focus_point is None:
+        focus_point = nx_graph.get_choke_point(graph)
+    assert collo_a is not None and collo_b is not None and focus_point is not None
+    return graph, focus_point, collo_a, collo_b
+
+
+def get_cooccurrences(args):
+    """"""
+    query_graph, target_graph, focus_point, collo_a, collo_b, word_or_lemma = args
+    embeddings = collections.defaultdict(set)
+    subgraphs = collections.defaultdict(set)
+    focus_points = collections.defaultdict(set)
+    sentences = collections.defaultdict(set)
+    target_graph = json_graph.node_link_graph(json.loads(target_graph))
+    isomorphisms = subgraph_isomorphism.get_subgraph_isomorphisms_nx(query_graph, target_graph)
+    for iso in isomorphisms:
+        item_a = target_graph.node[iso[collo_a]][word_or_lemma]
+        item_b = target_graph.node[iso[collo_b]][word_or_lemma]
+        pair = (item_a, item_b)
+        embeddings(iso).add(pair)
+        subgraphs[tuple(sorted(iso))].add(pair)
+        focus_points[iso[focus_point]].add(pair)
+    
+
 def main():
     """"""
     args = arguments()
-
+    conn, c = database.connect_to_database(args.CORPUS)
+    queries = pareidoscope.query.read_queries(args.QUERIES)
+    results = []
+    cpu_count = multiprocessing.cpu_count()
+    processes = min(max(1, int(cpu_count * args.cpu / 100)), cpu_count)
+    with multiprocessing.Pool(processes=processes) as pool:
+        for i, query in enumerate(queries):
+            logging.info("query no. %d" % i)
+            graph, focus_point, collo_a, collo_b = identify_collo_items(query)
+            with tempfile.TemporaryFile() as fp:
+                sents = database.sentence_candidates(c, pareidoscope.query.strip_vid(graph))
+                for s in sents:
+                    fp.write((s + "\n").encode(encoding="utf-8"))
+                fp.seek(0)
+                sentences = (s.decode(encoding="utf-8").rstrip() for s in fp)
 
 if __name__ == "__main__":
     main()
