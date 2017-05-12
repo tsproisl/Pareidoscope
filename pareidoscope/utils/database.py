@@ -20,6 +20,62 @@ def connect_to_database(filename, re=False):
     return conn, c
 
 
+def sentence_candidates(c, g):
+    """Get candidate sentences (no token candidates!) for the query
+    graph.
+
+    """
+    sentence_ids = []
+    for vertex in g.nodes():
+        sql_query = "SELECT DISTINCT sentence_id FROM tokens WHERE "
+        where = []
+        args = []
+        pos_lexical = set(["word", "pos", "lemma", "wc", "root"])
+        neg_lexical = set(["not_%s" % pl for pl in pos_lexical])
+        indegree = g.in_degree(vertex)
+        outdegree = g.out_degree(vertex)
+        if indegree > 0:
+            where.append("indegree >= ?")
+            args.append(indegree)
+        if outdegree > 0:
+            where.append("outdegree >= ?")
+            args.append(outdegree)
+        for k, v in g.node[vertex].items():
+            if k in pos_lexical:
+                where.append("%s = ?" % k)
+                if k == "root":
+                    args.append(v == "root")
+                else:
+                    args.append(v)
+            elif k in neg_lexical:
+                k = k[4:]
+                where.append("%s != ?" % k)
+                if k == "root":
+                    args.append(v == "root")
+                else:
+                    args.append(v)
+            elif k == "not_indep":
+                relations = []
+                for rel in v:
+                    relations.append("relation = ?")
+                    args.append(rel)
+                where.append("NOT EXISTS (SELECT 1 FROM dependencies WHERE dependent_id = token_id AND (%s))" % " OR ".join(relations))
+            elif k == "not_outdep":
+                relations = []
+                for rel in v:
+                    relations.append("relation = ?")
+                    args.append(rel)
+                where.append("NOT EXISTS (SELECT 1 FROM dependencies WHERE governor_id = token_id AND (%s))" % " OR ".join(relations))
+            else:
+                raise Exception("Unsupported key: %s" % k)
+        sql_query += " AND ".join(where)
+        sentence_ids.append(set([r[0] for r in c.execute(sql_query, args).fetchall()]))
+    candidate_ids = functools.reduce(lambda x, y: x.intersection(y), sentence_ids)
+    candidate_sentences = [r[0] for r in c.execute("SELECT graph FROM sentences WHERE sentence_id IN (%s)" % ", ".join([str(_) for _ in candidate_ids])).fetchall()]
+    return candidate_sentences
+
+
+# Only used in pareidoscope_collexeme_analysis_db
 def create_sql_query(query_graph):
     """Create an SQL query for the given query_graph."""
     sql_query = "SELECT s.sentence_id, s.graph, "
@@ -72,34 +128,6 @@ def create_sql_query(query_graph):
             arguments.append(l["relation"])
     sql_query += " AND ".join(where)
     return sql_query, tuple(arguments)
-
-
-def get_candidates(c, graph):
-    """Get candidate tokens for each vertex in the graph from the
-    database.
-
-    Arguments:
-    - `c`: Database cursor
-    - `graph`:
-
-    """
-    mapping = {v: i for i, v in enumerate(sorted(graph.nodes()))}
-    sentpos = {}
-    sentences = []
-    queries = [(i, _create_sql_query(graph, v)) for v, i in mapping.items()]
-    for i, (query, args) in queries:
-        sentpos[i] = {}
-        vsents = set()
-        for row in c.execute(query, args):
-            sentid, position = row
-            if sentid not in sentpos[i]:
-                sentpos[i][sentid] = set()
-            sentpos[i][sentid].add(position)
-            vsents.add(sentid)
-        sentences.append(vsents)
-    sent_intersect = functools.reduce(lambda x, y: x.intersection(y), sentences)
-    candidates = {sentid: [sentpos[i][sentid] for i in sorted(sentpos)] for sentid in sent_intersect}
-    return candidates
 
 
 def _create_sql_query(graph, v):
