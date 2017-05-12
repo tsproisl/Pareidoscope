@@ -130,18 +130,6 @@ def create_sql_query(query_graph):
     return sql_query, tuple(arguments)
 
 
-def might_contain_re(s):
-    """Return if the string might contain a regular expression, i.e. any
-    non-alphanumeric characters
-
-    Arguments:
-    - `s`:
-
-    """
-    reg = re.compile(r"^\w+$", flags=re.UNICODE)
-    return re.search(reg, s) is None
-
-
 def regexp(expression, item):
     """Does expression match item?
 
