@@ -27,47 +27,6 @@ def arguments():
     return args
 
 
-def connect_to_db(filename):
-    """Connect to database, create tables and indexes and return
-    connection and cursor."""
-    conn = sqlite3.connect(filename)
-    c = conn.cursor()
-    c.execute("PRAGMA page_size=4096")
-    c.execute("PRAGMA cache_size=100000")
-    c.execute("CREATE TABLE sentences (sentence_id INTEGER PRIMARY KEY AUTOINCREMENT, original_id TEXT, graph TEXT, UNIQUE (original_id))")
-    c.execute("CREATE TABLE tokens (token_id INTEGER PRIMARY KEY AUTOINCREMENT, sentence_id INTEGER, position INTEGER, word TEXT, pos TEXT, lemma TEXT, wc TEXT, indegree INTEGER, outdegree INTEGER, root BOOLEAN, FOREIGN KEY (sentence_id) REFERENCES sentences (sentence_id), UNIQUE (sentence_id, position))")
-    c.execute("CREATE TABLE dependencies (governor_id INTEGER, dependent_id INTEGER, relation TEXT, FOREIGN KEY (governor_id) REFERENCES tokens (token_id), FOREIGN KEY (dependent_id) REFERENCES tokens (token_id), UNIQUE (governor_id, dependent_id))")
-    c.execute("CREATE INDEX word_idx ON tokens (word)")
-    c.execute("CREATE INDEX pos_idx ON tokens (pos)")
-    c.execute("CREATE INDEX lemma_idx ON tokens (lemma)")
-    c.execute("CREATE INDEX wc_idx ON tokens (wc)")
-    c.execute("CREATE INDEX indegree_idx ON tokens (indegree)")
-    c.execute("CREATE INDEX outdegree_idx ON tokens (outdegree)")
-    c.execute("CREATE INDEX root_idx ON tokens (root)")
-    c.execute("CREATE INDEX governor_id_relation_idx ON dependencies (governor_id, relation)")
-    c.execute("CREATE INDEX dependent_id_relation_idx ON dependencies (dependent_id, relation)")
-    c.execute("CREATE INDEX relation_idx ON dependencies (relation)")
-    return conn, c
-
-
-def insert_sentence(c, origid, gs):
-    """Insert sentence into database"""
-    graph = json.dumps(json_graph.node_link_data(gs), ensure_ascii=False, sort_keys=True)
-    c.execute("INSERT INTO sentences (original_id, graph) VALUES (?, ?)", (origid, graph))
-    sid = c.execute("SELECT sentence_id FROM sentences WHERE original_id = ?", (origid, )).fetchall()[0][0]
-    token_id = {}
-    for vertice in sorted(gs.nodes()):
-        word = gs.node[vertice]["word"]
-        pos = gs.node[vertice]["pos"]
-        lemma = gs.node[vertice]["lemma"]
-        wc = gs.node[vertice]["wc"]
-        root = "root" in gs.node[vertice] and gs.node[vertice]["root"] == "root"
-        c.execute("INSERT INTO tokens (sentence_id, position, word, pos, lemma, wc, indegree, outdegree, root) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (sid, vertice, word, pos, lemma, wc, gs.in_degree(vertice), gs.out_degree(vertice), root))
-        token_id[vertice] = c.execute("SELECT token_id FROM tokens WHERE sentence_id = ? AND position = ?", (sid, vertice)).fetchall()[0][0]
-    for s, t, l in gs.edges(data=True):
-        c.execute("INSERT INTO dependencies (governor_id, dependent_id, relation) VALUES (?, ?, ?)", (token_id[s], token_id[t], l["relation"]))
-
-
 def main():
     """"""
     args = arguments()
@@ -86,7 +45,8 @@ def main():
         gs = create_digraph(sentence, origid)
         sensible = nx_graph.is_sensible_graph(gs)
         if sensible:
-            insert_sentence(c, origid, gs)
+            graph = json.dumps(json_graph.node_link_data(gs), ensure_ascii=False, sort_keys=True)
+            insert_sentence(c, origid, gs, graph)
     conn.commit()
     conn.close()
 
