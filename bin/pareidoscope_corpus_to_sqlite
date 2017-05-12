@@ -46,7 +46,7 @@ def main():
         sensible = nx_graph.is_sensible_graph(gs)
         if sensible:
             graph = json.dumps(json_graph.node_link_data(gs), ensure_ascii=False, sort_keys=True)
-            insert_sentence(c, origid, gs, graph)
+            database.insert_sentence(c, origid, gs, graph)
     conn.commit()
     conn.close()
 
