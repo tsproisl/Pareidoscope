@@ -12,6 +12,13 @@ from pareidoscope import subgraph_enumeration
 from pareidoscope import subgraph_isomorphism
 
 
+def read_queries(queries_file):
+    """Read all queries."""
+    queries = json.load(queries_file)
+    for query in queries:
+        yield json_graph.node_link_graph(query, directed=True, multigraph=False)
+
+
 def sanity_check_c_a_b(gc, ga, gb):
     """Do a few sanity checks on the query graphs."""
     connected_c = networkx.is_weakly_connected(gc)
@@ -34,41 +41,6 @@ def sanity_check_c_a_b(gc, ga, gb):
     if not sane:
         raise Exception("Incorrect formulation of query.")
     return sane
-
-
-def get_n_from_c_a_b(gc, ga, gb):
-    """Derive gn from gc, ga and gb and return it."""
-    vid_to_ga = {l["vid"]: v for v, l in ga.nodes(data=True)}
-    vid_to_gb = {l["vid"]: v for v, l in gb.nodes(data=True)}
-    vid_to_gcn = {l["vid"]: v for v, l in gc.nodes(data=True)}
-    # vn is the intersection of ga and gb
-    vn = set(vid_to_ga.keys()) & set(vid_to_gb.keys())
-    gn = networkx.DiGraph()
-    for vertex, label in gc.nodes(data=True):
-        vid = label["vid"]
-        if vid not in vn:
-            continue
-        # the label is the maximum of the labels in ga and gb
-        label_keys = set(ga.node[vid_to_ga[vid]].keys()) & set(gb.node[vid_to_gb[vid]].keys())
-        if all([ga.node[vid_to_ga[vid]][lk] == gb.node[vid_to_gb[vid]][lk] for lk in label_keys]):
-            gn.add_node(vertex, {lk: ga.node[vid_to_ga[vid]][lk] for lk in label_keys})
-        else:
-            raise Exception("Incompatible vertex labels: %s and  %s" % (repr(ga.node[vid_to_ga[vid]]), repr(gb.node[vid_to_gb[vid]])))
-    # en is the intersection of ea and eb
-    ea = set([(ga.node[s]["vid"], ga.node[t]["vid"]) for s, t in ga.edges()])
-    eb = set([(gb.node[s]["vid"], gb.node[t]["vid"]) for s, t in gb.edges()])
-    en = ea & eb
-    for s, t in en:
-        label_keys = set(ga.edge[vid_to_ga[s]][vid_to_ga[t]].keys()) & set(gb.edge[vid_to_gb[s]][vid_to_gb[t]].keys())
-        if all([ga.edge[vid_to_ga[s]][vid_to_ga[t]][lk] == gb.edge[vid_to_gb[s]][vid_to_gb[t]][lk] for lk in label_keys]):
-            gn.add_edge(vid_to_gcn[s], vid_to_gcn[t], {lk: ga.edge[vid_to_ga[s]][vid_to_ga[t]][lk] for lk in label_keys})
-        else:
-            raise Exception("Incompatible edge labels: %s and  %s" % (repr(ga.edge[vid_to_ga[s]][vid_to_ga[t]]), repr(gb.edge[vid_to_gb[s]][vid_to_gb[t]])))
-    # make sure that the remaining vertices are consecutively labeled
-    gn = nx_graph.ensure_consecutive_vertices(gn)
-    if not networkx.is_weakly_connected(gn):
-        raise Exception("gn is not a connected graph")
-    return gn
 
 
 def strip_vid(graph):
