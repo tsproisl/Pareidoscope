@@ -16,7 +16,10 @@ def read_queries(queries_file):
     """Read all queries."""
     queries = json.load(queries_file)
     for query in queries:
-        yield json_graph.node_link_graph(query, directed=True, multigraph=False)
+        graph = json_graph.node_link_graph(query, directed=True, multigraph=False)
+        for v, l in graph.nodes(data=True):
+            l["vid"] = v
+        yield graph
 
 
 def strip_vid(graph):
