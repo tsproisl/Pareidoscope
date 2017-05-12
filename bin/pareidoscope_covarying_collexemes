@@ -28,7 +28,7 @@ import argparse
 import collections
 
 import pareidoscope.query
-from pareidoscpe import subgraph_isomorphism
+from pareidoscope import subgraph_isomorphism
 from pareidoscope.utils import database
 from pareidoscope.utils import statistics
 from pareidoscope.utils import nx_graph
