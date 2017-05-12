@@ -29,13 +29,12 @@ import argparse
 
 def arguments():
     """"""
-    parser = argparse.ArgumentParser(description='blafasel')
-    # parser.add_argument("-a", help="Determine frequencies for all counting methods and not only for focus points", action='store_true')
-    # parser.add_argument("-f", "--format", choices=["conllu", "cwb", "db"], required=True, help="Input format of the corpus: Either a text-based format (CoNLL-U or CWB-treebank) or a database created by pareidoscope_corpus_to_sqlite")
-    # parser.add_argument("-o", "--output", type=str, required=True, help="Output prefix")
-    # parser.add_argument("-p", "--cpu", type=int, default=25, help="Percentage of CPUs to use (0-100; default: 25)")
-    # parser.add_argument("CORPUS", type=os.path.abspath, help="Input corpus")
-    # parser.add_argument("QUERIES", type=argparse.FileType("r", encoding="utf-8"), help="Queries file as JSON list")
+    parser = argparse.ArgumentParser(description="Perform a covarying collexeme analysis, i.e. find cooccurring words within a linguistic structure. If the structure is a single dependency relation, this is equivalent to relational cooccurrences.")
+    parser.add_argument("-c", "--collexeme", choices=["word", "lemma"], default="lemma", help="Should we look for collexemes at the word level or at the lemma level? Default: lemma")
+    parser.add_argument("-o", "--output", type=str, required=True, help="Output prefix")
+    parser.add_argument("-p", "--cpu", type=int, default=25, help="Percentage of CPUs to use (0-100; default: 25)")
+    parser.add_argument("CORPUS", type=os.path.abspath, help="Input corpus as SQLite3 database")
+    parser.add_argument("QUERIES", type=argparse.FileType("r", encoding="utf-8"), help="Queries file as JSON list")
     return parser.parse_args()
 
 
