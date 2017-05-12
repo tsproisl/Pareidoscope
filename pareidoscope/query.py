@@ -19,30 +19,6 @@ def read_queries(queries_file):
         yield json_graph.node_link_graph(query, directed=True, multigraph=False)
 
 
-def sanity_check_c_a_b(gc, ga, gb):
-    """Do a few sanity checks on the query graphs."""
-    connected_c = networkx.is_weakly_connected(gc)
-    connected_a = networkx.is_weakly_connected(ga)
-    connected_b = networkx.is_weakly_connected(gb)
-    vid_c = set([l["vid"] for v, l in gc.nodes(data=True)])
-    vid_a = set([l["vid"] for v, l in ga.nodes(data=True)])
-    vid_b = set([l["vid"] for v, l in gb.nodes(data=True)])
-    # vids are unique
-    vid_c_uniq = gc.number_of_nodes() == len(vid_c)
-    vid_a_uniq = ga.number_of_nodes() == len(vid_a)
-    vid_b_uniq = gb.number_of_nodes() == len(vid_b)
-    # union of vid_a and vid_b is vid_c
-    a_and_b_is_c = vid_a | vid_b == vid_c
-    # ga should subsume gc
-    ga_subsumes_gc = subgraph_enumeration.subsumes_nx(ga, gc)
-    # gb should subsume gc
-    gb_subsumes_gc = subgraph_enumeration.subsumes_nx(gb, gc)
-    sane = all([connected_c, connected_a, connected_b, vid_c_uniq, vid_a_uniq, vid_b_uniq, a_and_b_is_c, ga_subsumes_gc, gb_subsumes_gc])
-    if not sane:
-        raise Exception("Incorrect formulation of query.")
-    return sane
-
-
 def strip_vid(graph):
     """Return a copy of graph without vertex id (vid) labels."""
     copy = graph.copy()
