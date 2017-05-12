@@ -40,7 +40,6 @@ def arguments():
 def remove_auxiliary_attributes(graph, abcn):
     """Remove auxiliary attributes"""
     for v, l in graph.nodes(data=True):
-        l["vid"] = v
         if abcn == "a" or abcn == "n":
             if "only_B" in l:
                 for attribute in l["only_B"]:
