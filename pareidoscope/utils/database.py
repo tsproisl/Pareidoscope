@@ -111,7 +111,7 @@ def sentence_candidates(c, g):
         sql_query += " AND ".join(where)
         sentence_ids.append(set([r[0] for r in c.execute(sql_query, args).fetchall()]))
     candidate_ids = functools.reduce(lambda x, y: x.intersection(y), sentence_ids)
-    candidate_sentences = [r[0] for r in c.execute("SELECT graph FROM sentences WHERE sentence_id IN (%s)" % ", ".join([str(_) for _ in candidate_ids])).fetchall()]
+    candidate_sentences = (r[0] for r in c.execute("SELECT graph FROM sentences WHERE sentence_id IN (%s)" % ", ".join([str(_) for _ in candidate_ids])))
     return candidate_sentences
 
 
