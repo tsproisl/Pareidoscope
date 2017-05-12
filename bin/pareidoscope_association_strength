@@ -8,6 +8,7 @@ import json
 import logging
 import multiprocessing
 import os
+import tempfile
 
 from networkx.readwrite import json_graph
 
@@ -15,7 +16,7 @@ import pareidoscope.query
 from pareidoscope.utils import conllu
 from pareidoscope.utils import cwb
 from pareidoscope.utils import database
-from pareidoscope.utils import helper
+# from pareidoscope.utils import helper
 from pareidoscope.utils import nx_graph
 from pareidoscope.utils import statistics
 
@@ -113,9 +114,14 @@ def main():
             for i, qline in enumerate(queries):
                 logging.info("query no. %d" % i)
                 gc, ga, gb, gn, choke_point = qline
-                sents = database.sentence_candidates(c, pareidoscope.query.strip_vid(gn))
-                logging.info("%d candidate sentences" % len(sents))
-                for sentences in helper.grouper_nofill(groupsize, sents):
+                with tempfile.TemporaryFile() as fp:
+                    sents = database.sentence_candidates(c, pareidoscope.query.strip_vid(gn))
+                    for s in sents:
+                        fp.write((s + "\n").encode(encoding="utf-8"))
+                    fp.seek(0)
+                    sentences = (s.decode(encoding="utf-8") for s in fp)
+                # sents = database.sentence_candidates(c, pareidoscope.query.strip_vid(gn))
+                # for sentences in helper.grouper_nofill(groupsize, sents):
                     query_args = (itertools.chain.from_iterable(a) for a in zip(itertools.repeat(qline), ((s,) for s in sentences), ((a,) for a in itertools.repeat(args.a))))
                     r = pool.imap_unordered(pareidoscope.query.run_queries_db, query_args, 10)
                     # for debugging, it is often better to avoid multiprocessing:
@@ -129,14 +135,16 @@ def main():
                     sents = cwb.sentences_iter(corpus, return_id=False)
                 elif args.format == "conllu":
                     sents = conllu.sentences_iter(corpus, return_id=False)
-                for i, sentences in enumerate(helper.grouper_nofill(groupsize, sents)):
-                    logging.info("processing sentences %d--%d" % (i * groupsize + 1, i * groupsize + min(groupsize, len(sentences))))
-                    r = pool.imap_unordered(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(args.format), itertools.repeat(queries), itertools.repeat(args.a)), 10)
-                    # for debugging, it is often better to avoid multiprocessing:
-                    # r = map(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(args.format), itertools.repeat(queries)))
-                    for result, sensible in r:
-                        if sensible:
-                            pareidoscope.query.merge_result(result, results)
+                sentences = sents
+                # for i, sentences in enumerate(helper.grouper_nofill(groupsize, sents)):
+                    # logging.info("processing sentences %d--%d" % (i * groupsize + 1, i * groupsize + min(groupsize, len(sentences))))
+                r = pool.imap_unordered(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(args.format), itertools.repeat(queries), itertools.repeat(args.a)), 10)
+                # for debugging, it is often better to avoid multiprocessing:
+                # r = map(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(args.format), itertools.repeat(queries)))
+                for result, sensible in r:
+                    if sensible:
+                        pareidoscope.query.merge_result(result, results)
+                # end for
         for result in results:
             for counting_method, freq in result.items():
                 o, e = statistics.get_contingency_table(freq["o11"], freq["r1"], freq["c1"], freq["n"])
