@@ -77,7 +77,7 @@ def add_focus_point(query):
     focus_point_vertex = None
     for v, l in gn.nodes(data=True):
         if "focus_point" in l:
-            focus_point_vertex = l["focus_point"]
+            focus_point_vertex = v
             del l["focus_point"]
             break
     if focus_point_vertex is None:
