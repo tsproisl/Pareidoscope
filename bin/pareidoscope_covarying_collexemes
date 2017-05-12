@@ -34,6 +34,9 @@ from pareidoscope.utils import statistics
 from pareidoscope.utils import nx_graph
 
 
+Frequencies = collections.namedtuple("Frequencies", ["embeddings", "subgraphs", "focus_points", "sentences"])
+
+
 def arguments():
     """"""
     parser = argparse.ArgumentParser(description="Perform a covarying collexeme analysis, i.e. find cooccurring words within a linguistic structure. If the structure is a single dependency relation, this is equivalent to relational cooccurrences.")
@@ -67,19 +70,39 @@ def identify_collo_items(graph):
 def get_cooccurrences(args):
     """"""
     query_graph, target_graph, focus_point, collo_a, collo_b, word_or_lemma = args
-    embeddings = collections.defaultdict(set)
+    pairs = {}
+    embeddings = collections.defaultdict(int)
     subgraphs = collections.defaultdict(set)
     focus_points = collections.defaultdict(set)
-    sentences = collections.defaultdict(set)
+    sentences = set()
     target_graph = json_graph.node_link_graph(json.loads(target_graph))
     isomorphisms = subgraph_isomorphism.get_subgraph_isomorphisms_nx(query_graph, target_graph)
+    total_subgraphs, total_focus_points = set(), set()
     for iso in isomorphisms:
         item_a = target_graph.node[iso[collo_a]][word_or_lemma]
         item_b = target_graph.node[iso[collo_b]][word_or_lemma]
         pair = (item_a, item_b)
-        embeddings(iso).add(pair)
-        subgraphs[tuple(sorted(iso))].add(pair)
-        focus_points[iso[focus_point]].add(pair)
+        embeddings[pair] += 1
+        subgraph = tuple(sorted(iso))
+        subgraphs[pair].add(subgraph)
+        total_subgraphs.add(subgraph)
+        focus_points[pair].add(iso[focus_point])
+        total_focus_points.add(iso[focus_point])
+        sentences.add(pair)
+    for pair in sentences:
+        pairs[pair] = Frequencies(embeddings[pair], len(subgraphs[pair]), len(focus_points[pair]), 1)
+    sample_sizes = Frequencies(sum(embeddings.values()), len(total_subgraphs), len(total_focus_points), 1)
+    return pairs, sample_sizes
+
+
+def merge_results(r):
+    """"""
+    pairs = collections.defaultdict(lambda: (0, 0, 0, 0))
+    sample_sizes = [0, 0, 0, 0]
+    for ps, sam_siz in r:
+        sample_sizes = [sum(_) for _ in zip(sample_sizes, sam_siz)]
+        for pair, freqs in ps:
+            pairs[pair] = [sum(_) for _ in zip(pairs[pair], freqs)]
     
 
 def main():
@@ -87,7 +110,10 @@ def main():
     args = arguments()
     conn, c = database.connect_to_database(args.CORPUS)
     queries = pareidoscope.query.read_queries(args.QUERIES)
-    results = []
+    pairs = collections.defaultdict(lambda: (0, 0, 0, 0))
+    marginals_a = collections.defaultdict(lambda: (0, 0, 0, 0))
+    marginals_b = collections.defaultdict(lambda: (0, 0, 0, 0))
+    sample_sizes = (0, 0, 0, 0)
     cpu_count = multiprocessing.cpu_count()
     processes = min(max(1, int(cpu_count * args.cpu / 100)), cpu_count)
     with multiprocessing.Pool(processes=processes) as pool:
@@ -100,6 +126,18 @@ def main():
                     fp.write((s + "\n").encode(encoding="utf-8"))
                 fp.seek(0)
                 sentences = (s.decode(encoding="utf-8").rstrip() for s in fp)
+                query_args = zip(itertools.repeat(graph), sentences, itertools.repeat(focus_point), itertools.repeat(args.collo_a), itertools.repeat(collo_b), itertools.repeat(args.collexeme))
+                r = pool.imap_unordered(get_cooccurrences, query_args, 10)
+                for ps, sam_siz in r:
+                    sample_sizes = [sum(_) for _ in zip(sample_sizes, sam_siz)]
+                    for pair, freqs in ps.items():
+                        pairs[pair] = [sum(_) for _ in zip(pairs[pair], freqs)]
+            for pair, freqs in pairs.items():
+                item_a, item_b = pair
+                marginals_a[item_a] = [sum(_) for _ in zip(marginals_a[item_a], freqs)]
+                marginals_a[item_b] = [sum(_) for _ in zip(marginals_b[item_b], freqs)]
+            print(sample_sizes)
+
 
 if __name__ == "__main__":
     main()
