@@ -97,7 +97,7 @@ def write_results(prefix, results, word_or_lemma):
     - `prefix`:
     - `results`:
     """
-    values = ("o11", "r1", "c1", "n", "log_likelihood", "t_score", "dice")
+    values = ["o11", "r1", "c1", "n", "log_likelihood", "t_score", "dice"]
     with open("%s.tsv" % prefix, "w") as fh:
         header = ["query_number", word_or_lemma] + values
         fh.write("\t".join(header) + "\n")
