@@ -92,7 +92,7 @@ def write_results(prefix, results, word_or_lemma):
     """
     counting_methods = ("embeddings", "subgraphs", "focus_points", "sentences")
     values = ("o11", "r1", "c1", "n", "log_likelihood", "t_score", "dice")
-    with open("%s.json" % prefix, "w") as fh:
+    with open("%s.tsv" % prefix, "w") as fh:
         header = ["query_number", "%s_A" % word_or_lemma, "%s_B" % word_or_lemma] + [":".join(_) for _ in (itertools.product(counting_methods, values))]
         fh.write("\t".join(header) + "\n")
         for i, r in enumerate(results):
