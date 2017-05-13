@@ -90,15 +90,21 @@ def get_matches(args):
     return [target_graph.node[match][word_or_lemma] for match in matches]
 
 
-def write_results(prefix, results):
+def write_results(prefix, results, word_or_lemma):
     """Write results to files
 
     Arguments:
     - `prefix`:
     - `results`:
     """
-    with open("%s.json" % prefix, "w") as fh:
-        json.dump(results, fh, ensure_ascii=False, indent=4, sort_keys=True)
+    values = ("o11", "r1", "c1", "n", "log_likelihood", "t_score", "dice")
+    with open("%s.tsv" % prefix, "w") as fh:
+        header = ["query_number", word_or_lemma] + values
+        fh.write("\t".join(header) + "\n")
+        for i, r in enumerate(results):
+            for c in r:
+                line = [str(i), c[word_or_lemma]] + [str(c[v]) for v in values]
+                fh.write("\t".join(line) + "\n")
 
 
 def main():
