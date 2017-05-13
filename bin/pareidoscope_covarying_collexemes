@@ -97,7 +97,7 @@ def write_results(prefix, results, word_or_lemma):
         fh.write("\t".join(header) + "\n")
         for i, r in enumerate(results):
             for coocc in r:
-                line = [i, coocc["%s_A" % word_or_lemma], coocc["%s_B" % word_or_lemma]] + [coocc[cm][v] for cm, v in (itertools.product(counting_methods, values))]
+                line = [str(i), coocc["%s_A" % word_or_lemma], coocc["%s_B" % word_or_lemma]] + [str(coocc[cm][v]) for cm, v in (itertools.product(counting_methods, values))]
                 fh.write("\t".join(line) + "\n")
 
 
