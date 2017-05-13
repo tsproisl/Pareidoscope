@@ -162,7 +162,7 @@ def main():
                     local_result[pair][cm] = {"o11": f[0], "r1": f[1], "c1": f[2], "n": f[3], "log_likelihood": log_likelihood, "t_score": t_score, "dice": dice}
             sorted_pairs = sorted(local_result.keys(), key=lambda x: local_result[x]["focus_points"]["log_likelihood"], reverse=True)
             results.append([local_result[p] for p in sorted_pairs])
-        with open("%s.json" % prefix, "w") as fh:
+        with open("%s.json" % args.output, "w") as fh:
             json.dump(results, fh, ensure_ascii=False, indent=4, sort_keys=True)
 
 
