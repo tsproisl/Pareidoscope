@@ -151,7 +151,7 @@ def main():
             local_result = {}
             for pair, freq in pairs.items():
                 item_a, item_b = pair
-                local_result[pair] = {}
+                local_result[pair] = {"%s_A" % args.collexeme: item_a, "%s_B" % args.collexeme: item_b}
                 frequencies = zip(freq, marginals_a[item_a], marginals_b[item_b], sample_sizes)
                 counting_methods = ("embeddings", "subgraphs", "focus_points", "sentences")
                 for cm, f in zip(counting_methods, frequencies):
@@ -160,7 +160,8 @@ def main():
                     t_score = statistics.t_score(o, e)
                     dice = statistics.dice(o, e)
                     local_result[pair][cm] = {"o11": f[0], "r1": f[1], "c1": f[2], "n": f[3], "log_likelihood": log_likelihood, "t_score": t_score, "dice": dice}
-            results.append(local_result)
+            sorted_pairs = sorted(local_result.keys(), key=lambda x: local_result[x]["focus_points"]["log_likelihood"], reverse=True)
+            results.append([local_result[p] for p in sorted_pairs])
         print(results)
 
 
