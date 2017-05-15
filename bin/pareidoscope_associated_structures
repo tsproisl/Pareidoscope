@@ -1,0 +1,191 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import argparse
+import collections
+import functools
+import itertools
+import json
+import logging
+import multiprocessing
+import os
+import tempfile
+
+from networkx.readwrite import json_graph
+
+import pareidoscope.query
+from pareidoscope import subgraph_isomorphism
+from pareidoscope import subgraph_enumeration
+from pareidoscope.utils import database
+from pareidoscope.utils import statistics
+from pareidoscope.utils import nx_graph
+
+# logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=logging.INFO)
+logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=logging.DEBUG)
+
+
+Frequencies = collections.namedtuple("Frequencies", ["embeddings", "subgraphs", "focus_points", "sentences"])
+
+
+def arguments():
+    """"""
+    parser = argparse.ArgumentParser(description="Find associated larger structures, i.e. structures with additional adjacent vertices.")
+    parser.add_argument("-m", "--max-size", type=int, default=7, help="Maximal number of vertices in the larger structure. Default: 7")
+    parser.add_argument("-o", "--output", type=str, required=True, help="Output prefix")
+    parser.add_argument("-p", "--cpu", type=int, default=25, help="Percentage of CPUs to use (0-100; default: 25)")
+    parser.add_argument("CORPUS", type=os.path.abspath, help="Input corpus as SQLite3 database")
+    parser.add_argument("QUERIES", type=argparse.FileType("r", encoding="utf-8"), help="Queries file as JSON list")
+    return parser.parse_args()
+
+
+def get_focus_point(query):
+    """Search for choke point vertices"""
+    focus_point_vertex = None
+    for v, l in query.nodes(data=True):
+        if "focus_point" in l:
+            focus_point_vertex = v
+            del l["focus_point"]
+            break
+    if focus_point_vertex is None:
+        focus_point_vertex = nx_graph.get_choke_point(query)
+    return query, focus_point_vertex
+
+
+def get_cooccurring_structures(args):
+    """"""
+    query_graph, target_graph, focus_point_vertex, max_size = args
+    embedding_freq = 0
+    target_graph = json_graph.node_link_graph(json.loads(target_graph))
+    isomorphisms = subgraph_isomorphism.get_subgraph_isomorphisms_nx(pareidoscope.query.strip_vid(query_graph), target_graph)
+    embeddings, subgraphs, focus_points = set(), set(), set()
+    subgraph_to_embeddings = collections.defaultdict(set)
+    focus_point_to_embeddings = collections.defaultdict(list)
+    embedding_to_focus_point = {}
+    o11 = collections.defaultdict(lambda: [0, 0, 0, 0])
+    o11_focus_points = collections.defaultdict(set)
+    o11_embeddings = collections.defaultdict(set)
+    for iso in isomorphisms:
+        embedding_freq += 1
+        embeddings.add(iso)
+        subgraph = frozenset(iso)
+        subgraphs.add(subgraph)
+        subgraph_to_embeddings[subgraph].add(iso)
+        focus_point = iso[focus_point_vertex]
+        focus_points.add(focus_point)
+        focus_point_to_embeddings[focus_point].append(iso)
+        embedding_to_focus_point[iso] = focus_point
+    assert len(embeddings) == embedding_freq
+    subgraph_to_focus_points = {sg: set([embedding_to_focus_point[e] for e in embs]) for sg, embs in subgraph_to_embeddings.items()}
+    for subg in subgraphs:
+        neighbors = [set(target_graph.successors(v) + target_graph.predecessors(v)) for v in subg]
+        nbunch = functools.reduce(lambda x, y: x.union(y), neighbors + [subg])
+        induced_star = target_graph.subgraph(nbunch)
+        bfo_graph, bfo_to_raw = subgraph_enumeration.get_bfo(induced_star, fragment=True)
+        for sg in subgraph_enumeration.enumerate_csg_minmax(bfo_graph, bfo_to_raw, min_vertices=len(subg) + 1, max_vertices=min(induced_star.number_of_nodes(), max_size)):
+            # all vertices from sg have to be in isg
+            if not subg <= set(sg.nodes()):
+                continue
+            # all edges from query_graph have to be in isg
+            embedding = next(iter(subgraph_to_embeddings[subg]))
+            if not all([sg.has_edge(embedding[s], embedding[t]) for s, t in query_graph.edges()]):
+                continue
+            subgraph_to_query = {embedding[v]: v for v in query_graph.nodes()}
+            # delexicalize: remove all word, pos and lemma attributes unless they are in query
+            for v in sg.nodes():
+                if v in subgraph_to_query:
+                    for attribute in list(sg.node[v]):
+                        if attribute not in query_graph.node[subgraph_to_query[v]]:
+                            del sg.node[v][attribute]
+                else:
+                    for attribute in ("word", "pos", "lemma", "root"):
+                        if attribute in sg.node[v]:
+                            del sg.node[v][attribute]
+            for focus_point in subgraph_to_focus_points[subg]:
+                sg.node[focus_point]["focus_point"] = True
+                gc = nx_graph.canonize(sg)
+                gc_json = json.dumps(json_graph.node_link_data(gc), ensure_ascii=False, sort_keys=True)
+                del sg.node[focus_point]["focus_point"]
+                ### FIXME: o11[gc_json] = [sum(_) for _ in zip(o11[gc_json], (len(subgraph_to_embeddings[subg]), 1, 0, 0))]
+                o11_embeddings[gc_json] |= subgraph_to_embeddings[subg]
+                o11_focus_points[gc_json] |= subgraph_to_focus_points[subg]
+    for gc_json in o11:
+        o11[gc_json][2] = len(o11_focus_points[gc_json])
+        o11[gc_json][3] = 1
+        if o11[gc_json][0] > 1:
+            print(gc_json)
+            print(json.dumps(json_graph.node_link_data(target_graph)))
+    r1 = Frequencies(embedding_freq, len(subgraphs), len(focus_points), min(1, embedding_freq))
+    return o11, r1
+
+
+def write_results(prefix, results, word_or_lemma):
+    """Write results to files
+
+    Arguments:
+    - `prefix`:
+    - `results`:
+    """
+    counting_methods = ("embeddings", "subgraphs", "focus_points", "sentences")
+    values = ("o11", "r1", "c1", "n", "log_likelihood", "t_score", "dice")
+    with open("%s.tsv" % prefix, "w") as fh:
+        header = ["query_number", "%s_A" % word_or_lemma, "%s_B" % word_or_lemma] + [":".join(_) for _ in (itertools.product(counting_methods, values))]
+        fh.write("\t".join(header) + "\n")
+        for i, r in enumerate(results):
+            for coocc in r:
+                line = [str(i), coocc["%s_A" % word_or_lemma], coocc["%s_B" % word_or_lemma]] + [str(coocc[cm][v]) for cm, v in (itertools.product(counting_methods, values))]
+                fh.write("\t".join(line) + "\n")
+
+
+def main():
+    """"""
+    args = arguments()
+    results = []
+    conn, c = database.connect_to_database(args.CORPUS)
+    queries = pareidoscope.query.read_queries(args.QUERIES)
+    cpu_count = multiprocessing.cpu_count()
+    processes = min(max(1, int(cpu_count * args.cpu / 100)), cpu_count)
+    with multiprocessing.Pool(processes=processes) as pool:
+        for i, query in enumerate(queries):
+            logging.info("query no. %d" % i)
+            graph, focus_point = get_focus_point(query)
+            with tempfile.TemporaryFile() as fp:
+                sents = database.sentence_candidates(c, pareidoscope.query.strip_vid(graph))
+                for s in sents:
+                    fp.write((s + "\n").encode(encoding="utf-8"))
+                fp.seek(0)
+                sentences = (s.decode(encoding="utf-8").rstrip() for s in fp)
+                query_args = zip(itertools.repeat(graph), sentences, itertools.repeat(focus_point), itertools.repeat(args.max_size))
+                r = map(get_cooccurring_structures, query_args)
+                for o11, r1 in r:
+                    pass
+                    # print(o11, r1)
+                ### TODO
+    #             r = pool.imap_unordered(get_cooccurrences, query_args, 10)
+    #             for ps, sam_siz in r:
+    #                 sample_sizes = [sum(_) for _ in zip(sample_sizes, sam_siz)]
+    #                 for pair, freqs in ps.items():
+    #                     pairs[pair] = [sum(_) for _ in zip(pairs[pair], freqs)]
+    #         for pair, freqs in pairs.items():
+    #             item_a, item_b = pair
+    #             marginals_a[item_a] = [sum(_) for _ in zip(marginals_a[item_a], freqs)]
+    #             marginals_b[item_b] = [sum(_) for _ in zip(marginals_b[item_b], freqs)]
+    #         local_result = {}
+    #         for pair, freq in pairs.items():
+    #             item_a, item_b = pair
+    #             local_result[pair] = {"%s_A" % args.collexeme: item_a, "%s_B" % args.collexeme: item_b}
+    #             frequencies = zip(freq, marginals_a[item_a], marginals_b[item_b], sample_sizes)
+    #             counting_methods = ("embeddings", "subgraphs", "focus_points", "sentences")
+    #             for cm, f in zip(counting_methods, frequencies):
+    #                 o, e = statistics.get_contingency_table(f[0], f[1], f[2], f[3])
+    #                 log_likelihood = statistics.one_sided_log_likelihood(o, e)
+    #                 t_score = statistics.t_score(o, e)
+    #                 dice = statistics.dice(o, e)
+    #                 local_result[pair][cm] = {"o11": f[0], "r1": f[1], "c1": f[2], "n": f[3], "log_likelihood": log_likelihood, "t_score": t_score, "dice": dice}
+    #         sorted_pairs = sorted(local_result.keys(), key=lambda x: local_result[x]["focus_points"]["log_likelihood"], reverse=True)
+    #         results.append([local_result[p] for p in sorted_pairs])
+    #     write_results(args.output, results, args.collexeme)
+    # logging.info("done")
+
+
+if __name__ == "__main__":
+    main()
