@@ -1,0 +1,38 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import argparse
+import json
+import os
+
+import networkx
+from networkx.readwrite import json_graph
+
+
+def arguments():
+    """"""
+    parser = argparse.ArgumentParser(description="Draw the graphs")
+    parser.add_argument("-o", "--output", type=str, required=True, help="Output prefix")
+    parser.add_argument("GRAPHS", type=argparse.FileType("r", encoding="utf-8"), help="The graphs in node link format; use `-' to read from STDIN")
+    return parser.parse_args()
+
+
+def main():
+    """"""
+    args = arguments()
+    if not os.path.isdir(args.output):
+        os.mkdir(args.output)
+    for i, g in enumerate(args.GRAPHS):
+        graph = json_graph.node_link_graph(json.loads(g))
+        dotgraph = networkx.DiGraph(**graph.graph)
+        for v, l in graph.nodes(data=True):
+            label = "\n".join("%s: %s" % (k, v) for k, v in l.items())
+            dotgraph.add_node(v, {"shape": "rect", "label": label})
+        for s, t, l in graph.edges(data=True):
+            dotgraph.add_edge(s, t, {"label": l["relation"]})
+        pydotgraph = networkx.nx_pydot.to_pydot(dotgraph)
+        pydotgraph.write_png(os.path.join(args.output, "%d.png" % i))
+
+
+if __name__ == "__main__":
+    main()
