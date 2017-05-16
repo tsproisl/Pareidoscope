@@ -22,8 +22,6 @@ from pareidoscope.utils import statistics
 
 logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=logging.INFO)
 
-queries = []
-
 
 def arguments():
     """"""
@@ -82,6 +80,7 @@ def add_focus_point(query):
             break
     if focus_point_vertex is None:
         focus_point_vertex = nx_graph.get_choke_point(gn)
+    assert focus_point_vertex is not None
     return gc, ga, gb, gn, focus_point_vertex
 
 

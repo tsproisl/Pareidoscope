@@ -49,6 +49,7 @@ def get_focus_point(query):
             break
     if focus_point_vertex is None:
         focus_point_vertex = nx_graph.get_choke_point(query)
+    assert focus_point is not None
     return query, focus_point_vertex
 
 
