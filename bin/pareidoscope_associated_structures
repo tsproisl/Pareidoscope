@@ -200,16 +200,16 @@ def main():
     """"""
     args = arguments()
     results = []
-    r1 = Frequencies(0, 0, 0, 0)
-    n = Frequencies(0, 0, 0, 0)
-    o11 = collections.defaultdict(lambda: Frequencies(0, 0, 0, 0))
-    c1 = collections.defaultdict(lambda: Frequencies(0, 0, 0, 0))
     conn, c = database.connect_to_database(args.CORPUS)
     queries = pareidoscope.query.read_queries(args.QUERIES)
     cpu_count = multiprocessing.cpu_count()
     processes = min(max(1, int(cpu_count * args.cpu / 100)), cpu_count)
     with multiprocessing.Pool(processes=processes) as pool:
         for i, query in enumerate(queries):
+            r1 = Frequencies(0, 0, 0, 0)
+            n = Frequencies(0, 0, 0, 0)
+            o11 = collections.defaultdict(lambda: Frequencies(0, 0, 0, 0))
+            c1 = collections.defaultdict(lambda: Frequencies(0, 0, 0, 0))
             logging.info("query no. %d" % i)
             graph, focus_point = get_focus_point(query)
             delexicalized = delexicalize(graph)
@@ -258,13 +258,13 @@ def main():
                 local_result[gc] = {"larger_structure": gc}
                 for i, cm in enumerate(counting_methods):
                     lo11, lr1, lc1, ln = freq[i], r1[i], c1[gc_to_gb[gc]][i], n[i]
-                    o, e = statics.get_contingency_table(lo11, lr1, lc1, ln)
+                    o, e = statistics.get_contingency_table(lo11, lr1, lc1, ln)
                     log_likelihood = statistics.one_sided_log_likelihood(o, e)
                     t_score = statistics.t_score(o, e)
                     dice = statistics.dice(o, e)
                     local_result[gc][cm] = {"o11": lo11, "r1": lr1, "c1": lc1, "n": ln, "log_likelihood": log_likelihood, "t_score": t_score, "dice": dice}
             sorted_gcs = sorted(local_result.keys(), key=lambda x: local_result[x]["focus_points"]["log_likelihood"], reverse=True)
-            results.append([local_result[p] for p in sorted_pairs])
+            results.append([local_result[gc] for gc in sorted_gcs])
         write_results(args.output, results)
     logging.info("done")
 
