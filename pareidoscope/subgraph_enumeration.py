@@ -9,6 +9,9 @@ import networkx
 
 from pareidoscope.utils import nx_graph
 
+import json
+from networkx.readwrite import json_graph
+
 
 def get_subgraphs_nx(query_graph, target_graph, vertex_candidates=None):
     """Return a list of subgraphs of target_graph that are isomorphic to
@@ -120,15 +123,21 @@ def get_bfo(target_graph, fragment=False):
 
     """
     graph = networkx.DiGraph()
-    roots = [v[0] for v in target_graph.nodes(data=True) if "root" in v[1]]
-    if len(roots) == 0 and fragment:
+    agenda = []
+    roots = sorted([v[0] for v in target_graph.nodes(data=True) if "root" in v[1]])
+    if len(roots) == 0:
+        assert(fragment)
         all_vertices = set(target_graph.nodes())
-        roots = [v for v in target_graph.nodes() if all([networkx.has_path(target_graph, v, u) for u in all_vertices - set([v])])]
+        roots = sorted([v for v in target_graph.nodes() if all([networkx.has_path(target_graph, v, u) for u in all_vertices - set([v])])])
+        if len(roots) == 0:
+            roots = sorted([v for v in target_graph.nodes() if target_graph.in_degree(v) == 0])
+            if len(roots) > 1:
+                agenda = roots[1:]
     root = roots[0]
     raw_to_bfo = {root: 0}
     bfo_to_raw = {0: root}
     graph.add_node(0, target_graph.node[root])
-    agenda = [root]
+    agenda.insert(0, root)
     seen_vertices = set([])
     vertex_counter = 1
     while len(agenda) > 0:
