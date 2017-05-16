@@ -124,6 +124,8 @@ def get_bfo(target_graph, fragment=False):
     """
     graph = networkx.DiGraph()
     agenda = []
+    vertex_counter = 1
+    raw_to_bfo, bfo_to_raw = {}, {}
     roots = sorted([v[0] for v in target_graph.nodes(data=True) if "root" in v[1]])
     if len(roots) == 0:
         assert(fragment)
@@ -133,13 +135,16 @@ def get_bfo(target_graph, fragment=False):
             roots = sorted([v for v in target_graph.nodes() if target_graph.in_degree(v) == 0])
             if len(roots) > 1:
                 agenda = roots[1:]
+                for v in agenda:
+                    raw_to_bfo[v] = vertex_counter
+                    bfo_to_raw[vertex_counter] = v
+                    vertex_counter += 1
     root = roots[0]
-    raw_to_bfo = {root: 0}
-    bfo_to_raw = {0: root}
+    raw_to_bfo[root] = 0
+    bfo_to_raw[0] = root
     graph.add_node(0, target_graph.node[root])
     agenda.insert(0, root)
     seen_vertices = set([])
-    vertex_counter = 1
     while len(agenda) > 0:
         vertex = agenda.pop(0)
         if vertex in seen_vertices:
