@@ -33,8 +33,8 @@ def create_nx_digraph_from_cwb(cwb, origid=None):
             dg.node[l]["root"] = "root"
     for i, line in enumerate(cwb):
         indeps = line[4][1:-1]
-        if indeps != "":
-            for rel in indeps.split("|"):
+        if indeps != "|":
+            for rel in indeps.strip("|").split("|"):
                 match = re.search(relpattern, rel)
                 relation = match.group("relation")
                 offset = int(match.group("offset"))
