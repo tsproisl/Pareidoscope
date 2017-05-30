@@ -59,9 +59,12 @@ def get_cooccurrences(args):
     """"""
     query_graph, target_graph, focus_point, collo_a, collo_b, word_or_lemma = args
     pairs = {}
+    inconsistencies = collections.defaultdict(lambda: (0, 0, 0, 0))
     embeddings = collections.defaultdict(int)
     subgraphs = collections.defaultdict(set)
     focus_points = collections.defaultdict(set)
+    subgraph_to_pairs = collections.defaultdict(set)
+    focus_point_to_pairs = collections.defaultdict(set)
     sentences = set()
     target_graph = json_graph.node_link_graph(json.loads(target_graph))
     isomorphisms = subgraph_isomorphism.get_subgraph_isomorphisms_nx(pareidoscope.query.strip_vid(query_graph), target_graph)
@@ -73,14 +76,29 @@ def get_cooccurrences(args):
         embeddings[pair] += 1
         subgraph = tuple(sorted(iso))
         subgraphs[pair].add(subgraph)
+        subgraph_to_pairs[subgraph].add(pair)
         total_subgraphs.add(subgraph)
-        focus_points[pair].add(iso[focus_point])
-        total_focus_points.add(iso[focus_point])
+        fp = iso[focus_point]
+        focus_points[pair].add(fp)
+        focus_point_to_pairs[fp].add(pair)
+        total_focus_points.add(fp)
         sentences.add(pair)
     for pair in sentences:
         pairs[pair] = Frequencies(embeddings[pair], len(subgraphs[pair]), len(focus_points[pair]), 1)
     sample_sizes = Frequencies(sum(embeddings.values()), len(total_subgraphs), len(total_focus_points), min(1, len(sentences)))
-    return pairs, sample_sizes
+    # determine possible inconsistencies
+    for pair in itertools.product(*[set(_) for _ in zip(*sentences)]):
+        if pair not in sentences:
+            inconsistencies[pair] = [sum(_) for _ in zip(inconsistencies[pair], (0, 0, 0, 1))]
+    for focus_point, ps in focus_point_to_pairs.items():
+        for pair in itertools.product(*[set(_) for _ in zip(*ps)]):
+            if pair not in ps:
+                inconsistencies[pair] = [sum(_) for _ in zip(inconsistencies[pair], (0, 0, 1, 0))]
+    for subgraph, ps in subgraph_to_pairs.items():
+        for pair in itertools.product(*[set(_) for _ in zip(*ps)]):
+            if pair not in ps:
+                inconsistencies[pair] = [sum(_) for _ in zip(inconsistencies[pair], (0, 1, 0, 0))]
+    return pairs, sample_sizes, inconsistencies
 
 
 def write_results(prefix, results, word_or_lemma):
@@ -91,7 +109,7 @@ def write_results(prefix, results, word_or_lemma):
     - `results`:
     """
     counting_methods = ("embeddings", "subgraphs", "focus_points", "sentences")
-    values = ("o11", "r1", "c1", "n", "log_likelihood", "t_score", "dice")
+    values = ("o11", "r1", "c1", "n", "inconsistent", "log_likelihood", "t_score", "dice")
     with open("%s.tsv" % prefix, "w") as fh:
         header = ["query_number", "%s_A" % word_or_lemma, "%s_B" % word_or_lemma] + [":".join(_) for _ in (itertools.product(counting_methods, values))]
         fh.write("\t".join(header) + "\n")
@@ -110,6 +128,7 @@ def main():
     pairs = collections.defaultdict(lambda: (0, 0, 0, 0))
     marginals_a = collections.defaultdict(lambda: (0, 0, 0, 0))
     marginals_b = collections.defaultdict(lambda: (0, 0, 0, 0))
+    inconsistencies = collections.defaultdict(lambda: (0, 0, 0, 0))
     sample_sizes = (0, 0, 0, 0)
     cpu_count = multiprocessing.cpu_count()
     processes = min(max(1, int(cpu_count * args.cpu / 100)), cpu_count)
@@ -125,10 +144,12 @@ def main():
                 sentences = (s.decode(encoding="utf-8").rstrip() for s in fp)
                 query_args = zip(itertools.repeat(graph), sentences, itertools.repeat(focus_point), itertools.repeat(collo_a), itertools.repeat(collo_b), itertools.repeat(args.collexeme))
                 r = pool.imap_unordered(get_cooccurrences, query_args, 10)
-                for ps, sam_siz in r:
+                for ps, sam_siz, inc in r:
                     sample_sizes = [sum(_) for _ in zip(sample_sizes, sam_siz)]
                     for pair, freqs in ps.items():
                         pairs[pair] = [sum(_) for _ in zip(pairs[pair], freqs)]
+                    for pair, freqs in inc.items():
+                        inconsistencies[pair] = [sum(_) for _ in zip(inconsistencies[pair], freqs)]
             for pair, freqs in pairs.items():
                 item_a, item_b = pair
                 marginals_a[item_a] = [sum(_) for _ in zip(marginals_a[item_a], freqs)]
@@ -139,12 +160,16 @@ def main():
                 local_result[pair] = {"%s_A" % args.collexeme: item_a, "%s_B" % args.collexeme: item_b}
                 frequencies = zip(freq, marginals_a[item_a], marginals_b[item_b], sample_sizes)
                 counting_methods = ("embeddings", "subgraphs", "focus_points", "sentences")
-                for cm, f in zip(counting_methods, frequencies):
-                    o, e = statistics.get_contingency_table(f[0], f[1], f[2], f[3])
+                for cm, f, inc in zip(counting_methods, frequencies, inconsistencies[pair]):
+                    o11, r1, c1, n = f
+                    if inc > 0:
+                        r1 -= inc / 2
+                        c1 -= inc / 2
+                    o, e = statistics.get_contingency_table(o11, r1, c1, n)
                     log_likelihood = statistics.one_sided_log_likelihood(o, e)
                     t_score = statistics.t_score(o, e)
                     dice = statistics.dice(o, e)
-                    local_result[pair][cm] = {"o11": f[0], "r1": f[1], "c1": f[2], "n": f[3], "log_likelihood": log_likelihood, "t_score": t_score, "dice": dice}
+                    local_result[pair][cm] = {"o11": f[0], "r1": f[1], "c1": f[2], "n": f[3], "inconsistent": inc, "log_likelihood": log_likelihood, "t_score": t_score, "dice": dice}
             sorted_pairs = sorted(local_result.keys(), key=lambda x: local_result[x]["focus_points"]["log_likelihood"], reverse=True)
             results.append([local_result[p] for p in sorted_pairs])
         write_results(args.output, results, args.collexeme)
