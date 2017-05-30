@@ -2,15 +2,12 @@
 # -*- coding: utf-8 -*-
 
 import argparse
-import functools
 import itertools
-import json
 import logging
 import multiprocessing
 import os
 import tempfile
 
-from networkx.readwrite import json_graph
 
 import pareidoscope.query
 from pareidoscope.utils import conllu
@@ -91,8 +88,14 @@ def write_results(prefix, results):
     - `prefix`:
     - `results`:
     """
-    with open("%s.json" % prefix, "w") as fh:
-        json.dump(results, fh, ensure_ascii=False, indent=4, sort_keys=True)
+    counting_methods = [cm for cm in ("embeddings", "subgraphs", "focus_points", "sentences") if cm in results[0]]
+    values = ("o11", "r1", "c1", "n", "inconsistent", "log_likelihood", "t_score", "dice")
+    with open("%s.tsv" % prefix, "w") as fh:
+        header = ["query_number"] + [":".join(_) for _ in (itertools.product(counting_methods, values))]
+        fh.write("\t".join(header) + "\n")
+        for i, r in enumerate(results):
+            line = [str(i)] + [str(r[cm][v]) for cm, v in (itertools.product(counting_methods, values))]
+            fh.write("\t".join(line) + "\n")
 
 
 def main():
@@ -104,7 +107,7 @@ def main():
     results = [{} for q in queries]
     cpu_count = multiprocessing.cpu_count()
     processes = min(max(1, int(cpu_count * args.cpu / 100)), cpu_count)
-    groupsize = 10 * 10 * processes
+    # groupsize = 10 * 10 * processes
     with multiprocessing.Pool(processes=processes) as pool:
         logging.info("using %d cpus" % processes)
         if args.format == "db":
