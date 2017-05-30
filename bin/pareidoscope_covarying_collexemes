@@ -98,7 +98,7 @@ def get_cooccurrences(args):
         for pair in itertools.product(*[set(_) for _ in zip(*ps)]):
             if pair not in ps:
                 inconsistencies[pair] = [sum(_) for _ in zip(inconsistencies[pair], (0, 1, 0, 0))]
-    return pairs, sample_sizes, inconsistencies
+    return pairs, sample_sizes, dict(inconsistencies)
 
 
 def write_results(prefix, results, word_or_lemma):
@@ -125,15 +125,15 @@ def main():
     results = []
     conn, c = database.connect_to_database(args.CORPUS)
     queries = pareidoscope.query.read_queries(args.QUERIES)
-    pairs = collections.defaultdict(lambda: (0, 0, 0, 0))
-    marginals_a = collections.defaultdict(lambda: (0, 0, 0, 0))
-    marginals_b = collections.defaultdict(lambda: (0, 0, 0, 0))
-    inconsistencies = collections.defaultdict(lambda: (0, 0, 0, 0))
-    sample_sizes = (0, 0, 0, 0)
     cpu_count = multiprocessing.cpu_count()
     processes = min(max(1, int(cpu_count * args.cpu / 100)), cpu_count)
     with multiprocessing.Pool(processes=processes) as pool:
         for i, query in enumerate(queries):
+            pairs = collections.defaultdict(lambda: (0, 0, 0, 0))
+            marginals_a = collections.defaultdict(lambda: (0, 0, 0, 0))
+            marginals_b = collections.defaultdict(lambda: (0, 0, 0, 0))
+            inconsistencies = collections.defaultdict(lambda: (0, 0, 0, 0))
+            sample_sizes = (0, 0, 0, 0)
             logging.info("query no. %d" % i)
             graph, focus_point, collo_a, collo_b = identify_collo_items(query)
             with tempfile.TemporaryFile() as fp:
@@ -169,7 +169,7 @@ def main():
                     log_likelihood = statistics.one_sided_log_likelihood(o, e)
                     t_score = statistics.t_score(o, e)
                     dice = statistics.dice(o, e)
-                    local_result[pair][cm] = {"o11": f[0], "r1": f[1], "c1": f[2], "n": f[3], "inconsistent": inc, "log_likelihood": log_likelihood, "t_score": t_score, "dice": dice}
+                    local_result[pair][cm] = {"o11": o11, "r1": r1, "c1": c1, "n": n, "inconsistent": inc, "log_likelihood": log_likelihood, "t_score": t_score, "dice": dice}
             sorted_pairs = sorted(local_result.keys(), key=lambda x: local_result[x]["focus_points"]["log_likelihood"], reverse=True)
             results.append([local_result[p] for p in sorted_pairs])
         write_results(args.output, results, args.collexeme)
