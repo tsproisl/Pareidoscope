@@ -34,7 +34,8 @@ def arguments():
 
 def remove_auxiliary_attributes(graph, abcn):
     """Remove auxiliary attributes"""
-    for v, l in graph.nodes(data=True):
+    
+    for l in [l for v, l in graph.nodes(data=True)] + [l for s, t, l in graph.edges(data=True)]:
         if abcn == "a" or abcn == "n":
             if "only_B" in l:
                 for attribute in l["only_B"]:
@@ -46,11 +47,12 @@ def remove_auxiliary_attributes(graph, abcn):
         if abcn != "n":
             if "focus_point" in l:
                 del l["focus_point"]
-        del l["query"]
         if "only_A" in l:
             del l["only_A"]
         if "only_B" in l:
             del l["only_B"]
+    for v, l in graph.nodes(data=True):
+        del l["query"]
     return graph
 
 
