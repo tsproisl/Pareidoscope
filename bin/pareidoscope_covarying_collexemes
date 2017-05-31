@@ -74,7 +74,7 @@ def get_cooccurrences(args):
         item_b = target_graph.node[iso[collo_b]][word_or_lemma]
         pair = (item_a, item_b)
         embeddings[pair] += 1
-        subgraph = tuple(sorted(iso))
+        subgraph = frozenset(iso)
         subgraphs[pair].add(subgraph)
         subgraph_to_pairs[subgraph].add(pair)
         total_subgraphs.add(subgraph)
