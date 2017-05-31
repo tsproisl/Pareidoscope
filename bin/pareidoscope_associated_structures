@@ -49,7 +49,7 @@ def get_focus_point(query):
             break
     if focus_point_vertex is None:
         focus_point_vertex = nx_graph.get_choke_point(query)
-    assert focus_point is not None
+    assert focus_point_vertex is not None
     return query, focus_point_vertex
 
 
@@ -164,6 +164,77 @@ def get_c1_and_n(args):
                     for attribute in ("word", "pos", "lemma", "root"):
                         if attribute in sg.node[v]:
                             del sg.node[v][attribute]
+            for focus_point in mappings["subgraph_to_focus_points"][subg]:
+                sg.node[focus_point]["focus_point"] = True
+                gc = nx_graph.canonize(sg)
+                gc_json = json.dumps(json_graph.node_link_data(gc), ensure_ascii=False, sort_keys=True)
+                del sg.node[focus_point]["focus_point"]
+                if gc_json in larger_structures:
+                    c1_counts[gc_json]["subgraphs"].add(subg)
+                    c1_counts[gc_json]["embeddings"] |= mappings["subgraph_to_embeddings"][subg]
+                    c1_counts[gc_json]["focus_points"] |= mappings["subgraph_to_focus_points"][subg]
+    for gc_json, counts in c1_counts.items():
+        c1[gc_json] = Frequencies(len(counts["embeddings"]), len(counts["subgraphs"]), len(counts["focus_points"]), 1)
+    n = Frequencies(len(n_counts["embeddings"]), len(n_counts["subgraphs"]), len(n_counts["focus_points"]), min(1, len(n_counts["embeddings"])))
+    return c1, n
+
+
+def get_frequencies(args):
+    """"""
+    gn, ga, gc_to_gb, gs, focus_point_vertex, max_size = args
+    target_graph = json_graph.node_link_graph(json.loads(gs))
+    vs = set(target_graph.nodes())
+    isomorphisms = subgraph_isomorphism.get_subgraph_isomorphisms_nx(pareidoscope.query.strip_vid(gn), target_graph)
+    n_counts = collections.defaultdict(set)
+    mappings = collections.defaultdict(lambda: collections.defaultdict(set))
+    c1 = {}
+    c1_counts = collections.defaultdict(lambda: collections.defaultdict(set))
+    iso_subsumption = collections.defaultdict(dict)
+    normal_cand_a, stripped_ga = None, None
+    for iso in isomorphisms:
+        subgraph = frozenset(iso)
+        focus_point = iso[focus_point_vertex]
+        n_counts["embeddings"].add(iso)
+        n_counts["subgraphs"].add(subgraph)
+        n_counts["focus_points"].add(focus_point)
+        mappings["subgraph_to_embeddings"][subgraph].add(iso)
+        mappings["embedding_to_focus_point"][iso] = focus_point
+        # check if iso is instance of ga
+        if normal_cand_a is None:
+            stripped_ga = pareidoscope.query.strip_vid(ga)
+            normal_cand_a = nx_graph.get_vertex_candidates(stripped_ga, target_graph)
+        vid_to_iso = {gn.node[qv]["vid"]: tv for qv, tv in zip(sorted(gn.nodes()), iso)}
+        vert_cand_a = pareidoscope.query._get_isomorphism_vertex_candidates(ga, normal_cand_a, vs, subgraph, vid_to_iso)
+        iso_subsumption[iso]["ga"] = subgraph_enumeration.subsumes_nx(stripped_ga, target_graph, vertex_candidates=vert_cand_a)
+    mappings["subgraph_to_focus_points"] = {sg: set([mappings["embedding_to_focus_point"][e] for e in embs]) for sg, embs in mappings["subgraph_to_embeddings"].items()}
+    for subg in n_counts["subgraphs"]:
+        neighbors = [set(target_graph.successors(v) + target_graph.predecessors(v)) for v in subg]
+        nbunch = functools.reduce(lambda x, y: x.union(y), neighbors + [subg])
+        induced_star = target_graph.subgraph(nbunch)
+        bfo_graph, bfo_to_raw = subgraph_enumeration.get_bfo(induced_star, fragment=True)
+        for sg in subgraph_enumeration.enumerate_csg_minmax(bfo_graph, bfo_to_raw, min_vertices=len(subg) + 1, max_vertices=min(induced_star.number_of_nodes(), max_size)):
+            # all vertices from subg have to be in sg
+            if not subg <= set(sg.nodes()):
+                continue
+            # all edges from gn have to be in sg
+            embedding = next(iter(mappings["subgraph_to_embeddings"][subg]))
+            if not all([sg.has_edge(embedding[s], embedding[t]) for s, t in gn.edges()]):
+                continue
+            subgraph_to_query = {embedding[v]: v for v in gn.nodes()}
+            # delexicalize: remove all word, pos and lemma attributes unless they are in query
+            for v in sg.nodes():
+                if v in subgraph_to_query:
+                    for attribute in list(sg.node[v]):
+                        if attribute not in gn.node[subgraph_to_query[v]]:
+                            del sg.node[v][attribute]
+                else:
+                    for attribute in ("word", "pos", "lemma", "root"):
+                        if attribute in sg.node[v]:
+                            del sg.node[v][attribute]
+            ### TODO
+            # check if sg is in set of gbs
+            # if yes: check if isomorphisms are instances of gb
+            # if yes and instance of ga: check if isomorphisms are instances of gc
             for focus_point in mappings["subgraph_to_focus_points"][subg]:
                 sg.node[focus_point]["focus_point"] = True
                 gc = nx_graph.canonize(sg)
