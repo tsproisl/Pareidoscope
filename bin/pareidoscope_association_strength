@@ -25,7 +25,6 @@ logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=loggi
 def arguments():
     """"""
     parser = argparse.ArgumentParser(description='Run a batch of queries against a corpus')
-    parser.add_argument("-a", help="Determine frequencies for all counting methods and not only for focus points", action='store_true')
     parser.add_argument("-f", "--format", choices=["conllu", "cwb", "db"], required=True, help="Input format of the corpus: Either a text-based format (CoNLL-U or CWB-treebank) or a database created by pareidoscope_corpus_to_sqlite")
     parser.add_argument("-o", "--output", type=str, required=True, help="Output prefix")
     parser.add_argument("-p", "--cpu", type=int, default=25, help="Percentage of CPUs to use (0-100; default: 25)")
@@ -126,7 +125,7 @@ def main():
                     sentences = (s.decode(encoding="utf-8") for s in fp)
                 # sents = database.sentence_candidates(c, pareidoscope.query.strip_vid(gn))
                 # for sentences in helper.grouper_nofill(groupsize, sents):
-                    query_args = (itertools.chain.from_iterable(a) for a in zip(itertools.repeat(qline), ((s,) for s in sentences), ((a,) for a in itertools.repeat(args.a))))
+                    query_args = (itertools.chain.from_iterable(a) for a in zip(itertools.repeat(qline), ((s,) for s in sentences)))
                     r = pool.imap_unordered(pareidoscope.query.run_queries_db, query_args, 10)
                     # for debugging, it is often better to avoid multiprocessing:
                     # r = map(pareidoscope.query.run_queries_db, query_args)
@@ -142,7 +141,7 @@ def main():
                 sentences = sents
                 # for i, sentences in enumerate(helper.grouper_nofill(groupsize, sents)):
                     # logging.info("processing sentences %d--%d" % (i * groupsize + 1, i * groupsize + min(groupsize, len(sentences))))
-                r = pool.imap_unordered(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(args.format), itertools.repeat(queries), itertools.repeat(args.a)), 10)
+                r = pool.imap_unordered(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(args.format), itertools.repeat(queries)), 10)
                 # for debugging, it is often better to avoid multiprocessing:
                 # r = map(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(args.format), itertools.repeat(queries)))
                 for result, sensible in r:
