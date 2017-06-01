@@ -181,7 +181,24 @@ def get_c1_and_n(args):
 
 def get_frequencies(args):
     """"""
-    gn, ga, gb_to_gc, gs, focus_point_vertex, max_size = args
+    # for embedding of gn in gs:
+    #     subsumed_by_ga[embedding] = True/False -> check vertex labels
+    #     for larger_subgraph of induced_subgraph of embedding:
+    #     	mapping[larger_subgraph_gc].add((embedding, larger_subgraph))
+    # 	if larger_subgraph_gb in gbs:
+    # 	   subsumed_by_gb[gb][embedding] = True/False
+    # r1 = count embeddings where subsumed_by_ga == True
+    # n = number of embeddings
+    # for gc, gb in gc_to_gb.items():
+    #     c1 = count embeddings where subsumed_by_gb[gb][embedding] == True
+    #     if gc in mapping:
+    #        for embedding, larger_subgraph in mapping[gc]:
+    #        	   subsumed_by_gc[gc][embedding] = True/False
+    # 	   vector[embedding] = (subsumed_by_gc, subsumed_by_ga[embedding], subsumed_by_gb[gb][embedding])
+    #     else:
+    # 	result[gc] = (0, r1, c1, n, 0)
+    gn, ga, gc_to_gb, gbs, gs, focus_point_vertex, max_size = args
+    stripped_ga = pareidoscope.query.strip_vid(ga)
     target_graph = json_graph.node_link_graph(json.loads(gs))
     vs = set(target_graph.nodes())
     isomorphisms = subgraph_isomorphism.get_subgraph_isomorphisms_nx(pareidoscope.query.strip_vid(gn), target_graph)
@@ -192,6 +209,7 @@ def get_frequencies(args):
     iso_subsumption = collections.defaultdict(dict)
     subsumed_by_ga = {}
     vid_to_iso = {}
+    mapping_gc = collections.defaultdict(set)
     normal_cand_a, stripped_ga = None, None
     for iso in isomorphisms:
         subgraph = frozenset(iso)
@@ -202,12 +220,12 @@ def get_frequencies(args):
         mappings["subgraph_to_embeddings"][subgraph].add(iso)
         mappings["embedding_to_focus_point"][iso] = focus_point
         # check if iso is instance of ga
-        if normal_cand_a is None:
-            stripped_ga = pareidoscope.query.strip_vid(ga)
-            normal_cand_a = nx_graph.get_vertex_candidates(stripped_ga, target_graph)
-        vid_to_iso[iso] = {gn.node[qv]["vid"]: tv for qv, tv in zip(sorted(gn.nodes()), iso)}
-        vert_cand_a = pareidoscope.query._get_isomorphism_vertex_candidates(ga, normal_cand_a, vs, subgraph, vid_to_iso)
-        subsumed_by_ga[iso] = subgraph_enumeration.subsumes_nx(stripped_ga, target_graph, vertex_candidates=vert_cand_a)
+        subsumed_by_ga[iso] = all((nx_graph.dictionary_match(qv, tv) for qv, tv in zip((l for v, l in sorted(stripped_ga.nodes(data=True))), (target_graph.node[v] for v in iso))))
+        # if normal_cand_a is None:
+        #     normal_cand_a = nx_graph.get_vertex_candidates(stripped_ga, target_graph)
+        # vid_to_iso[iso] = {gn.node[qv]["vid"]: tv for qv, tv in zip(sorted(gn.nodes()), iso)}
+        # vert_cand_a = pareidoscope.query._get_isomorphism_vertex_candidates(ga, normal_cand_a, vs, subgraph, vid_to_iso)
+        # subsumed_by_ga[iso] = subgraph_enumeration.subsumes_nx(stripped_ga, target_graph, vertex_candidates=vert_cand_a)
     mappings["subgraph_to_focus_points"] = {sg: set([mappings["embedding_to_focus_point"][e] for e in embs]) for sg, embs in mappings["subgraph_to_embeddings"].items()}
     for subg in n_counts["subgraphs"]:
         neighbors = [set(target_graph.successors(v) + target_graph.predecessors(v)) for v in subg]
@@ -237,26 +255,28 @@ def get_frequencies(args):
                         if attribute in gc.node[v]:
                             del gc.node[v][attribute]
             gc_json = json.dumps(json_graph.node_link_data(nx_graph.canonize(gc)), ensure_ascii=False, sort_keys=True)
+            for iso in mappings["subgraph_to_embeddings"][subg]:
+                mapping_gc[gc_json].add((iso, gc))
             # check if gb is in gb_to_gc
-            if gb_json in gb_to_gc:
+            if gb_json in gbs:
                 # if yes: check if isomorphisms are instances of gb
                 for iso in mappings["subgraph_to_embeddings"][subg]:
-                    isomorphism_candidates = [set([v]) in subg else vs - subg for v in sorted(gb.nodes)]
+                    isomorphism_candidates = [set([v]) if v in subg else vs - subg for v in sorted(gb.nodes)]
                     stripped_gb = pareidoscope.query.strip_vid(gb)
                     normal_cand_b = nx_graph.get_vertex_candidates(stripped_gb, target_graph)
                     vert_cand_b = [a & b for a, b in zip(normal_cand_b, isomorphism_candidates)]
                     subsumed_by_gb[gb_json][iso] = subgraph_enumeration.subsumes_nx(stripped_gb, target_graph, vertex_candidates=vert_cand_b)
-                    # if yes and instance of ga: check if isomorphisms are instances of gc
-                    if subsumed_by_ga and subsumed_by_gb[gb_json][iso]:
-                        for gcj in gb_to_gc[gb_json]:
-                            if gcj != gc_json:
-                                subsumed_by_gc[gcj][iso] = False
-                            else:
-                                isomorphism_candidates = [set([v]) in subg else vs - subg for v in sorted(gc.nodes)]
-                                stripped_gc = pareidoscope.query.strip_vid(gc)
-                                normal_cand_c = nx_graph.get_vertex_candidates(stripped_gc, target_graph)
-                                vert_cand_c = [a & b for a, b in zip(normal_cand_c, isomorphism_candidates)]
-                                subsumed_by_gc[gc_json][iso] = subgraph_enumeration.subsumes_nx(stripped_gc, target_graph, vertex_candidates=vert_cand_c)
+                    # # if yes and instance of ga: check if isomorphisms are instances of gc
+                    # if subsumed_by_ga and subsumed_by_gb[gb_json][iso]:
+                    #     for gcj in gb_to_gc[gb_json]:
+                    #         if gcj != gc_json:
+                    #             subsumed_by_gc[gcj][iso] = False
+                    #         else:
+                    #             isomorphism_candidates = [set([v]) in subg else vs - subg for v in sorted(gc.nodes)]
+                    #             stripped_gc = pareidoscope.query.strip_vid(gc)
+                    #             normal_cand_c = nx_graph.get_vertex_candidates(stripped_gc, target_graph)
+                    #             vert_cand_c = [a & b for a, b in zip(normal_cand_c, isomorphism_candidates)]
+                    #             subsumed_by_gc[gc_json][iso] = subgraph_enumeration.subsumes_nx(stripped_gc, target_graph, vertex_candidates=vert_cand_c)
     ###TODO
             for focus_point in mappings["subgraph_to_focus_points"][subg]:
                 sg.node[focus_point]["focus_point"] = True
