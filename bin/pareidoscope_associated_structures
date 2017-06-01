@@ -97,7 +97,7 @@ def get_cooccurring_structures(args):
             embedding = next(iter(mappings["subgraph_to_embeddings"][subg]))
             if not all([sg.has_edge(embedding[s], embedding[t]) for s, t in query_graph.edges()]):
                 continue
-            subgraph_to_query = {embedding[v]: v for v in query_graph.nodes()}
+            subgraph_to_query = {embedding[v]: v for v in sorted(query_graph.nodes())}
             # delexicalize: remove all word, pos and lemma attributes unless they are in query
             for v in sg.nodes():
                 if v in subgraph_to_query:
@@ -108,14 +108,19 @@ def get_cooccurring_structures(args):
                     for attribute in ("word", "pos", "lemma", "root"):
                         if attribute in sg.node[v]:
                             del sg.node[v][attribute]
-            for focus_point in mappings["subgraph_to_focus_points"][subg]:
-                sg.node[focus_point]["focus_point"] = True
-                gc = nx_graph.canonize(sg)
-                gc_json = json.dumps(json_graph.node_link_data(gc), ensure_ascii=False, sort_keys=True)
-                del sg.node[focus_point]["focus_point"]
-                o11_counts[gc_json]["subgraphs"].add(subg)
-                o11_counts[gc_json]["embeddings"] |= mappings["subgraph_to_embeddings"][subg]
-                o11_counts[gc_json]["focus_points"] |= mappings["subgraph_to_focus_points"][subg]
+            gc = nx_graph.canonize(sg)
+            gc_json = json.dumps(json_graph.node_link_data(gc), ensure_ascii=False, sort_keys=True)
+            o11_counts[gc_json]["subgraphs"].add(subg)
+            o11_counts[gc_json]["embeddings"] |= mappings["subgraph_to_embeddings"][subg]
+            o11_counts[gc_json]["focus_points"] |= mappings["subgraph_to_focus_points"][subg]
+            # for focus_point in mappings["subgraph_to_focus_points"][subg]:
+            #     sg.node[focus_point]["focus_point"] = True
+            #     gc = nx_graph.canonize(sg)
+            #     gc_json = json.dumps(json_graph.node_link_data(gc), ensure_ascii=False, sort_keys=True)
+            #     del sg.node[focus_point]["focus_point"]
+            #     o11_counts[gc_json]["subgraphs"].add(subg)
+            #     o11_counts[gc_json]["embeddings"] |= mappings["subgraph_to_embeddings"][subg]
+            #     o11_counts[gc_json]["focus_points"] |= mappings["subgraph_to_focus_points"][subg]
     for gc_json, counts in o11_counts.items():
         o11[gc_json] = Frequencies(len(counts["embeddings"]), len(counts["subgraphs"]), len(counts["focus_points"]), 1)
     r1 = Frequencies(len(r1_counts["embeddings"]), len(r1_counts["subgraphs"]), len(r1_counts["focus_points"]), min(1, len(r1_counts["embeddings"])))
@@ -179,38 +184,27 @@ def get_c1_and_n(args):
     return c1, n
 
 
+def derive_frequency_tuple(embeddings, focus_point_vertex):
+    """"""
+    subgraphs = set([frozenset(iso) for iso in embeddings])
+    focus_points = set([iso[focus_point_vertex] for iso in embeddings])
+    frequency_tuple = Frequencies(len(embeddings), len(subgraphs), len(focus_points), min(1, len(embeddings)))
+    return subgraphs, focus_points, frequency_tuple
+
+
 def get_frequencies(args):
     """"""
-    # for embedding of gn in gs:
-    #     subsumed_by_ga[embedding] = True/False -> check vertex labels
-    #     for larger_subgraph of induced_subgraph of embedding:
-    #     	mapping[larger_subgraph_gc].add((embedding, larger_subgraph))
-    # 	if larger_subgraph_gb in gbs:
-    # 	   subsumed_by_gb[gb][embedding] = True/False
-    # r1 = count embeddings where subsumed_by_ga == True
-    # n = number of embeddings
-    # for gc, gb in gc_to_gb.items():
-    #     c1 = count embeddings where subsumed_by_gb[gb][embedding] == True
-    #     if gc in mapping:
-    #        for embedding, larger_subgraph in mapping[gc]:
-    #        	   subsumed_by_gc[gc][embedding] = True/False
-    # 	   vector[embedding] = (subsumed_by_gc, subsumed_by_ga[embedding], subsumed_by_gb[gb][embedding])
-    #     else:
-    # 	result[gc] = (0, r1, c1, n, 0)
     gn, ga, gc_to_gb, gbs, gs, focus_point_vertex, max_size = args
+    n_counts = collections.defaultdict(set)
+    mappings = collections.defaultdict(lambda: collections.defaultdict(set))
+    subsumed_by_ga = {}
+    subsumed_by_gb = collections.defaultdict(dict)
+    subsumed_by_gc = collections.defaultdict(dict)
+    result = collections.defaultdict(dict)
     stripped_ga = pareidoscope.query.strip_vid(ga)
     target_graph = json_graph.node_link_graph(json.loads(gs))
     vs = set(target_graph.nodes())
     isomorphisms = subgraph_isomorphism.get_subgraph_isomorphisms_nx(pareidoscope.query.strip_vid(gn), target_graph)
-    n_counts = collections.defaultdict(set)
-    mappings = collections.defaultdict(lambda: collections.defaultdict(set))
-    c1 = {}
-    c1_counts = collections.defaultdict(lambda: collections.defaultdict(set))
-    iso_subsumption = collections.defaultdict(dict)
-    subsumed_by_ga = {}
-    vid_to_iso = {}
-    mapping_gc = collections.defaultdict(set)
-    normal_cand_a, stripped_ga = None, None
     for iso in isomorphisms:
         subgraph = frozenset(iso)
         focus_point = iso[focus_point_vertex]
@@ -218,7 +212,6 @@ def get_frequencies(args):
         n_counts["subgraphs"].add(subgraph)
         n_counts["focus_points"].add(focus_point)
         mappings["subgraph_to_embeddings"][subgraph].add(iso)
-        mappings["embedding_to_focus_point"][iso] = focus_point
         # check if iso is instance of ga
         subsumed_by_ga[iso] = all((nx_graph.dictionary_match(qv, tv) for qv, tv in zip((l for v, l in sorted(stripped_ga.nodes(data=True))), (target_graph.node[v] for v in iso))))
         # if normal_cand_a is None:
@@ -226,7 +219,6 @@ def get_frequencies(args):
         # vid_to_iso[iso] = {gn.node[qv]["vid"]: tv for qv, tv in zip(sorted(gn.nodes()), iso)}
         # vert_cand_a = pareidoscope.query._get_isomorphism_vertex_candidates(ga, normal_cand_a, vs, subgraph, vid_to_iso)
         # subsumed_by_ga[iso] = subgraph_enumeration.subsumes_nx(stripped_ga, target_graph, vertex_candidates=vert_cand_a)
-    mappings["subgraph_to_focus_points"] = {sg: set([mappings["embedding_to_focus_point"][e] for e in embs]) for sg, embs in mappings["subgraph_to_embeddings"].items()}
     for subg in n_counts["subgraphs"]:
         neighbors = [set(target_graph.successors(v) + target_graph.predecessors(v)) for v in subg]
         nbunch = functools.reduce(lambda x, y: x.union(y), neighbors + [subg])
@@ -240,15 +232,13 @@ def get_frequencies(args):
             embedding = next(iter(mappings["subgraph_to_embeddings"][subg]))
             if not all([sg.has_edge(embedding[s], embedding[t]) for s, t in gn.edges()]):
                 continue
-            subgraph_to_query = {embedding[v]: v for v in gn.nodes()}
-            gb = delexicalize(sg)
-            gb_json = json.dumps(json_graph.node_link_data(nx_graph.canonize(gb)), ensure_ascii=False, sort_keys=True)
+            subgraph_to_query = {embedding[v]: v for v in sorted(gn.nodes())}
             gc = sg.copy()
             # delexicalize: remove all word, pos and lemma attributes unless they are in query
             for v in gc.nodes():
                 if v in subgraph_to_query:
                     for attribute in list(gc.node[v]):
-                        if attribute not in gn.node[subgraph_to_query[v]]:
+                        if attribute not in ga.node[subgraph_to_query[v]]:
                             del gc.node[v][attribute]
                 else:
                     for attribute in ("word", "pos", "lemma", "root"):
@@ -256,41 +246,44 @@ def get_frequencies(args):
                             del gc.node[v][attribute]
             gc_json = json.dumps(json_graph.node_link_data(nx_graph.canonize(gc)), ensure_ascii=False, sort_keys=True)
             for iso in mappings["subgraph_to_embeddings"][subg]:
-                mapping_gc[gc_json].add((iso, gc))
+                mappings["gc_json_to_embedding_and_gc"][gc_json].add((iso, gc))
+            gb = delexicalize(gc)
+            gb_json = json.dumps(json_graph.node_link_data(nx_graph.canonize(gb)), ensure_ascii=False, sort_keys=True)
             # check if gb is in gb_to_gc
             if gb_json in gbs:
                 # if yes: check if isomorphisms are instances of gb
                 for iso in mappings["subgraph_to_embeddings"][subg]:
-                    isomorphism_candidates = [set([v]) if v in subg else vs - subg for v in sorted(gb.nodes)]
-                    stripped_gb = pareidoscope.query.strip_vid(gb)
-                    normal_cand_b = nx_graph.get_vertex_candidates(stripped_gb, target_graph)
+                    isomorphism_candidates = [set([v]) if v in subg else vs - subg for v in sorted(gb.nodes())]
+                    consecutive_gb = nx_graph.ensure_consecutive_vertices(gb)
+                    normal_cand_b = nx_graph.get_vertex_candidates(consecutive_gb, target_graph)
                     vert_cand_b = [a & b for a, b in zip(normal_cand_b, isomorphism_candidates)]
-                    subsumed_by_gb[gb_json][iso] = subgraph_enumeration.subsumes_nx(stripped_gb, target_graph, vertex_candidates=vert_cand_b)
-                    # # if yes and instance of ga: check if isomorphisms are instances of gc
-                    # if subsumed_by_ga and subsumed_by_gb[gb_json][iso]:
-                    #     for gcj in gb_to_gc[gb_json]:
-                    #         if gcj != gc_json:
-                    #             subsumed_by_gc[gcj][iso] = False
-                    #         else:
-                    #             isomorphism_candidates = [set([v]) in subg else vs - subg for v in sorted(gc.nodes)]
-                    #             stripped_gc = pareidoscope.query.strip_vid(gc)
-                    #             normal_cand_c = nx_graph.get_vertex_candidates(stripped_gc, target_graph)
-                    #             vert_cand_c = [a & b for a, b in zip(normal_cand_c, isomorphism_candidates)]
-                    #             subsumed_by_gc[gc_json][iso] = subgraph_enumeration.subsumes_nx(stripped_gc, target_graph, vertex_candidates=vert_cand_c)
-    ###TODO
-            for focus_point in mappings["subgraph_to_focus_points"][subg]:
-                sg.node[focus_point]["focus_point"] = True
-                gc = nx_graph.canonize(sg)
-                gc_json = json.dumps(json_graph.node_link_data(gc), ensure_ascii=False, sort_keys=True)
-                del sg.node[focus_point]["focus_point"]
-                if gc_json in larger_structures:
-                    c1_counts[gc_json]["subgraphs"].add(subg)
-                    c1_counts[gc_json]["embeddings"] |= mappings["subgraph_to_embeddings"][subg]
-                    c1_counts[gc_json]["focus_points"] |= mappings["subgraph_to_focus_points"][subg]
-    for gc_json, counts in c1_counts.items():
-        c1[gc_json] = Frequencies(len(counts["embeddings"]), len(counts["subgraphs"]), len(counts["focus_points"]), 1)
+                    subsumed_by_gb[gb_json][iso] = subgraph_enumeration.subsumes_nx(consecutive_gb, target_graph, vertex_candidates=vert_cand_b)
+    r1_embeddings = set([iso for iso, t in subsumed_by_ga.items() if t])
+    r1_subgraphs, r1_focus_points, r1 = derive_frequency_tuple(r1_embeddings, focus_point_vertex)
     n = Frequencies(len(n_counts["embeddings"]), len(n_counts["subgraphs"]), len(n_counts["focus_points"]), min(1, len(n_counts["embeddings"])))
-    return c1, n
+    for gc, gb in gc_to_gb.items():
+        c1_embeddings = set([iso for iso, t in subsumed_by_gb.get(gb, {}).items() if t])
+        c1_subgraphs, c1_focus_points, c1 = derive_frequency_tuple(c1_embeddings, focus_point_vertex)
+        if gc in mappings["gc_json_to_embedding_and_gc"]:
+            for iso, g in mappings["gc_json_to_embedding_and_gc"][gc]:
+                subg = set(iso)
+                isomorphism_candidates = [set([v]) if v in subg else vs - subg for v in sorted(g.nodes())]
+                consecutive_gc = nx_graph.ensure_consecutive_vertices(g)
+                normal_cand_c = nx_graph.get_vertex_candidates(consecutive_gc, target_graph)
+                vert_cand_c = [a & b for a, b in zip(normal_cand_c, isomorphism_candidates)]
+                subsumed_by_gc[gc][iso] = subgraph_enumeration.subsumes_nx(consecutive_gc, target_graph, vertex_candidates=vert_cand_c)
+        o11_embeddings = set([iso for iso, t in subsumed_by_gc.get(gc, {}).items() if t])
+        o11_subgraphs, o11_focus_points, o11 = derive_frequency_tuple(o11_embeddings, focus_point_vertex)
+        inconsistent_embeddings = (r1_embeddings & c1_embeddings) - o11_embeddings
+        inconsistent_subgraphs = (r1_subgraphs & c1_subgraphs) - o11_subgraphs
+        inconsistent_focus_points = (r1_focus_points & c1_focus_points) - o11_focus_points
+        inconsistent_sentence = 1 if r1.sentences == 1 and c1.sentences == 1 and o11.sentences == 0 else 0
+        inconsistencies = Frequencies(len(inconsistent_embeddings), len(inconsistent_subgraphs), len(inconsistent_focus_points), inconsistent_sentence)
+        result[gc]["embeddings"] = (o11.embeddings, r1.embeddings - inconsistencies.embeddings / 2, c1.embeddings - inconsistencies.embeddings / 2, n.embeddings, inconsistencies.embeddings)
+        result[gc]["subgraphs"] = (o11.subgraphs, r1.subgraphs - inconsistencies.subgraphs / 2, c1.subgraphs - inconsistencies.subgraphs / 2, n.subgraphs, inconsistencies.subgraphs)
+        result[gc]["focus_points"] = (o11.focus_points, r1.focus_points - inconsistencies.focus_points / 2, c1.focus_points - inconsistencies.focus_points / 2, n.focus_points, inconsistencies.focus_points)
+        result[gc]["sentences"] = (o11.sentences, r1.sentences - inconsistencies.sentences / 2, c1.sentences - inconsistencies.sentences / 2, n.sentences, inconsistencies.sentences)
+    return result
 
 
 def write_results(prefix, results):
@@ -301,7 +294,7 @@ def write_results(prefix, results):
     - `results`:
     """
     counting_methods = ("embeddings", "subgraphs", "focus_points", "sentences")
-    values = ("o11", "r1", "c1", "n", "log_likelihood", "t_score", "dice")
+    values = ("o11", "r1", "c1", "n", "inconsistent", "log_likelihood", "t_score", "dice")
     with open("%s.tsv" % prefix, "w") as fh:
         header = ["query_number", "larger_structure"] + [":".join(_) for _ in (itertools.product(counting_methods, values))]
         fh.write("\t".join(header) + "\n")
@@ -315,6 +308,7 @@ def main():
     """"""
     args = arguments()
     results = []
+    counting_methods = ("embeddings", "subgraphs", "focus_points", "sentences")
     conn, c = database.connect_to_database(args.CORPUS)
     queries = pareidoscope.query.read_queries(args.QUERIES)
     cpu_count = multiprocessing.cpu_count()
@@ -322,9 +316,8 @@ def main():
     with multiprocessing.Pool(processes=processes) as pool:
         for i, query in enumerate(queries):
             r1 = Frequencies(0, 0, 0, 0)
-            n = Frequencies(0, 0, 0, 0)
             o11 = collections.defaultdict(lambda: Frequencies(0, 0, 0, 0))
-            c1 = collections.defaultdict(lambda: Frequencies(0, 0, 0, 0))
+            frequencies = collections.defaultdict(lambda: collections.defaultdict(lambda: (0, 0, 0, 0, 0)))
             logging.info("query no. %d" % i)
             graph, focus_point = get_focus_point(query)
             delexicalized = delexicalize(graph)
@@ -341,8 +334,8 @@ def main():
                     r1 = [sum(_) for _ in zip(r1, local_r1)]
                     for g, freq in local_o11.items():
                         o11[g] = [sum(_) for _ in zip(o11[g], freq)]
-            larger_structures = set()
             gc_to_gb = {}
+            gbs = set()
             for gc, freq in o11.items():
                 if freq[3] < args.min_coocc:
                     continue
@@ -351,33 +344,43 @@ def main():
                 gb = nx_graph.canonize(gb)
                 gb = json.dumps(json_graph.node_link_data(gb), ensure_ascii=False, sort_keys=True)
                 gc_to_gb[gc] = gb
-                larger_structures.add(gb)
+                gbs.add(gb)
             with tempfile.TemporaryFile() as fp:
                 sents = database.sentence_candidates(c, pareidoscope.query.strip_vid(delexicalized))
                 for s in sents:
                     fp.write((s + "\n").encode(encoding="utf-8"))
                 fp.seek(0)
                 sentences = (s.decode(encoding="utf-8").rstrip() for s in fp)
-                query_args = zip(itertools.repeat(delexicalized), sentences, itertools.repeat(focus_point), itertools.repeat(args.max_size), itertools.repeat(larger_structures))
-                r = pool.imap_unordered(get_c1_and_n, query_args, 10)
+                # query_args = zip(itertools.repeat(delexicalized), sentences, itertools.repeat(focus_point), itertools.repeat(args.max_size), itertools.repeat(larger_structures))
+                # r = pool.imap_unordered(get_c1_and_n, query_args, 10)
                 # r = map(get_c1_and_n, query_args)
-                for local_c1, local_n in r:
-                    n = [sum(_) for _ in zip(n, local_n)]
-                    for g, freq in local_c1.items():
-                        c1[g] = [sum(_) for _ in zip(c1[g], freq)]
+                query_args = zip(itertools.repeat(delexicalized), itertools.repeat(graph), itertools.repeat(gc_to_gb), itertools.repeat(gbs), sentences, itertools.repeat(focus_point), itertools.repeat(args.max_size))
+                r = pool.imap_unordered(get_frequencies, query_args, 10)
+                # r = map(get_frequencies, query_args)
+                for res in r:
+                    for gc, freqs in res.items():
+                        for cm in counting_methods:
+                            frequencies[gc][cm] = [sum(_) for _ in zip(frequencies[gc][cm], freqs[cm])]
             local_result = {}
-            counting_methods = ("embeddings", "subgraphs", "focus_points", "sentences")
-            for gc, freq in o11.items():
-                if freq[3] < args.min_coocc:
+            for gc in gc_to_gb:
+                assert frequencies[gc]["embeddings"][0] == o11[gc][0]
+                assert frequencies[gc]["embeddings"][1] + frequencies[gc]["embeddings"][4] / 2 == r1[0]
+                assert frequencies[gc]["subgraphs"][0] == o11[gc][1]
+                assert frequencies[gc]["subgraphs"][1] + frequencies[gc]["subgraphs"][4] / 2 == r1[1]
+                assert frequencies[gc]["focus_points"][0] == o11[gc][2]
+                assert frequencies[gc]["focus_points"][1] + frequencies[gc]["focus_points"][4] / 2 == r1[2]
+                assert frequencies[gc]["sentences"][0] == o11[gc][3]
+                assert frequencies[gc]["sentences"][1] + frequencies[gc]["sentences"][4] / 2 == r1[3]
+                if frequencies[gc]["sentences"][0] < args.min_coocc:
                     continue
                 local_result[gc] = {"larger_structure": gc}
                 for i, cm in enumerate(counting_methods):
-                    lo11, lr1, lc1, ln = freq[i], r1[i], c1[gc_to_gb[gc]][i], n[i]
+                    lo11, lr1, lc1, ln, linc = frequencies[gc][cm]
                     o, e = statistics.get_contingency_table(lo11, lr1, lc1, ln)
                     log_likelihood = statistics.one_sided_log_likelihood(o, e)
                     t_score = statistics.t_score(o, e)
                     dice = statistics.dice(o, e)
-                    local_result[gc][cm] = {"o11": lo11, "r1": lr1, "c1": lc1, "n": ln, "log_likelihood": log_likelihood, "t_score": t_score, "dice": dice}
+                    local_result[gc][cm] = {"o11": lo11, "r1": lr1, "c1": lc1, "n": ln, "inconsistent": linc, "log_likelihood": log_likelihood, "t_score": t_score, "dice": dice}
             sorted_gcs = sorted(local_result.keys(), key=lambda x: local_result[x]["focus_points"]["log_likelihood"], reverse=True)
             results.append([local_result[gc] for gc in sorted_gcs])
         write_results(args.output, results)
