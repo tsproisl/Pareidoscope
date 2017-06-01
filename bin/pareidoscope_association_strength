@@ -8,6 +8,8 @@ import multiprocessing
 import os
 import tempfile
 
+import json
+from networkx.readwrite import json_graph
 
 import pareidoscope.query
 from pareidoscope.utils import conllu
@@ -34,13 +36,12 @@ def arguments():
 
 def remove_auxiliary_attributes(graph, abcn):
     """Remove auxiliary attributes"""
-    
     for l in [l for v, l in graph.nodes(data=True)] + [l for s, t, l in graph.edges(data=True)]:
         if abcn == "a" or abcn == "n":
             if "only_B" in l:
                 for attribute in l["only_B"]:
                     del l[attribute]
-        elif abcn == "b" or abcn == "n":
+        if abcn == "b" or abcn == "n":
             if "only_A" in l:
                 for attribute in l["only_A"]:
                     del l[attribute]
