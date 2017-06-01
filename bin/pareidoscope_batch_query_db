@@ -159,7 +159,7 @@ def main():
             # remove sentence ids
             # sentences = [s[1:] for s in sentences]
             # query_args = (itertools.chain.from_iterable(a) for a in zip(itertools.repeat(qline), sentences))
-            query_args = (itertools.chain.from_iterable(a) for a in zip(itertools.repeat(qline), ((s,) for s in sentences), ((t,) for t in itertools.repeat(True))))
+            query_args = (itertools.chain.from_iterable(a) for a in zip(itertools.repeat(qline), ((s,) for s in sentences)))
             r = pool.imap_unordered(pareidoscope.query.run_queries_db, query_args, 10)
             # r = map(pareidoscope.query.run_queries_db, query_args)
             for result in r:
