@@ -72,6 +72,54 @@ def _frequency_signature(subsumes, args_c, args_a, args_b):
     return o11, r1, c1, n, inconsistent
 
 
+def derive_subgraphs_and_focus_points(embeddings, focus_point_vertex):
+    """"""
+    subgraphs = set([frozenset(iso) for iso in embeddings])
+    focus_points = set([iso[focus_point_vertex] for iso in embeddings])
+    # embeddings, subgraphs, focus_points, sentences
+    frequencies = (len(embeddings), len(subgraphs), len(focus_points), min(1, len(embeddings)))
+    return subgraphs, focus_points, frequencies
+
+
+def all_counting_methods(gc, ga, gb, gn, gs, focus_point, candidates=None):
+    """Count embeddings and derive the other counting methods."""
+    result = {}
+    vs = set(gs.nodes())
+    stripped_gc = strip_vid(gc)
+    stripped_ga = strip_vid(ga)
+    stripped_gb = strip_vid(gb)
+    embeddings_gc, embeddings_ga, embeddings_gb = set(), set(), set()
+    embeddings = set(subgraph_isomorphism.get_subgraph_isomorphisms_nx(strip_vid(gn), gs, vertex_candidates=candidates))
+    if len(embeddings) > 0:
+        normal_cand_c = nx_graph.get_vertex_candidates(stripped_gc, gs)
+        normal_cand_a = nx_graph.get_vertex_candidates(stripped_ga, gs)
+        normal_cand_b = nx_graph.get_vertex_candidates(stripped_gb, gs)
+    for embedding in embeddings:
+        vid_to_iso = {gn.node[qv]["vid"]: tv for qv, tv in zip(sorted(gn.nodes()), embedding)}
+        v_embedding = set(embedding)
+        vert_cand_c = _get_isomorphism_vertex_candidates(gc, normal_cand_c, vs, v_embedding, vid_to_iso)
+        vert_cand_a = _get_isomorphism_vertex_candidates(ga, normal_cand_a, vs, v_embedding, vid_to_iso)
+        vert_cand_b = _get_isomorphism_vertex_candidates(gb, normal_cand_b, vs, v_embedding, vid_to_iso)
+        if subgraph_enumeration.subsumes_nx(stripped_gc, gs, vertex_candidates=vert_cand_c):
+            embeddings_gc.add(embedding)
+        if subgraph_enumeration.subsumes_nx(stripped_ga, gs, vertex_candidates=vert_cand_a):
+            embeddings_ga.add(embedding)
+        if subgraph_enumeration.subsumes_nx(stripped_gb, gs, vertex_candidates=vert_cand_b):
+            embeddings_gb.add(embedding)
+    subgraphs_n, focus_points_n, n = derive_subgraphs_and_focus_points(embeddings, focus_point)
+    subgraphs_gc, focus_points_gc, o11 = derive_subgraphs_and_focus_points(embeddings_gc, focus_point)
+    subgraphs_ga, focus_points_ga, r1 = derive_subgraphs_and_focus_points(embeddings_ga, focus_point)
+    subgraphs_gb, focus_points_gb, c1 = derive_subgraphs_and_focus_points(embeddings_gb, focus_point)
+    inconsistent_embeddings = (embeddings_ga & embeddings_gb) - embeddings_gc
+    inconsistent_subgraphs = (subgraphs_ga & subgraphs_gb) - subgraphs_gc
+    inconsistent_focus_points = (focus_points_ga & focus_points_gb) - focus_points_gc
+    inconsistent_sentence = 1 if r1[3] == 1 and c1[3] == 1 and o11[3] == 0 else 0
+    inconsistencies = (len(inconsistent_embeddings), len(inconsistent_subgraphs), len(inconsistent_focus_points), inconsistent_sentence)
+    for i, cm in enumerate(("embeddings", "subgraphs", "focus_points", "sentences")):
+        result[cm] = {"o11": o11[i], "r1": r1[i] - inconsistencies[i] / 2, "c1": c1[i] - inconsistencies[i] / 2, "n": n[i], "inconsistent": inconsistencies[i]}
+    return result
+
+
 def isomorphisms(gc, ga, gb, gn, gs, candidates=None):
     """Count isomorphisms
 
@@ -235,7 +283,7 @@ def run_queries(args):
     - `args`:
 
     """
-    sentence, input_format, queries, all_counting_methods = args
+    sentence, input_format, queries = args
     result = []
     if input_format == "cwb":
         gs = nx_graph.create_nx_digraph_from_cwb(sentence)
@@ -246,7 +294,8 @@ def run_queries(args):
         for qline in queries:
             gc, ga, gb, gn, choke_point = qline
             candidates = nx_graph.get_vertex_candidates(strip_vid(gn), gs)
-            result.append(_run_query(gc, ga, gb, gn, gs, choke_point, candidates, all_counting_methods))
+            # result.append(_run_query(gc, ga, gb, gn, gs, choke_point, candidates, all_counting_methods))
+            result.append(_run_query_all(gc, ga, gb, gn, gs, choke_point, candidates))
     return result, sensible
 
 
@@ -257,13 +306,14 @@ def run_queries_db(args):
     - `args`:
 
     """
-    gc, ga, gb, gn, choke_point, sentence, all_counting_methods = args
+    gc, ga, gb, gn, choke_point, sentence = args
     gs = json_graph.node_link_graph(json.loads(sentence))
     candidates = nx_graph.get_vertex_candidates(strip_vid(gn), gs)
-    return _run_query(gc, ga, gb, gn, gs, choke_point, candidates, all_counting_methods)
+    # return _run_query(gc, ga, gb, gn, gs, choke_point, candidates)
+    return _run_query_all(gc, ga, gb, gn, gs, choke_point, candidates)
 
 
-def _run_query(gc, ga, gb, gn, gs, choke_point, candidates, all_counting_methods=True):
+def _run_query(gc, ga, gb, gn, gs, choke_point, candidates):
     """Run a single query on a single graph"""
     result = {}
     # choke_points (contingency table)
@@ -271,17 +321,21 @@ def _run_query(gc, ga, gb, gn, gs, choke_point, candidates, all_counting_methods
     if choke_point is not None:
         choke_point_ct = choke_points(gc, ga, gb, gn, gs, choke_point, candidates)
         result["focus_points"] = choke_point_ct
-    if all_counting_methods:
-        # isomorphisms
-        iso_ct = isomorphisms(gc, ga, gb, gn, gs, candidates)
-        result["embeddings"] = iso_ct
-        # subgraphs (contingency table)
-        sub_ct = subgraphs(gc, ga, gb, gn, gs, candidates)
-        result["subgraphs"] = sub_ct
-        # sentences (contingency table)
-        sent_ct = sentences(gc, ga, gb, gn, gs, candidates)
-        result["sentences"] = sent_ct
+    # isomorphisms
+    iso_ct = isomorphisms(gc, ga, gb, gn, gs, candidates)
+    result["embeddings"] = iso_ct
+    # subgraphs (contingency table)
+    sub_ct = subgraphs(gc, ga, gb, gn, gs, candidates)
+    result["subgraphs"] = sub_ct
+    # sentences (contingency table)
+    sent_ct = sentences(gc, ga, gb, gn, gs, candidates)
+    result["sentences"] = sent_ct
     return result
+
+
+def _run_query_all(gc, ga, gb, gn, gs, choke_point, candidates):
+    """Run a single query on a single graph"""
+    return all_counting_methods(gc, ga, gb, gn, gs, choke_point, candidates)
 
 
 def merge_result(result, results):
