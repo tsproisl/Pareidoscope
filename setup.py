@@ -10,6 +10,7 @@ setup(
         'pareidoscope.utils'
     ],
     scripts=[
+        'bin/pareidoscope_corpus_to_sqlite',
         'bin/pareidoscope_batch_query',
         'bin/pareidoscope_create_queries_from_corpus',
         'bin/pareidoscope_cwb_to_db',
