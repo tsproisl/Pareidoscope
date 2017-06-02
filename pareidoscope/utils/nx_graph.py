@@ -32,7 +32,7 @@ def create_nx_digraph_from_cwb(cwb, origid=None):
         if cwb[l][6] == "root":
             dg.node[l]["root"] = "root"
     for i, line in enumerate(cwb):
-        indeps = line[4][1:-1]
+        indeps = line[4]
         if indeps != "|":
             for rel in indeps.strip("|").split("|"):
                 match = re.search(relpattern, rel)
