@@ -381,7 +381,7 @@ def main():
                     t_score = statistics.t_score(o, e)
                     dice = statistics.dice(o, e)
                     local_result[gc][cm] = {"o11": lo11, "r1": lr1, "c1": lc1, "n": ln, "inconsistent": linc, "log_likelihood": log_likelihood, "t_score": t_score, "dice": dice}
-            sorted_gcs = sorted(local_result.keys(), key=lambda x: local_result[x]["focus_points"]["log_likelihood"], reverse=True)
+            sorted_gcs = sorted(local_result.keys(), key=lambda x: (local_result[x]["focus_points"]["log_likelihood"], x), reverse=True)
             results.append([local_result[gc] for gc in sorted_gcs])
         write_results(args.output, results)
     logging.info("done")
