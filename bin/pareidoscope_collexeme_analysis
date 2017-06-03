@@ -144,7 +144,7 @@ def main():
                 log_likelihood[item] = statistics.one_sided_log_likelihood(o, e)
                 t_score[item] = statistics.t_score(o, e)
                 dice[item] = statistics.dice(o, e)
-            local_results = [{args.collexeme: item, "o11": o11[item], "r1": r1, "c1": c1[item], "n": n, "log_likelihood": ll, "t_score": t_score[item], "dice": dice[item]} for item, ll in sorted(log_likelihood.items(), key=operator.itemgetter(1), reverse=True)]
+            local_results = [{args.collexeme: item, "o11": o11[item], "r1": r1, "c1": c1[item], "n": n, "log_likelihood": ll, "t_score": t_score[item], "dice": dice[item]} for item, ll in sorted(log_likelihood.items(), key=operator.itemgetter(1, 0), reverse=True)]
             results.append(local_results)
     write_results(args.output, results, args.collexeme)
     logging.info("done")
