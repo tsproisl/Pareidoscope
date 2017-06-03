@@ -101,7 +101,7 @@ The attributes that can be used for the vertices depend on the kind of
 query. The following attributes can always be used: `word`, `pos`,
 `lemma`, `wc`, `root`, `not_indep` (a list), `not_outdep` (a list).
 The first five attributes can also be negated by prefixing them with
-`not_`, \eg `"not_wc": "NOUN"` for indicating that a vertex should
+`not_`, e.g. `"not_wc": "NOUN"` for indicating that a vertex should
 not be a noun.
 
 For determining the association strength between two structures with
@@ -446,11 +446,11 @@ detailed usage information):
 In this example, we use the output file created by the previous
 command, extract the ten most strongly associated larger structures
 (using GNU coreutils) and draw them. The images are written to the
-directory `draw`. Figure~\ref{fig:monotransitive-give} displays the
-visualizations of the four larger structures that are most strongly
-associated with monotransitive *give*.
+directory `draw`. Here are the visualizations created for the four
+larger structures that are most strongly associated with
+monotransitive *give*.
 
-![Rank 1](doc/monotransitive_give_01.png?raw=true "Title")
-![Rank 2](doc/monotransitive_give_02.png?raw=true "Title")
-![Rank 3](doc/monotransitive_give_03.png?raw=true "Title")
-![Rank 4](doc/monotransitive_give_04.png?raw=true "Title")
+![Rank 1](doc/monotransitive_give_01.png?raw=true)
+![Rank 2](doc/monotransitive_give_02.png?raw=true)
+![Rank 3](doc/monotransitive_give_03.png?raw=true)
+![Rank 4](doc/monotransitive_give_04.png?raw=true)
