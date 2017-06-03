@@ -1,7 +1,11 @@
 # Pareidoscope #
 
-A collections of tools for determining the association between
-arbitrary linguistic structures.
+The Pareidoscope is a collection of tools for determining the
+association between arbitrary linguistic structures, e.g. between
+words (collocations), between words and structures (collostructions)
+or between structures. For the underlying cooccurrence model, cf.
+Proisl (in preparation).
+
 
 ## Installation ##
 
@@ -17,7 +21,7 @@ in CWB-treebank format.
 
 CoNLL-U is the format used for the treebanks of the
 [Universal Dependencies project](http://universaldependencies.org/)
-([Nivre et al., 2016](http://www.lrec-conf.org/proceedings/lrec2016/summaries/348.html)).
+([Nivre et al., 2016](http://www.lrec-conf.org/proceedings/lrec2016/pdf/348_Paper.pdf)).
 The format is specified in the
 [UD documentation](http://universaldependencies.org/format.html). Here
 is an example that has been adapted from the documentation:
@@ -42,7 +46,7 @@ column nine, an enhanced dependency graph can be represented that does
 not need to be a tree.
 
 For details on the CWB-treebank format, cf.
-[Proisl and Uhrig (2012)](http://www.lrec-conf.org/proceedings/lrec2012/summaries/709.html).
+[Proisl and Uhrig (2012)](http://www.lrec-conf.org/proceedings/lrec2012/pdf/709_Paper.pdf).
 
 
 #### Queries ####
@@ -104,13 +108,13 @@ For determining the association strength between two structures with
 `pareidoscope_association_strength`, the following additional
 attributes can be used. The attribute `query` has to be used for every
 vertex and takes the values `A`, `B` or `AB`. This attribute indicates
-if the vertex belongs to $G_A$, $G_B$ or to both, \ie to $G_C$. For
-vertices marked as `"query":~"AB"`, the optional attributes `only_A`
-and `only_B` can be used. These attributes are lists and indicate
-which other attributes only apply to $G_A$ or to $G_B$. The focus
-point vertex of the graph can be marked by setting
-`"focus_point":~true`. The attributes `only_A` and `only_B` can
-also be used for edges.
+if the vertex belongs to *G<sub>A</sub>*, *G<sub>B</sub>* or to both,
+i.e. to *G<sub>C</sub>*. For vertices marked as `"query": "AB"`, the
+optional attributes `only_A` and `only_B` can be used. These
+attributes are lists and indicate which other attributes only apply to
+*G<sub>A</sub>* or to *G<sub>B</sub>*. The focus point vertex of the
+graph can be marked by setting `"focus_point": true`. The attributes
+`only_A` and `only_B` can also be used for edges.
 
 For simple collexeme analysis with `pareidoscope_collexeme_analysis`,
 the attribute `collo_item` has to be set to `true` for the collexeme
@@ -124,7 +128,7 @@ vertex.
 
 For finding associated larger structures with
 `pareidoscope_associated_structures`, the focus point vertex can be
-marked by setting `"focus_point":~true`.
+marked by setting `"focus_point": true`.
 
 
 ### Convert a corpus into an SQLite3 database ###
@@ -141,8 +145,9 @@ program with the option `-h` outputs a help message with detailed
 usage information. Here is an example where we convert the training
 part of the
 [English Universal Dependencies treebank](https://github.com/UniversalDependencies/UD_English)
-(`en-ud-train.conllu`)[^1] which is in CoNLL-U format, and create the
-database `en-ud-train.db`:
+(`en-ud-train.conllu`; we use the version included in the
+[2.0 release of the UD treebanks](http://hdl.handle.net/11234/1-1983).)
+which is in CoNLL-U format, and create the database `en-ud-train.db`:
 
     pareidoscope_corpus_to_sqlite --db en-ud-train.db --format conllu en-ud-train.conllu
 
@@ -158,4 +163,3 @@ database `en-ud-train.db`:
 #### Visualizing associated structures ####
 
 
-[^1]: We use the version included in the [2.0 release of the UD treebanks](http://hdl.handle.net/11234/1-1983).
