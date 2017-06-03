@@ -1,0 +1,119 @@
+[
+    {
+        "graph": {
+            "description": "cooccurrence of the ditransitive, i.e. (VERB, X, iobj), (VERB, NOUN,obj), with direct objects having a determiner, i.e. (VERB, NOUN, obj), (NOUN, X, det)"
+        },
+        "nodes": [
+            {
+                "id": 0,
+                "wc": "VERB",
+                "query": "AB",
+		"focus_point": true
+            },
+            {
+                "id": 1,
+                "query": "A"
+            },
+            {
+                "id": 2,
+                "wc": "NOUN",
+                "query": "AB"
+            },
+            {
+                "id": 3,
+                "query": "B"
+            }
+        ],
+        "links": [
+            {
+                "source": 0,
+                "target": 1,
+                "relation": "iobj"
+            },
+            {
+                "source": 0,
+                "target": 2,
+                "relation": "obj"
+            },
+            {
+                "source": 2,
+                "target": 3,
+                "relation": "det"
+            }
+        ]
+    },
+    {
+	"graph": {
+            "description": "cooccurrence of a noun with a relative clause modifier, i.e. (NOUN, VERB, acl:relcl), with monotransitive give, i.e. (give, X, obj), not(give, Y, iobj), not(give, Z, obl)"
+        },
+	"nodes": [
+            {
+                "id": 0,
+                "wc": "NOUN",
+                "query": "A"
+            },
+            {
+                "id": 1,
+		"lemma": "give",
+		"wc": "VERB",
+		"not_outdep": ["iobj", "obl"],
+                "query": "AB",
+		"only_B": ["lemma"]
+            },
+            {
+                "id": 2,
+                "query": "B"
+            }
+        ],
+        "links": [
+            {
+                "source": 0,
+                "target": 1,
+                "relation": "acl:relcl"
+            },
+            {
+                "source": 1,
+                "target": 2,
+                "relation": "obj"
+            }
+        ]
+    },
+    {
+        "graph": {
+            "description": "cooccurrence of the verb give with the ditransitive, where the direct object is a noun and the indirect object is a pronoun"
+        },
+        "nodes": [
+            {
+                "id": 0,
+		"lemma": "give",
+                "wc": "VERB",
+                "query": "AB",
+		"only_A": ["lemma"],
+		"focus_point": true
+            },
+            {
+                "id": 1,
+		"wc": "NOUN",
+                "query": "B"
+            },
+            {
+                "id": 2,
+                "wc": "PRON",
+                "query": "B"
+            }
+        ],
+        "links": [
+            {
+                "source": 0,
+                "target": 1,
+                "relation": "obj"
+            },
+            {
+                "source": 0,
+                "target": 2,
+                "relation": "iobj"
+            }
+        ]
+    },
+    {"graph": {"description": "another test"}, "links": [{"relation": "nsubj:pass", "source": 0, "target": 1}, {"relation": "nmod", "source": 1, "target": 2}, {"relation": "case", "source": 2, "target": 3}, {"relation": "det", "source": 2, "target": 4}, {"relation": "nmod", "source": 2, "target": 5}], "nodes": [{"id": 0, "wc": "VERB", "query": "B"}, {"id": 1, "wc": "NOUN", "query": "AB"}, {"id": 2, "wc": "NOUN", "query": "AB"}, {"id": 3, "lemma": "of", "query": "AB", "only_A": ["lemma"]}, {"id": 4, "lemma": "the", "query": "AB", "only_A": ["lemma"]}, {"id": 5, "wc": "NOUN", "query": "B"}]}
+]

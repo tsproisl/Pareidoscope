@@ -1,0 +1,143 @@
+[
+    {
+        "graph": {
+            "description": "Into-causative, i.e. verb someone into verbing"
+        },
+        "nodes": [
+            {
+                "id": 0,
+                "wc": "VERB",
+		"collo_A": true
+            },
+            {
+                "id": 1,
+		"pos": "VBG",
+		"collo_B": true
+            },
+            {
+                "id": 2
+            },
+            {
+                "id": 3,
+		"lemma": "into"
+            }
+        ],
+        "links": [
+            {
+                "source": 0,
+                "target": 1,
+                "relation": "advcl"
+            },
+            {
+                "source": 0,
+                "target": 2,
+                "relation": "obj"
+            },
+            {
+                "source": 1,
+                "target": 3,
+                "relation": "mark"
+            }
+        ]
+    },
+    {
+        "graph": {
+            "description": "'of the' possessive"
+        },
+        "nodes": [
+            {
+                "id": 0,
+                "wc": "NOUN",
+		"collo_A": true
+            },
+            {
+                "id": 1,
+		"wc": "NOUN",
+		"collo_B": true
+            },
+            {
+                "id": 2,
+		"lemma": "of"
+            },
+            {
+                "id": 3,
+		"lemma": "the"
+            }
+        ],
+        "links": [
+            {
+                "source": 0,
+                "target": 1,
+                "relation": "nmod"
+            },
+            {
+                "source": 1,
+                "target": 2,
+                "relation": "case"
+            },
+            {
+                "source": 1,
+                "target": 3,
+                "relation": "det"
+            }
+        ]
+    },
+    {
+        "graph": {
+            "description": "Relational cooccurrence with additional constraints: verb and direct object in monotransitive uses"
+        },
+        "nodes": [
+            {
+                "id": 0,
+                "wc": "VERB",
+		"collo_A": true,
+		"not_outdep": ["iobj", "obl"]
+            },
+            {
+                "id": 1,
+		"collo_B": true
+            }
+        ],
+        "links": [
+            {
+                "source": 0,
+                "target": 1,
+                "relation": "obj"
+            }
+        ]
+    },
+    {
+        "graph": {
+            "description": "ADJ ADJ SUBST"
+        },
+        "nodes": [
+            {
+                "id": 0,
+                "wc": "NOUN",
+		"focus_point": true
+            },
+            {
+                "id": 1,
+		"wc": "ADJ",
+		"collo_A": true
+            },
+            {
+                "id": 2,
+		"wc": "ADJ",
+		"collo_B": true
+            }
+        ],
+        "links": [
+            {
+                "source": 0,
+                "target": 1,
+                "relation": "amod"
+            },
+            {
+                "source": 0,
+                "target": 2,
+                "relation": "amod"
+            }
+        ]
+    }
+]

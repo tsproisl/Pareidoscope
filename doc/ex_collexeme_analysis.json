@@ -1,0 +1,32 @@
+[
+    {
+        "graph": {
+            "description": "Verbs associated with the ditransitive"
+        },
+        "nodes": [
+            {
+                "id": 0,
+                "wc": "VERB",
+		"collo_item": true
+            },
+            {
+                "id": 1
+            },
+            {
+                "id": 2
+            }
+        ],
+        "links": [
+            {
+                "source": 0,
+                "target": 1,
+                "relation": "iobj"
+            },
+            {
+                "source": 0,
+                "target": 2,
+                "relation": "obj"
+            }
+        ]
+    }
+]
