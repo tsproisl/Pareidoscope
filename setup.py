@@ -10,7 +10,7 @@ with open(path.join(here, 'README.rst')) as fh:
 
 setup(
     name='Pareidoscope',
-    version='0.9.0',
+    version='0.9.1',
     author='Thomas Proisl',
     author_email='thomas.proisl@fau.de',
     packages=[
@@ -25,12 +25,14 @@ setup(
         'bin/pareidoscope_covarying_collexemes',
         'bin/pareidoscope_draw_graphs',
     ],
+    url='https://github.com/tsproisl/Pareidoscope',
+    # include_package_data=True,
     # url='http://pypi.python.org/pypi/Pareidoscope/',
     license='GNU General Public License v3 or later (GPLv3+)',
     description='A collection of tools for determining the association between arbitrary linguistic structures.',
     long_description=long_description,
     install_requires=[
-        "networkx >= 1.6",
+        'networkx >= 1.6',
     ],
     classifiers=[
         'Development Status :: 4 - Beta',
