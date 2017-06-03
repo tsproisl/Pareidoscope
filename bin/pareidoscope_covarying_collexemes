@@ -170,7 +170,7 @@ def main():
                     t_score = statistics.t_score(o, e)
                     dice = statistics.dice(o, e)
                     local_result[pair][cm] = {"o11": o11, "r1": r1, "c1": c1, "n": n, "inconsistent": inc, "log_likelihood": log_likelihood, "t_score": t_score, "dice": dice}
-            sorted_pairs = sorted(local_result.keys(), key=lambda x: local_result[x]["focus_points"]["log_likelihood"], reverse=True)
+            sorted_pairs = sorted(local_result.keys(), key=lambda x: (local_result[x]["focus_points"]["log_likelihood"], x), reverse=True)
             results.append([local_result[p] for p in sorted_pairs])
         write_results(args.output, results, args.collexeme)
     logging.info("done")
