@@ -1,2 +1,5 @@
 include *.txt
-recursive-include docs *.txt
+include *.md
+include *.rst
+recursive-include doc *.json
+recursive-include doc *.png
