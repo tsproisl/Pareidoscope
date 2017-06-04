@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import collections
 import json
 
 import networkx
@@ -86,7 +85,7 @@ def count_isomorphisms(query, target, query_vertex, target_vertex):
 def extract_stars_for_position(args):
     """Extract star-like subgraphs from sentence for a given position
     (token)
-    
+
     Arguments:
     - `sentid`:
     - `graph`:
@@ -108,7 +107,7 @@ def extract_stars_for_position(args):
 
 def extract_all_stars(args):
     """Extract all star-like subgraphs from sentence
-    
+
     Arguments:
     - `sentid`:
     - `graph`:
