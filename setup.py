@@ -15,7 +15,7 @@ here = path.abspath(path.dirname(__file__))
 with open(path.join(here, 'README.rst')) as fh:
     long_description = fh.read()
 
-version = "0.9.2"
+version = "0.9.4"
 
 setup(
     name='Pareidoscope',
