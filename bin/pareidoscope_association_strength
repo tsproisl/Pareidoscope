@@ -109,6 +109,7 @@ def main():
     results = [{} for q in queries]
     cpu_count = multiprocessing.cpu_count()
     processes = min(max(1, int(cpu_count * args.cpu / 100)), cpu_count)
+    logging.info("Using %d processes" % processes)
     # groupsize = 10 * 10 * processes
     with multiprocessing.Pool(processes=processes) as pool:
         logging.info("using %d cpus" % processes)

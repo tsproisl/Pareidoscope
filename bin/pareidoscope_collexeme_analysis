@@ -115,6 +115,7 @@ def main():
     results = []
     cpu_count = multiprocessing.cpu_count()
     processes = min(max(1, int(cpu_count * args.cpu / 100)), cpu_count)
+    logging.info("Using %d processes" % processes)
     with multiprocessing.Pool(processes=processes) as pool:
         for i, query in enumerate(queries):
             logging.info("query no. %d" % i)
