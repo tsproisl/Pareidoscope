@@ -3,11 +3,27 @@
 The Pareidoscope is a collection of tools for determining the
 association between arbitrary linguistic structures, e.g. between
 words (collocations), between words and structures (collostructions)
-or between structures. For the underlying cooccurrence model, cf.
-Proisl (in preparation).
+or between larger linguistic structures. For the underlying
+cooccurrence model, cf. Proisl (in preparation).
 
 
 ## Installation ##
+
+The Pareidoscope is available on
+[PyPI](https://pypi.python.org/pypi/Pareidoscope) and can be installed
+using pip:
+
+    pip3 install Pareidoscope
+
+Alternatively, you can download and decompress the
+[latest release](https://github.com/tsproisl/Pareidoscope/releases/latest)
+or clone the git repository:
+
+    git clone https://github.com/tsproisl/Pareidoscope.git
+
+In the new directory, run the following command:
+
+    python3 setup.py install
 
 
 ## Usage ##
