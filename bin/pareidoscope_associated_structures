@@ -321,6 +321,7 @@ def main():
             logging.info("query no. %d" % i)
             graph, focus_point = get_focus_point(query)
             delexicalized = delexicalize(graph)
+            logging.info("Collect cooccurring larger structures")
             with tempfile.TemporaryFile() as fp:
                 sents = database.sentence_candidates(c, pareidoscope.query.strip_vid(graph))
                 for s in sents:
@@ -345,6 +346,7 @@ def main():
                 gb = json.dumps(json_graph.node_link_data(gb), ensure_ascii=False, sort_keys=True)
                 gc_to_gb[gc] = gb
                 gbs.add(gb)
+            logging.info("Determine association strengths")
             with tempfile.TemporaryFile() as fp:
                 sents = database.sentence_candidates(c, pareidoscope.query.strip_vid(delexicalized))
                 for s in sents:
