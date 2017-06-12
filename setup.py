@@ -4,7 +4,10 @@
 #
 # 2. Check if everything looks all right: https://pypi.python.org/pypi/Pareidoscope
 #
-# 3. Create tag and push to Github:
+# 3. Go to https://github.com/tsproisl/Pareidoscope/releases/new and
+# create a new release
+#
+# 3. (alt.) Create tag and push to Github:
 # git tag -a v<version> -m "annotation for this release"
 # git push origin --tags
 
