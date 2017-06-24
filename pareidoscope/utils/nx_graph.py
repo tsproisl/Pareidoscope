@@ -70,8 +70,8 @@ def create_nx_digraph_from_conllu(conllu, origid=None):
         if line[8] != "_":
             for rel in line[8].split("|"):
                 gov, relation = rel.split(":", maxsplit=1)
-                governor = id_to_enumeration[gov]
                 if relation != "root":
+                    governor = id_to_enumeration[gov]
                     relations.add((governor, relation))
         for governor, relation in relations:
             if relation == "root" or relation == "punct":
