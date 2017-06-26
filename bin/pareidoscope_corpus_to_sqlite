@@ -2,10 +2,10 @@
 # -*- coding: utf-8 -*-
 
 import argparse
+import itertools
 import json
 import logging
 import os
-import sqlite3
 
 from networkx.readwrite import json_graph
 
@@ -28,25 +28,34 @@ def arguments():
     return args
 
 
+def sentence_to_graph(args):
+    """"""
+    (sentence, origid), corpus_format = args
+    if corpus_format == "cwb":
+        create_digraph = nx_graph.create_nx_digraph_from_cwb
+    elif corpus_format == "conllu":
+        create_digraph = nx_graph.create_nx_digraph_from_conllu
+    gs = create_digraph(sentence, origid)
+    sensible = nx_graph.is_sensible_graph(gs)
+    graph = ""
+    if sensible:
+        graph = json.dumps(json_graph.node_link_data(gs), ensure_ascii=False, sort_keys=True)
+    return gs, graph, origid, sensible
+
+
 def main():
     """"""
     args = arguments()
     conn, c = database.create_db(args.db)
-    i = 1
     if args.format == "cwb":
         sents = cwb.sentences_iter(args.CORPUS, return_id=True)
-        create_digraph = nx_graph.create_nx_digraph_from_cwb
     elif args.format == "conllu":
         sents = conllu.sentences_iter(args.CORPUS, return_id=True)
-        create_digraph = nx_graph.create_nx_digraph_from_conllu
-    for sentence, origid in sents:
-        if args.no_id:
-            origid = "s-%d" % i
-            i += 1
-        gs = create_digraph(sentence, origid)
-        sensible = nx_graph.is_sensible_graph(gs)
+    if args.no_id:
+        sents = ((s, "s-%d" % i) for i, (s, _) in zip(itertools.count(1), sents))
+    result = map(sentence_to_graph, zip(sents, itertools.repeat(args.format)))
+    for gs, graph, origid, sensible in result:
         if sensible:
-            graph = json.dumps(json_graph.node_link_data(gs), ensure_ascii=False, sort_keys=True)
             database.insert_sentence(c, origid, gs, graph)
     conn.commit()
     conn.close()
