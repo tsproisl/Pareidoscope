@@ -65,14 +65,15 @@ def create_nx_digraph_from_conllu(conllu, origid=None):
             dg.node[l]["root"] = "root"
     for i, line in enumerate(conllu):
         relations = set()
-        if line[7] != "root" and line[7] != "_":
-            relations.add((id_to_enumeration[line[6]], line[7]))
         if line[8] != "_":
             for rel in line[8].split("|"):
                 gov, relation = rel.split(":", maxsplit=1)
                 if relation != "root":
                     governor = id_to_enumeration[gov]
                     relations.add((governor, relation))
+        elif line[7] != "_":
+            if line[7] != "root":
+                relations.add((id_to_enumeration[line[6]], line[7]))
         for governor, relation in relations:
             if relation == "root" or relation == "punct":
                 continue
