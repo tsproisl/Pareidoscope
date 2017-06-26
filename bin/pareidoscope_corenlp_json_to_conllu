@@ -92,13 +92,22 @@ def main():
             xpostag = token["pos"]
             head = basic_deps[idx]["governor"]
             deprel = basic_deps[idx]["dep"]
+            if deprel == "ROOT":
+                deprel = "root"
             governor = tokens.get(head)
             gov_pos = None
             if governor is not None:
                 gov_pos = governor["pos"]
             upostag = map_penn_to_upos(lemma, xpostag, deprel, gov_pos)
-            deps = "|".join([":".join((str(d["governor"]), d["dep"])) for d in sorted(epp_deps[idx], key=operator.itemgetter("governor"))])
-            print("\t".join((str(idx), form, lemma, upostag, xpostag, "_", str(head), deprel, deps, "_")))
+            deps = []
+            for d in sorted(epp_deps[idx], key=operator.itemgetter("governor")):
+                governor = d["governor"]
+                dep = d["dep"]
+                if dep == "ROOT":
+                    dep = "root"
+                deps.append("%d:%s" % (governor, dep))
+            # deps = "|".join([":".join((str(d["governor"]), d["dep"])) for d in sorted(epp_deps[idx], key=operator.itemgetter("governor"))])
+            print("\t".join((str(idx), form, lemma, upostag, xpostag, "_", str(head), deprel, "|".join(deps), "_")))
         print()
 
 
