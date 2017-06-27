@@ -99,15 +99,17 @@ def main():
             if governor is not None:
                 gov_pos = governor["pos"]
             upostag = map_penn_to_upos(lemma, xpostag, deprel, gov_pos)
-            deps = []
+            deps = set()
             for d in sorted(epp_deps[idx], key=operator.itemgetter("governor")):
                 governor = d["governor"]
                 dep = d["dep"]
                 if dep == "ROOT":
                     dep = "root"
-                deps.append("%d:%s" % (governor, dep))
-            # deps = "|".join([":".join((str(d["governor"]), d["dep"])) for d in sorted(epp_deps[idx], key=operator.itemgetter("governor"))])
-            print("\t".join((str(idx), form, lemma, upostag, xpostag, "_", str(head), deprel, "|".join(deps), "_")))
+                # no self-loops
+                if governor != idx:
+                    # no parallel edges
+                    deps.add((governor, dep))
+            print("\t".join((str(idx), form, lemma, upostag, xpostag, "_", str(head), deprel, "|".join(("%d:%s" % (g, d) for g, d in sorted(deps))), "_")))
         print()
 
 
