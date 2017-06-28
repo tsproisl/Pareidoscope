@@ -3,12 +3,11 @@
 
 import argparse
 import collections
+import itertools
+import json
 import logging
 import multiprocessing
 import os
-import itertools
-import json
-import tempfile
 
 from networkx.readwrite import json_graph
 
@@ -23,6 +22,10 @@ logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=loggi
 
 
 Frequencies = collections.namedtuple("Frequencies", ["embeddings", "subgraphs", "focus_points", "sentences"])
+
+
+class Sentinel:
+    pass
 
 
 def arguments():
@@ -119,61 +122,90 @@ def write_results(prefix, results, word_or_lemma):
                 fh.write("\t".join(line) + "\n")
 
 
+def fill_input_queue(input_queue, corpus, graph, focus_point, collo_a, collo_b, collexeme, processes, sentinel):
+    """"""
+    conn, c = database.connect_to_database(corpus)
+    sents = database.sentence_candidates(c, pareidoscope.query.strip_vid(graph))
+    for s in sents:
+        input_queue.put((graph, s, focus_point, collo_a, collo_b, collexeme))
+    conn.close()
+    for proc in range(processes):
+        input_queue.put(sentinel)
+
+
+def process_input_queue(func, input_queue, output_queue, sentinel):
+    """"""
+    while True:
+        data = input_queue.get()
+        if isinstance(data, Sentinel):
+            break
+        result = func(data)
+        output_queue.put(result)
+    output_queue.put(sentinel)
+
+
 def main():
     """"""
     args = arguments()
     results = []
-    conn, c = database.connect_to_database(args.CORPUS)
     queries = pareidoscope.query.read_queries(args.QUERIES)
     cpu_count = multiprocessing.cpu_count()
     processes = min(max(1, int(cpu_count * args.cpu / 100)), cpu_count)
-    logging.info("Using %d processes" % processes)
-    with multiprocessing.Pool(processes=processes) as pool:
-        for i, query in enumerate(queries):
-            pairs = collections.defaultdict(lambda: (0, 0, 0, 0))
-            marginals_a = collections.defaultdict(lambda: (0, 0, 0, 0))
-            marginals_b = collections.defaultdict(lambda: (0, 0, 0, 0))
-            inconsistencies = collections.defaultdict(lambda: (0, 0, 0, 0))
-            sample_sizes = (0, 0, 0, 0)
-            logging.info("query no. %d" % i)
-            graph, focus_point, collo_a, collo_b = identify_collo_items(query)
-            with tempfile.TemporaryFile() as fp:
-                sents = database.sentence_candidates(c, pareidoscope.query.strip_vid(graph))
-                for s in sents:
-                    fp.write((s + "\n").encode(encoding="utf-8"))
-                fp.seek(0)
-                sentences = (s.decode(encoding="utf-8").rstrip() for s in fp)
-                query_args = zip(itertools.repeat(graph), sentences, itertools.repeat(focus_point), itertools.repeat(collo_a), itertools.repeat(collo_b), itertools.repeat(args.collexeme))
-                r = pool.imap_unordered(get_cooccurrences, query_args, 10)
-                for ps, sam_siz, inc in r:
-                    sample_sizes = [sum(_) for _ in zip(sample_sizes, sam_siz)]
-                    for pair, freqs in ps.items():
-                        pairs[pair] = [sum(_) for _ in zip(pairs[pair], freqs)]
-                    for pair, freqs in inc.items():
-                        inconsistencies[pair] = [sum(_) for _ in zip(inconsistencies[pair], freqs)]
-            for pair, freqs in pairs.items():
-                item_a, item_b = pair
-                marginals_a[item_a] = [sum(_) for _ in zip(marginals_a[item_a], freqs)]
-                marginals_b[item_b] = [sum(_) for _ in zip(marginals_b[item_b], freqs)]
-            local_result = {}
-            for pair, freq in pairs.items():
-                item_a, item_b = pair
-                local_result[pair] = {"%s_A" % args.collexeme: item_a, "%s_B" % args.collexeme: item_b}
-                frequencies = zip(freq, marginals_a[item_a], marginals_b[item_b], sample_sizes)
-                counting_methods = ("embeddings", "subgraphs", "focus_points", "sentences")
-                for cm, f, inc in zip(counting_methods, frequencies, inconsistencies[pair]):
-                    o11, r1, c1, n = f
-                    if inc > 0:
-                        r1 -= inc / 2
-                        c1 -= inc / 2
-                    o, e = statistics.get_contingency_table(o11, r1, c1, n)
-                    log_likelihood = statistics.one_sided_log_likelihood(o, e)
-                    t_score = statistics.t_score(o, e)
-                    dice = statistics.dice(o, e)
-                    local_result[pair][cm] = {"o11": o11, "r1": r1, "c1": c1, "n": n, "inconsistent": inc, "log_likelihood": log_likelihood, "t_score": t_score, "dice": dice}
-            sorted_pairs = sorted(local_result.keys(), key=lambda x: (local_result[x]["focus_points"]["log_likelihood"], x), reverse=True)
-            results.append([local_result[p] for p in sorted_pairs])
-        write_results(args.output, results, args.collexeme)
+    processes = max(1, processes - 1)
+    sentinel = Sentinel()
+    logging.info("Using %d + 1 processes" % processes)
+    for i, query in enumerate(queries):
+        logging.info("query no. %d" % i)
+        pairs = collections.defaultdict(lambda: (0, 0, 0, 0))
+        marginals_a = collections.defaultdict(lambda: (0, 0, 0, 0))
+        marginals_b = collections.defaultdict(lambda: (0, 0, 0, 0))
+        inconsistencies = collections.defaultdict(lambda: (0, 0, 0, 0))
+        sample_sizes = (0, 0, 0, 0)
+        graph, focus_point, collo_a, collo_b = identify_collo_items(query)
+        input_queue = multiprocessing.Queue(maxsize=processes * 100)
+        output_queue = multiprocessing.Queue(maxsize=processes * 100)
+        producer = multiprocessing.Process(target=fill_input_queue, args=(input_queue, args.CORPUS, graph, focus_point, collo_a, collo_b, args.collexeme, processes, sentinel))
+        with multiprocessing.Pool(processes=processes, initializer=process_input_queue, initargs=(get_cooccurrences, input_queue, output_queue, sentinel)):
+            producer.start()
+            observed_sentinels = 0
+            while True:
+                data = output_queue.get()
+                if isinstance(data, Sentinel):
+                    observed_sentinels += 1
+                    if observed_sentinels == processes:
+                        break
+                    else:
+                        continue
+                ps, sam_siz, inc = data
+                sample_sizes = [sum(_) for _ in zip(sample_sizes, sam_siz)]
+                for pair, freqs in ps.items():
+                    pairs[pair] = [sum(_) for _ in zip(pairs[pair], freqs)]
+                for pair, freqs in inc.items():
+                    inconsistencies[pair] = [sum(_) for _ in zip(inconsistencies[pair], freqs)]
+            producer.join()
+        for pair, freqs in pairs.items():
+            item_a, item_b = pair
+            marginals_a[item_a] = [sum(_) for _ in zip(marginals_a[item_a], freqs)]
+            marginals_b[item_b] = [sum(_) for _ in zip(marginals_b[item_b], freqs)]
+        local_result = {}
+        for pair, freq in pairs.items():
+            item_a, item_b = pair
+            local_result[pair] = {"%s_A" % args.collexeme: item_a, "%s_B" % args.collexeme: item_b}
+            frequencies = zip(freq, marginals_a[item_a], marginals_b[item_b], sample_sizes)
+            counting_methods = ("embeddings", "subgraphs", "focus_points", "sentences")
+            for cm, f, inc in zip(counting_methods, frequencies, inconsistencies[pair]):
+                o11, r1, c1, n = f
+                if inc > 0:
+                    r1 -= inc / 2
+                    c1 -= inc / 2
+                o, e = statistics.get_contingency_table(o11, r1, c1, n)
+                log_likelihood = statistics.one_sided_log_likelihood(o, e)
+                t_score = statistics.t_score(o, e)
+                dice = statistics.dice(o, e)
+                local_result[pair][cm] = {"o11": o11, "r1": r1, "c1": c1, "n": n, "inconsistent": inc, "log_likelihood": log_likelihood, "t_score": t_score, "dice": dice}
+        sorted_pairs = sorted(local_result.keys(), key=lambda x: (local_result[x]["focus_points"]["log_likelihood"], x), reverse=True)
+        results.append([local_result[p] for p in sorted_pairs])
+    write_results(args.output, results, args.collexeme)
     logging.info("done")
 
 

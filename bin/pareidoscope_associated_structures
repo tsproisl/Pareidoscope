@@ -9,7 +9,6 @@ import json
 import logging
 import multiprocessing
 import os
-import tempfile
 
 from networkx.readwrite import json_graph
 
@@ -25,6 +24,10 @@ logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=loggi
 
 
 Frequencies = collections.namedtuple("Frequencies", ["embeddings", "subgraphs", "focus_points", "sentences"])
+
+
+class Sentinel:
+    pass
 
 
 def arguments():
@@ -247,89 +250,129 @@ def write_results(prefix, results):
                 fh.write("\t".join(line) + "\n")
 
 
+def fill_input_queue(input_queue, corpus, graph, focus_point, max_size, processes, sentinel):
+    """"""
+    conn, c = database.connect_to_database(corpus)
+    sents = database.sentence_candidates(c, pareidoscope.query.strip_vid(graph))
+    for s in sents:
+        input_queue.put((graph, s, focus_point, max_size))
+    for proc in range(processes):
+        input_queue.put(sentinel)
+
+
+def fill_second_input_queue(input_queue, corpus, delexicalized, graph, gc_to_gb, gbs, focus_point, max_size, processes, sentinel):
+    """"""
+    conn, c = database.connect_to_database(corpus)
+    sents = database.sentence_candidates(c, pareidoscope.query.strip_vid(graph))
+    for s in sents:
+        input_queue.put((delexicalized, graph, gc_to_gb, gbs, s, focus_point, max_size))
+    for proc in range(processes):
+        input_queue.put(sentinel)
+
+
+def process_input_queue(func, input_queue, output_queue, sentinel):
+    """"""
+    while True:
+        data = input_queue.get()
+        if isinstance(data, Sentinel):
+            break
+        result = func(data)
+        output_queue.put(result)
+    output_queue.put(sentinel)
+
+
 def main():
     """"""
+    logging.info("Queues version")
     args = arguments()
     results = []
     counting_methods = ("embeddings", "subgraphs", "focus_points", "sentences")
-    conn, c = database.connect_to_database(args.CORPUS)
     queries = pareidoscope.query.read_queries(args.QUERIES)
     cpu_count = multiprocessing.cpu_count()
     processes = min(max(1, int(cpu_count * args.cpu / 100)), cpu_count)
-    logging.info("Using %d processes" % processes)
-    with multiprocessing.Pool(processes=processes) as pool:
-        for i, query in enumerate(queries):
-            r1 = Frequencies(0, 0, 0, 0)
-            o11 = collections.defaultdict(lambda: Frequencies(0, 0, 0, 0))
-            frequencies = collections.defaultdict(lambda: collections.defaultdict(lambda: (0, 0, 0, 0, 0)))
-            logging.info("query no. %d" % i)
-            graph, focus_point = get_focus_point(query)
-            delexicalized = delexicalize(graph)
-            logging.info("Collect cooccurring larger structures")
-            with tempfile.TemporaryFile() as fp:
-                sents = database.sentence_candidates(c, pareidoscope.query.strip_vid(graph))
-                for s in sents:
-                    fp.write((s + "\n").encode(encoding="utf-8"))
-                fp.seek(0)
-                sentences = (s.decode(encoding="utf-8").rstrip() for s in fp)
-                query_args = zip(itertools.repeat(graph), sentences, itertools.repeat(focus_point), itertools.repeat(args.max_size))
-                r = pool.imap_unordered(get_cooccurring_structures, query_args, 10)
-                # r = map(get_cooccurring_structures, query_args)
-                for local_o11, local_r1 in r:
-                    r1 = [sum(_) for _ in zip(r1, local_r1)]
-                    for g, freq in local_o11.items():
-                        o11[g] = [sum(_) for _ in zip(o11[g], freq)]
-            gc_to_gb = {}
-            gbs = set()
-            for gc, freq in o11.items():
-                if freq[3] < args.min_coocc:
-                    continue
-                gb = json_graph.node_link_graph(json.loads(gc))
-                gb = delexicalize(gb)
-                gb = nx_graph.canonize(gb)
-                gb = json.dumps(json_graph.node_link_data(gb), ensure_ascii=False, sort_keys=True)
-                gc_to_gb[gc] = gb
-                gbs.add(gb)
-            logging.info("Determine association strengths")
-            with tempfile.TemporaryFile() as fp:
-                sents = database.sentence_candidates(c, pareidoscope.query.strip_vid(delexicalized))
-                for s in sents:
-                    fp.write((s + "\n").encode(encoding="utf-8"))
-                fp.seek(0)
-                sentences = (s.decode(encoding="utf-8").rstrip() for s in fp)
-                # query_args = zip(itertools.repeat(delexicalized), sentences, itertools.repeat(focus_point), itertools.repeat(args.max_size), itertools.repeat(larger_structures))
-                # r = pool.imap_unordered(get_c1_and_n, query_args, 10)
-                # r = map(get_c1_and_n, query_args)
-                query_args = zip(itertools.repeat(delexicalized), itertools.repeat(graph), itertools.repeat(gc_to_gb), itertools.repeat(gbs), sentences, itertools.repeat(focus_point), itertools.repeat(args.max_size))
-                r = pool.imap_unordered(get_frequencies, query_args, 10)
-                # r = map(get_frequencies, query_args)
-                for res in r:
-                    for gc, freqs in res.items():
-                        for cm in counting_methods:
-                            frequencies[gc][cm] = [sum(_) for _ in zip(frequencies[gc][cm], freqs[cm])]
-            local_result = {}
-            for gc in gc_to_gb:
-                assert frequencies[gc]["embeddings"][0] == o11[gc][0]
-                assert frequencies[gc]["embeddings"][1] + frequencies[gc]["embeddings"][4] / 2 == r1[0]
-                assert frequencies[gc]["subgraphs"][0] == o11[gc][1]
-                assert frequencies[gc]["subgraphs"][1] + frequencies[gc]["subgraphs"][4] / 2 == r1[1]
-                assert frequencies[gc]["focus_points"][0] == o11[gc][2]
-                assert frequencies[gc]["focus_points"][1] + frequencies[gc]["focus_points"][4] / 2 == r1[2]
-                assert frequencies[gc]["sentences"][0] == o11[gc][3]
-                assert frequencies[gc]["sentences"][1] + frequencies[gc]["sentences"][4] / 2 == r1[3]
-                if frequencies[gc]["sentences"][0] < args.min_coocc:
-                    continue
-                local_result[gc] = {"larger_structure": gc}
-                for i, cm in enumerate(counting_methods):
-                    lo11, lr1, lc1, ln, linc = frequencies[gc][cm]
-                    o, e = statistics.get_contingency_table(lo11, lr1, lc1, ln)
-                    log_likelihood = statistics.one_sided_log_likelihood(o, e)
-                    t_score = statistics.t_score(o, e)
-                    dice = statistics.dice(o, e)
-                    local_result[gc][cm] = {"o11": lo11, "r1": lr1, "c1": lc1, "n": ln, "inconsistent": linc, "log_likelihood": log_likelihood, "t_score": t_score, "dice": dice}
-            sorted_gcs = sorted(local_result.keys(), key=lambda x: (local_result[x]["focus_points"]["log_likelihood"], x), reverse=True)
-            results.append([local_result[gc] for gc in sorted_gcs])
-        write_results(args.output, results)
+    processes = max(1, processes - 1)
+    sentinel = Sentinel()
+    logging.info("Using %d + 1 processes" % processes)
+    for i, query in enumerate(queries):
+        r1 = Frequencies(0, 0, 0, 0)
+        o11 = collections.defaultdict(lambda: Frequencies(0, 0, 0, 0))
+        frequencies = collections.defaultdict(lambda: collections.defaultdict(lambda: (0, 0, 0, 0, 0)))
+        logging.info("query no. %d" % i)
+        graph, focus_point = get_focus_point(query)
+        delexicalized = delexicalize(graph)
+        logging.info("Collect cooccurring larger structures")
+        input_queue = multiprocessing.Queue(maxsize=processes * 100)
+        output_queue = multiprocessing.Queue(maxsize=processes * 100)
+        producer = multiprocessing.Process(target=fill_input_queue, args=(input_queue, args.CORPUS, graph, focus_point, args.max_size, processes, sentinel))
+        with multiprocessing.Pool(processes=processes, initializer=process_input_queue, initargs=(get_cooccurring_structures, input_queue, output_queue, sentinel)):
+            producer.start()
+            observed_sentinels = 0
+            while True:
+                data = output_queue.get()
+                if isinstance(data, Sentinel):
+                    observed_sentinels += 1
+                    if observed_sentinels == processes:
+                        break
+                    else:
+                        continue
+                local_o11, local_r1 = data
+                r1 = [sum(_) for _ in zip(r1, local_r1)]
+                for g, freq in local_o11.items():
+                    o11[g] = [sum(_) for _ in zip(o11[g], freq)]
+            producer.join()
+        gc_to_gb = {}
+        gbs = set()
+        for gc, freq in o11.items():
+            if freq[3] < args.min_coocc:
+                continue
+            gb = json_graph.node_link_graph(json.loads(gc))
+            gb = delexicalize(gb)
+            gb = nx_graph.canonize(gb)
+            gb = json.dumps(json_graph.node_link_data(gb), ensure_ascii=False, sort_keys=True)
+            gc_to_gb[gc] = gb
+            gbs.add(gb)
+        logging.info("Determine association strengths")
+        input_queue = multiprocessing.Queue(maxsize=processes * 10)
+        output_queue = multiprocessing.Queue(maxsize=processes * 10)
+        producer = multiprocessing.Process(target=fill_second_input_queue, args=(input_queue, args.CORPUS, delexicalized, graph, gc_to_gb, gbs, focus_point, args.max_size, processes, sentinel))
+        with multiprocessing.Pool(processes=processes, initializer=process_input_queue, initargs=(get_frequencies, input_queue, output_queue, sentinel)):
+            producer.start()
+            observed_sentinels = 0
+            while True:
+                data = output_queue.get()
+                if isinstance(data, Sentinel):
+                    observed_sentinels += 1
+                    if observed_sentinels == processes:
+                        break
+                    else:
+                        continue
+                for gc, freqs in data.items():
+                    for cm in counting_methods:
+                        frequencies[gc][cm] = [sum(_) for _ in zip(frequencies[gc][cm], freqs[cm])]
+            producer.join()
+        local_result = {}
+        for gc in gc_to_gb:
+            assert frequencies[gc]["embeddings"][0] == o11[gc][0]
+            assert frequencies[gc]["embeddings"][1] + frequencies[gc]["embeddings"][4] / 2 == r1[0]
+            assert frequencies[gc]["subgraphs"][0] == o11[gc][1]
+            assert frequencies[gc]["subgraphs"][1] + frequencies[gc]["subgraphs"][4] / 2 == r1[1]
+            assert frequencies[gc]["focus_points"][0] == o11[gc][2]
+            assert frequencies[gc]["focus_points"][1] + frequencies[gc]["focus_points"][4] / 2 == r1[2]
+            assert frequencies[gc]["sentences"][0] == o11[gc][3]
+            assert frequencies[gc]["sentences"][1] + frequencies[gc]["sentences"][4] / 2 == r1[3]
+            if frequencies[gc]["sentences"][0] < args.min_coocc:
+                continue
+            local_result[gc] = {"larger_structure": gc}
+            for i, cm in enumerate(counting_methods):
+                lo11, lr1, lc1, ln, linc = frequencies[gc][cm]
+                o, e = statistics.get_contingency_table(lo11, lr1, lc1, ln)
+                log_likelihood = statistics.one_sided_log_likelihood(o, e)
+                t_score = statistics.t_score(o, e)
+                dice = statistics.dice(o, e)
+                local_result[gc][cm] = {"o11": lo11, "r1": lr1, "c1": lc1, "n": ln, "inconsistent": linc, "log_likelihood": log_likelihood, "t_score": t_score, "dice": dice}
+        sorted_gcs = sorted(local_result.keys(), key=lambda x: (local_result[x]["focus_points"]["log_likelihood"], x), reverse=True)
+        results.append([local_result[gc] for gc in sorted_gcs])
+    write_results(args.output, results)
     logging.info("done")
 
 

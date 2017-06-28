@@ -6,10 +6,6 @@ import itertools
 import logging
 import multiprocessing
 import os
-import tempfile
-
-import json
-from networkx.readwrite import json_graph
 
 import pareidoscope.query
 from pareidoscope.utils import conllu
@@ -20,6 +16,10 @@ from pareidoscope.utils import nx_graph
 from pareidoscope.utils import statistics
 
 logging.basicConfig(format="%(levelname)s %(asctime)s: %(message)s", level=logging.INFO)
+
+
+class Sentinel:
+    pass
 
 
 def arguments():
@@ -100,62 +100,114 @@ def write_results(prefix, results):
             fh.write("\t".join(line) + "\n")
 
 
+def process_input_queue(func, input_queue, output_queue, sentinel):
+    """"""
+    while True:
+        data = input_queue.get()
+        if isinstance(data, Sentinel):
+            break
+        result = func(data)
+        output_queue.put(result)
+    output_queue.put(sentinel)
+
+
+def fill_input_queue_db(input_queue, corpus, query, processes, sentinel):
+    """"""
+    conn, c = database.connect_to_database(corpus)
+    gc, ga, gb, gn, choke_point = query
+    sents = database.sentence_candidates(c, pareidoscope.query.strip_vid(gn))
+    for s in sents:
+        input_queue.put((gc, ga, gb, gn, choke_point, s))
+    conn.close()
+    for proc in range(processes):
+        input_queue.put(sentinel)
+
+
+def fill_input_queue_text(input_queue, corpus, corpus_format, queries, processes, sentinel):
+    """"""
+    with open(corpus, encoding="utf-8") as corpus:
+        if corpus_format == "cwb":
+            sents = cwb.sentences_iter(corpus, return_id=False)
+        elif corpus_format == "conllu":
+            sents = conllu.sentences_iter(corpus, return_id=False)
+        for s in sents:
+            input_queue.put((s, corpus_format, queries))
+    for proc in range(processes):
+        input_queue.put(sentinel)
+
+
+def association_strength_db(args, queries, processes, sentinel):
+    """"""
+    results = [{} for q in queries]
+    for i, query in enumerate(queries):
+        logging.info("query no. %d" % i)
+        gc, ga, gb, gn, choke_point = query
+        input_queue = multiprocessing.Queue(maxsize=processes * 100)
+        output_queue = multiprocessing.Queue(maxsize=processes * 100)
+        producer = multiprocessing.Process(target=fill_input_queue_db, args=(input_queue, args.CORPUS, query, processes, sentinel))
+        with multiprocessing.Pool(processes=processes, initializer=process_input_queue, initargs=(pareidoscope.query.run_queries_db, input_queue, output_queue, sentinel)):
+            producer.start()
+            observed_sentinels = 0
+            while True:
+                data = output_queue.get()
+                if isinstance(data, Sentinel):
+                    observed_sentinels += 1
+                    if observed_sentinels == processes:
+                        break
+                    else:
+                        continue
+                pareidoscope.query.merge_result_db(data, i, results)
+            producer.join()
+        logging.info(results[i])
+    return results
+
+
+def association_strength_text(args, queries, processes, sentinel):
+    """"""
+    results = [{} for q in queries]
+    input_queue = multiprocessing.Queue(maxsize=processes * 100)
+    output_queue = multiprocessing.Queue(maxsize=processes * 100)
+    producer = multiprocessing.Process(target=fill_input_queue_text, args=(input_queue, args.CORPUS, args.format, queries, processes, sentinel))
+    with multiprocessing.Pool(processes=processes, initializer=process_input_queue, initargs=(pareidoscope.query.run_queries, input_queue, output_queue, sentinel)):
+        producer.start()
+        observed_sentinels = 0
+        while True:
+            data = output_queue.get()
+            if isinstance(data, Sentinel):
+                observed_sentinels += 1
+                if observed_sentinels == processes:
+                    break
+                else:
+                    continue
+            result, sensible = data
+            if sensible:
+                pareidoscope.query.merge_result(result, results)
+        producer.join()
+    return results
+
+
 def main():
     """"""
     args = arguments()
     queries = pareidoscope.query.read_queries(args.QUERIES)
     queries = [extract_graphs(q) for q in queries]
     queries = [add_focus_point(q) for q in queries]
-    results = [{} for q in queries]
     cpu_count = multiprocessing.cpu_count()
     processes = min(max(1, int(cpu_count * args.cpu / 100)), cpu_count)
-    logging.info("Using %d processes" % processes)
-    # groupsize = 10 * 10 * processes
-    with multiprocessing.Pool(processes=processes) as pool:
-        logging.info("using %d cpus" % processes)
-        if args.format == "db":
-            conn, c = database.connect_to_database(args.CORPUS)
-            for i, qline in enumerate(queries):
-                logging.info("query no. %d" % i)
-                gc, ga, gb, gn, choke_point = qline
-                with tempfile.TemporaryFile() as fp:
-                    sents = database.sentence_candidates(c, pareidoscope.query.strip_vid(gn))
-                    for s in sents:
-                        fp.write((s + "\n").encode(encoding="utf-8"))
-                    fp.seek(0)
-                    sentences = (s.decode(encoding="utf-8") for s in fp)
-                # sents = database.sentence_candidates(c, pareidoscope.query.strip_vid(gn))
-                # for sentences in helper.grouper_nofill(groupsize, sents):
-                    query_args = (itertools.chain.from_iterable(a) for a in zip(itertools.repeat(qline), ((s,) for s in sentences)))
-                    r = pool.imap_unordered(pareidoscope.query.run_queries_db, query_args, 10)
-                    # for debugging, it is often better to avoid multiprocessing:
-                    # r = map(pareidoscope.query.run_queries_db, query_args)
-                    for result in r:
-                        pareidoscope.query.merge_result_db(result, i, results)
-                logging.info(results[i])
-        else:
-            with open(args.CORPUS, encoding="utf-8") as corpus:
-                if args.format == "cwb":
-                    sents = cwb.sentences_iter(corpus, return_id=False)
-                elif args.format == "conllu":
-                    sents = conllu.sentences_iter(corpus, return_id=False)
-                sentences = sents
-                # for i, sentences in enumerate(helper.grouper_nofill(groupsize, sents)):
-                    # logging.info("processing sentences %d--%d" % (i * groupsize + 1, i * groupsize + min(groupsize, len(sentences))))
-                r = pool.imap_unordered(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(args.format), itertools.repeat(queries)), 10)
-                # for debugging, it is often better to avoid multiprocessing:
-                # r = map(pareidoscope.query.run_queries, zip(sentences, itertools.repeat(args.format), itertools.repeat(queries)))
-                for result, sensible in r:
-                    if sensible:
-                        pareidoscope.query.merge_result(result, results)
-                # end for
-        for result in results:
-            for counting_method, freq in result.items():
-                o, e = statistics.get_contingency_table(freq["o11"], freq["r1"], freq["c1"], freq["n"])
-                freq["log_likelihood"] = statistics.one_sided_log_likelihood(o, e)
-                freq["t_score"] = statistics.t_score(o, e)
-                freq["dice"] = statistics.dice(o, e)
-        write_results(args.output, results)
+    processes = max(1, processes - 1)
+    sentinel = Sentinel()
+    logging.info("Using %d + 1 processes" % processes)
+    if args.format == "db":
+        results = association_strength_db(args, queries, processes, sentinel)
+    else:
+        results = association_strength_text(args, queries, processes, sentinel)
+    for result in results:
+        for counting_method, freq in result.items():
+            o, e = statistics.get_contingency_table(freq["o11"], freq["r1"], freq["c1"], freq["n"])
+            freq["log_likelihood"] = statistics.one_sided_log_likelihood(o, e)
+            freq["t_score"] = statistics.t_score(o, e)
+            freq["dice"] = statistics.dice(o, e)
+    write_results(args.output, results)
 
 
 if __name__ == "__main__":

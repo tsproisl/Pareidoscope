@@ -2,8 +2,9 @@
 
 import argparse
 import collections
-import json
+import functools
 import gzip
+import json
 import operator
 import os
 import re
