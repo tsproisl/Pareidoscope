@@ -115,6 +115,7 @@ def main():
                 if dep == "ROOT":
                     dep = "root"
                 dep.replace("|", "-pipe-")
+                # Optional: check if dependency relation conforms to the guidelines (http://universaldependencies.org/format.html)
                 # if not re.search(r"^[a-z][a-z_-]*(:[a-z][a-z_-]*)?$", dep):
                 #     print("Malformed dependency relation: %s" % dep, file=sys.stderr)
                 # no self-loops
