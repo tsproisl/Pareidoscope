@@ -6,10 +6,6 @@ import itertools
 import logging
 import multiprocessing
 import os
-import tempfile
-
-import json
-from networkx.readwrite import json_graph
 
 import pareidoscope.query
 from pareidoscope.utils import conllu

@@ -9,7 +9,6 @@ import json
 import logging
 import multiprocessing
 import os
-import tempfile
 
 from networkx.readwrite import json_graph
 

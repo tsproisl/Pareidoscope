@@ -3,12 +3,11 @@
 
 import argparse
 import collections
+import itertools
+import json
 import logging
 import multiprocessing
 import os
-import itertools
-import json
-import tempfile
 
 from networkx.readwrite import json_graph
 
