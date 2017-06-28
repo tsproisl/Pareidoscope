@@ -291,7 +291,7 @@ def main():
     queries = pareidoscope.query.read_queries(args.QUERIES)
     cpu_count = multiprocessing.cpu_count()
     processes = min(max(1, int(cpu_count * args.cpu / 100)), cpu_count)
-    processes = max(1, processes - 2)
+    processes = max(1, processes - 1)
     sentinel = Sentinel()
     logging.info("Using %d processes" % processes)
     for i, query in enumerate(queries):
@@ -333,8 +333,8 @@ def main():
             gc_to_gb[gc] = gb
             gbs.add(gb)
         logging.info("Determine association strengths")
-        input_queue = multiprocessing.Queue(maxsize=processes * 100)
-        output_queue = multiprocessing.Queue(maxsize=processes * 100)
+        input_queue = multiprocessing.Queue(maxsize=processes * 10)
+        output_queue = multiprocessing.Queue(maxsize=processes * 10)
         producer = multiprocessing.Process(target=fill_second_input_queue, args=(input_queue, args.CORPUS, delexicalized, graph, gc_to_gb, gbs, focus_point, args.max_size, processes, sentinel))
         with multiprocessing.Pool(processes=processes, initializer=process_input_queue, initargs=(get_frequencies, input_queue, output_queue, sentinel)):
             producer.start()
