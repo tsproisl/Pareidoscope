@@ -293,7 +293,7 @@ def main():
     processes = min(max(1, int(cpu_count * args.cpu / 100)), cpu_count)
     processes = max(1, processes - 1)
     sentinel = Sentinel()
-    logging.info("Using %d processes" % processes)
+    logging.info("Using %d + 1 processes" % processes)
     for i, query in enumerate(queries):
         r1 = Frequencies(0, 0, 0, 0)
         o11 = collections.defaultdict(lambda: Frequencies(0, 0, 0, 0))
