@@ -36,7 +36,7 @@ def arguments():
 
 def sentence_to_graph(args):
     """"""
-    (sentence, origid), corpus_format = args
+    sentence, origid, corpus_format = args
     if corpus_format == "cwb":
         create_digraph = nx_graph.create_nx_digraph_from_cwb
     elif corpus_format == "conllu":
@@ -55,6 +55,17 @@ def fill_input_queue(input_queue, sentences, corpus_format, processes, sentinel)
         input_queue.put((s, sid, cf))
     for proc in range(processes):
         input_queue.put(sentinel)
+
+
+def process_input_queue(func, input_queue, output_queue, sentinel):
+    """"""
+    while True:
+        data = input_queue.get()
+        if isinstance(data, Sentinel):
+            break
+        result = func(data)
+        output_queue.put(result)
+    output_queue.put(sentinel)
 
 
 def consume_output_queue(output_queue, db, processes, sentinel):
@@ -76,26 +87,6 @@ def consume_output_queue(output_queue, db, processes, sentinel):
     conn.close()
 
 
-def sentence_to_graph_queue_based(input_queue, output_queue, sentinel):
-    """"""
-    while True:
-        data = input_queue.get()
-        if isinstance(data, Sentinel):
-            break
-        sentence, origid, corpus_format = data
-        if corpus_format == "cwb":
-            create_digraph = nx_graph.create_nx_digraph_from_cwb
-        elif corpus_format == "conllu":
-            create_digraph = nx_graph.create_nx_digraph_from_conllu
-        gs = create_digraph(sentence, origid)
-        sensible = nx_graph.is_sensible_graph(gs)
-        graph = ""
-        if sensible:
-            graph = json.dumps(json_graph.node_link_data(gs), ensure_ascii=False, sort_keys=True)
-        output_queue.put((gs, graph, origid, sensible))
-    output_queue.put(sentinel)
-
-
 def main():
     """"""
     args = arguments()
@@ -113,7 +104,7 @@ def main():
     output_queue = multiprocessing.Queue(maxsize=processes * 100)
     producer = multiprocessing.Process(target=fill_input_queue, args=(input_queue, sents, args.format, processes, sentinel))
     consumer = multiprocessing.Process(target=consume_output_queue, args=(output_queue, args.db, processes, sentinel))
-    with multiprocessing.Pool(processes=processes, initializer=sentence_to_graph_queue_based, initargs=(input_queue, output_queue, sentinel)):
+    with multiprocessing.Pool(processes=processes, initializer=process_input_queue, initargs=(sentence_to_graph, input_queue, output_queue, sentinel)):
         producer.start()
         consumer.start()
         producer.join()
