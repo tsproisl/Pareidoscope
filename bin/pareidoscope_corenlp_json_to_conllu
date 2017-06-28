@@ -8,6 +8,7 @@ import operator
 import os
 import re
 import functools
+# import sys
 
 
 def arguments():
@@ -74,6 +75,7 @@ def map_penn_to_upos(lemma, xpostag, deprel, gov_pos):
 
 def main():
     args = arguments()
+    replacements = {"-LRB-": "(", "-RRB-": ")", "-LSB-": "[", "-RSB-": "]", "-LCB-": "{", "-RCB-": "}"}
     if args.JSON.endswith(".gz"):
         with gzip.open(args.JSON, mode="rt") as f:
             data = json.load(f)
@@ -92,6 +94,9 @@ def main():
         for idx, token in sorted(tokens.items()):
             form = token["word"]
             lemma = token["lemma"]
+            if form in replacements:
+                form = replacements[form]
+                lemma = form
             xpostag = token["pos"]
             head = basic_deps[idx]["governor"]
             deprel = basic_deps[idx]["dep"]
@@ -108,6 +113,9 @@ def main():
                 dep = d["dep"]
                 if dep == "ROOT":
                     dep = "root"
+                dep.replace("|", "-pipe-")
+                # if not re.search(r"^[a-z][a-z_-]*(:[a-z][a-z_-]*)?$", dep):
+                #     print("Malformed dependency relation: %s" % dep, file=sys.stderr)
                 # no self-loops
                 if governor != idx:
                     # no parallel edges
