@@ -284,6 +284,7 @@ def process_input_queue(func, input_queue, output_queue, sentinel):
 
 def main():
     """"""
+    logging.info("Queues version")
     args = arguments()
     results = []
     counting_methods = ("embeddings", "subgraphs", "focus_points", "sentences")
