@@ -86,6 +86,9 @@ def main():
         epp_deps = collections.defaultdict(list)
         for d in sentence["enhancedPlusPlusDependencies"]:
             epp_deps[d["dependent"]].append(d)
+        print("# sent_id = %d" % sentence["index"])
+        original_text = "".join([t["originalText"] + t["after"] for idx, t in sorted(tokens.items())]).rstrip()
+        print("# text = %s" % original_text)
         for idx, token in sorted(tokens.items()):
             form = token["word"]
             lemma = token["lemma"]
