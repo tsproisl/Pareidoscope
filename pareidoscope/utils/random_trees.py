@@ -48,7 +48,7 @@ def get_random_tree(nr_of_vertices, vertex_label_distri, edge_label_distri, degr
         directed_tree.add_node(root)
     else:
         undirected_tree = create_tree_skeleton(nr_of_vertices, degree_distri, max_outdegree)
-        root = random.choice(list(itertools.chain.from_iterable([[v] * undirected_tree.degree(v) for v in undirected_tree.nodes()])))
+        root = random.choice(list(itertools.chain.from_iterable([[v] * undirected_tree.degree[v] for v in undirected_tree.nodes()])))
         directed_tree.add_edges_from(networkx.bfs_edges(undirected_tree, root))
     if not no_root:
         directed_tree.nodes[root]["root"] = "root"

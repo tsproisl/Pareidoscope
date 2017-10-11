@@ -35,7 +35,7 @@ def _extract_stars(graph, vertex, edge_stars, skel_stars, edge_to_skel={}, inclu
         if not all((subgraph.has_edge(vertex, x) or subgraph.has_edge(x, vertex) for x in other_vertices)):
             continue
         length = subgraph.__len__()
-        degree_sequence = " ".join([str(_) for _ in sorted([subgraph.degree(_) for _ in subgraph.nodes()], reverse=True)])
+        degree_sequence = " ".join([str(_) for _ in sorted([subgraph.degree[_] for _ in subgraph.nodes()], reverse=True)])
         sorted_edges = " ".join(sorted([l["relation"] for s, t, l in subgraph.edges(data=True)]))
         edge_star = nx_graph.skeletize(subgraph, only_vertices=True)
         edge_star, order = nx_graph.canonize(edge_star, order=True)

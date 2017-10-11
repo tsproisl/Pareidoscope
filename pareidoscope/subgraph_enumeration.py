@@ -129,7 +129,7 @@ def get_bfo(target_graph, fragment=False):
         all_vertices = set(target_graph.nodes())
         roots = sorted([v for v in target_graph.nodes() if all([networkx.has_path(target_graph, v, u) for u in all_vertices - set([v])])])
         if len(roots) == 0:
-            roots = sorted([v for v in target_graph.nodes() if target_graph.in_degree(v) == 0])
+            roots = sorted([v for v in target_graph.nodes() if target_graph.in_degree[v] == 0])
             if len(roots) > 1:
                 agenda = roots[1:]
                 for v in agenda:

@@ -72,8 +72,8 @@ def sentence_candidates(c, g):
         args = []
         pos_lexical = set(["word", "pos", "lemma", "wc", "root"])
         neg_lexical = set(["not_%s" % pl for pl in pos_lexical])
-        indegree = g.in_degree(vertex)
-        outdegree = g.out_degree(vertex)
+        indegree = g.in_degree[vertex]
+        outdegree = g.out_degree[vertex]
         if indegree > 0:
             where.append("indegree >= ?")
             args.append(indegree)
@@ -143,8 +143,8 @@ def create_sql_query(query_graph):
     pos_lexical = set(["word", "pos", "lemma", "wc", "root"])
     neg_lexical = set(["not_%s" % pl for pl in pos_lexical])
     for vertex in query_graph.nodes():
-        indegree = query_graph.in_degree(vertex)
-        outdegree = query_graph.out_degree(vertex)
+        indegree = query_graph.in_degree[vertex]
+        outdegree = query_graph.out_degree[vertex]
         if indegree > 0:
             where.append("tok_%s.indegree >= %d" % (vertex, indegree))
         if outdegree > 0:

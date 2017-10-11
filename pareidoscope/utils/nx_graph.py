@@ -45,7 +45,7 @@ def create_nx_digraph_from_cwb(cwb, origid=None):
                     dg.add_edge(i + offset, i, relation=relation)
     # remove unconnected vertices, e.g. punctuation in the SD model
     for v, l in list(dg.nodes(data=True)):
-        if "root" not in l and dg.degree(v) == 0:
+        if "root" not in l and dg.degree[v] == 0:
             dg.remove_node(v)
     # make sure that the remaining vertices are consecutively labeled
     dg = ensure_consecutive_vertices(dg)
@@ -80,7 +80,7 @@ def create_nx_digraph_from_conllu(conllu, origid=None):
             dg.add_edge(governor, i, relation=relation)
     # remove unconnected vertices, e.g. punctuation in the SD model
     for v, l in list(dg.nodes(data=True)):
-        if "root" not in l and dg.degree(v) == 0:
+        if "root" not in l and dg.degree[v] == 0:
             dg.remove_node(v)
     # make sure that the remaining vertices are consecutively labeled
     dg = ensure_consecutive_vertices(dg)
@@ -111,7 +111,7 @@ def is_sensible_graph(nx_graph):
     if not all([networkx.has_path(nx_graph, root, v) for v in other_vertices]):
         return False
     # # do the vertices have sensible outdegrees <= 10?
-    if any([nx_graph.out_degree(v) > 10 for v in nx_graph.nodes()]):
+    if any([nx_graph.out_degree[v] > 10 for v in nx_graph.nodes()]):
         return False
     # is the graph overly dense, i.e. is there a vertex with an
     # extended star (neighbors + edges between them) with more than 18
@@ -132,9 +132,9 @@ def get_vertex_candidates(query_graph, target_graph):
             candidates[vertex] = target_graph.nodes()
         else:
             candidates[vertex] = [tv for tv in target_graph.nodes() if dictionary_match(query_graph.nodes[vertex], target_graph.nodes[tv])]
-        query_in = query_graph.in_degree(vertex)
-        query_out = query_graph.out_degree(vertex)
-        candidates[vertex] = [tv for tv in candidates[vertex] if (query_in <= target_graph.in_degree(tv)) and (query_out <= target_graph.out_degree(tv))]
+        query_in = query_graph.in_degree[vertex]
+        query_out = query_graph.out_degree[vertex]
+        candidates[vertex] = [tv for tv in candidates[vertex] if (query_in <= target_graph.in_degree[tv]) and (query_out <= target_graph.out_degree[tv])]
         # negated edges
         not_indep = query_graph.nodes[vertex].get("not_indep")
         if not_indep is not None:
@@ -283,8 +283,8 @@ def _get_vertex_tuple(nx_graph, vertex):
         choke_point = True
     else:
         choke_point = all((networkx.has_path(nx_graph, vertex, x) or networkx.has_path(nx_graph, x, vertex) for x in other_vertices))
-    indegree = nx_graph.in_degree(vertex)
-    outdegree = nx_graph.out_degree(vertex)
+    indegree = nx_graph.in_degree[vertex]
+    outdegree = nx_graph.out_degree[vertex]
     label = tuple(sorted(nx_graph.nodes[vertex].items()))
     inedgelabels = tuple(sorted([tuple(sorted(nx_graph.edges[s, t].items())) for s, t in nx_graph.in_edges(vertex)]))
     outedgelabels = tuple(sorted([tuple(sorted(nx_graph.edges[s, t].items())) for s, t in nx_graph.out_edges(vertex)]))
