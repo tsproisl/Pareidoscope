@@ -234,8 +234,8 @@ def split_tree(tree):
     s, t = random.choice(tree.edges())
     t_bunch = set(networkx.dfs_preorder_nodes(tree, t))
     s_bunch = set(tree.nodes()) - t_bunch
-    a = tree.subgraph(s_bunch)
-    b = tree.subgraph(t_bunch)
+    a = tree.subgraph(s_bunch).copy()
+    b = tree.subgraph(t_bunch).copy()
     # give edge to either source or target vertex
     if random.choice(["source", "target"]) == "source":
         a.add_node(t, word=".+")
