@@ -27,9 +27,9 @@ def main():
         dotgraph = networkx.DiGraph(**graph.graph)
         for v, l in graph.nodes(data=True):
             label = "\n".join("%s: %s" % (k, v) for k, v in l.items())
-            dotgraph.add_node(v, {"shape": "rect", "label": label})
+            dotgraph.add_node(v, shape="rect", label=label)
         for s, t, l in graph.edges(data=True):
-            dotgraph.add_edge(s, t, {"label": '"%s"' % l["relation"]})
+            dotgraph.add_edge(s, t, label='"%s"' % l["relation"])
         pydotgraph = networkx.nx_pydot.to_pydot(dotgraph)
         pydotgraph.write_png(os.path.join(args.output, "%d.png" % i))
 

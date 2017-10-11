@@ -53,7 +53,7 @@ def build_focus_point_query(graph, focus_point):
     neg_lexical = set(["not_%s" % pl for pl in pos_lexical])
     sql_query = "SELECT count(*) FROM tokens"
     where, args = [], []
-    for k, v in graph.node[focus_point].items():
+    for k, v in graph.nodes[focus_point].items():
         if k in pos_lexical:
             where.append("%s = ?" % k)
             if k == "root":
@@ -103,7 +103,7 @@ def get_matches(args):
     query_graph, target_graph, focus_point_vertex, word_or_lemma = args
     target_graph = json_graph.node_link_graph(json.loads(target_graph))
     matches = subgraph_enumeration.get_choke_point_matches(pareidoscope.query.strip_vid(query_graph), target_graph, focus_point_vertex)
-    return [target_graph.node[match][word_or_lemma] for match in matches]
+    return [target_graph.nodes[match][word_or_lemma] for match in matches]
 
 
 def write_results(prefix, results, word_or_lemma):

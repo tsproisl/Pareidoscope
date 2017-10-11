@@ -88,7 +88,7 @@ def get_cooccurring_structures(args):
         mappings["embedding_to_focus_point"][iso] = focus_point
     mappings["subgraph_to_focus_points"] = {sg: set([mappings["embedding_to_focus_point"][e] for e in embs]) for sg, embs in mappings["subgraph_to_embeddings"].items()}
     for subg in r1_counts["subgraphs"]:
-        neighbors = [set(target_graph.successors(v) + target_graph.predecessors(v)) for v in subg]
+        neighbors = [set(list(target_graph.successors(v)) + list(target_graph.predecessors(v))) for v in subg]
         nbunch = functools.reduce(lambda x, y: x.union(y), neighbors + [subg])
         induced_star = target_graph.subgraph(nbunch)
         bfo_graph, bfo_to_raw = subgraph_enumeration.get_bfo(induced_star, fragment=True)
@@ -102,15 +102,15 @@ def get_cooccurring_structures(args):
                 continue
             subgraph_to_query = {embedding[v]: v for v in sorted(query_graph.nodes())}
             # delexicalize: remove all word, pos and lemma attributes unless they are in query
-            for v in sg.nodes():
+            for v in list(sg.nodes()):
                 if v in subgraph_to_query:
-                    for attribute in list(sg.node[v]):
-                        if attribute not in query_graph.node[subgraph_to_query[v]]:
-                            del sg.node[v][attribute]
+                    for attribute in list(sg.nodes[v]):
+                        if attribute not in query_graph.nodes[subgraph_to_query[v]]:
+                            del sg.nodes[v][attribute]
                 else:
                     for attribute in ("word", "pos", "lemma", "root"):
-                        if attribute in sg.node[v]:
-                            del sg.node[v][attribute]
+                        if attribute in sg.nodes[v]:
+                            del sg.nodes[v][attribute]
             gc = nx_graph.canonize(sg)
             gc_json = json.dumps(json_graph.node_link_data(gc), ensure_ascii=False, sort_keys=True)
             o11_counts[gc_json]["subgraphs"].add(subg)
@@ -159,14 +159,14 @@ def get_frequencies(args):
         n_counts["focus_points"].add(focus_point)
         mappings["subgraph_to_embeddings"][subgraph].add(iso)
         # check if iso is instance of ga
-        subsumed_by_ga[iso] = all((nx_graph.dictionary_match(qv, tv) for qv, tv in zip((l for v, l in sorted(stripped_ga.nodes(data=True))), (target_graph.node[v] for v in iso))))
+        subsumed_by_ga[iso] = all((nx_graph.dictionary_match(qv, tv) for qv, tv in zip((l for v, l in sorted(stripped_ga.nodes(data=True))), (target_graph.nodes[v] for v in iso))))
         # if normal_cand_a is None:
         #     normal_cand_a = nx_graph.get_vertex_candidates(stripped_ga, target_graph)
         # vid_to_iso[iso] = {gn.node[qv]["vid"]: tv for qv, tv in zip(sorted(gn.nodes()), iso)}
         # vert_cand_a = pareidoscope.query._get_isomorphism_vertex_candidates(ga, normal_cand_a, vs, subgraph, vid_to_iso)
         # subsumed_by_ga[iso] = subgraph_enumeration.subsumes_nx(stripped_ga, target_graph, vertex_candidates=vert_cand_a)
     for subg in n_counts["subgraphs"]:
-        neighbors = [set(target_graph.successors(v) + target_graph.predecessors(v)) for v in subg]
+        neighbors = [set(list(target_graph.successors(v)) + list(target_graph.predecessors(v))) for v in subg]
         nbunch = functools.reduce(lambda x, y: x.union(y), neighbors + [subg])
         induced_star = target_graph.subgraph(nbunch)
         bfo_graph, bfo_to_raw = subgraph_enumeration.get_bfo(induced_star, fragment=True)
@@ -181,15 +181,15 @@ def get_frequencies(args):
             subgraph_to_query = {embedding[v]: v for v in sorted(gn.nodes())}
             gc = sg.copy()
             # delexicalize: remove all word, pos and lemma attributes unless they are in query
-            for v in gc.nodes():
+            for v in list(gc.nodes()):
                 if v in subgraph_to_query:
-                    for attribute in list(gc.node[v]):
-                        if attribute not in ga.node[subgraph_to_query[v]]:
-                            del gc.node[v][attribute]
+                    for attribute in list(gc.nodes[v]):
+                        if attribute not in ga.nodes[subgraph_to_query[v]]:
+                            del gc.nodes[v][attribute]
                 else:
                     for attribute in ("word", "pos", "lemma", "root"):
-                        if attribute in gc.node[v]:
-                            del gc.node[v][attribute]
+                        if attribute in gc.nodes[v]:
+                            del gc.nodes[v][attribute]
             gc_json = json.dumps(json_graph.node_link_data(nx_graph.canonize(gc)), ensure_ascii=False, sort_keys=True)
             for iso in mappings["subgraph_to_embeddings"][subg]:
                 mappings["gc_json_to_embedding_and_gc"][gc_json].add((iso, gc))

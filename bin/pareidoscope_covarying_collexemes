@@ -73,8 +73,8 @@ def get_cooccurrences(args):
     isomorphisms = subgraph_isomorphism.get_subgraph_isomorphisms_nx(pareidoscope.query.strip_vid(query_graph), target_graph)
     total_subgraphs, total_focus_points = set(), set()
     for iso in isomorphisms:
-        item_a = target_graph.node[iso[collo_a]][word_or_lemma]
-        item_b = target_graph.node[iso[collo_b]][word_or_lemma]
+        item_a = target_graph.nodes[iso[collo_a]][word_or_lemma]
+        item_b = target_graph.nodes[iso[collo_b]][word_or_lemma]
         pair = (item_a, item_b)
         embeddings[pair] += 1
         subgraph = frozenset(iso)
