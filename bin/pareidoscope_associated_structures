@@ -88,7 +88,7 @@ def get_cooccurring_structures(args):
         mappings["embedding_to_focus_point"][iso] = focus_point
     mappings["subgraph_to_focus_points"] = {sg: set([mappings["embedding_to_focus_point"][e] for e in embs]) for sg, embs in mappings["subgraph_to_embeddings"].items()}
     for subg in r1_counts["subgraphs"]:
-        neighbors = [target_graph.successors(v) | target_graph.predecessors(v) for v in subg]
+        neighbors = [set(target_graph.successors(v) + target_graph.predecessors(v)) for v in subg]
         nbunch = functools.reduce(lambda x, y: x.union(y), neighbors + [subg])
         induced_star = target_graph.subgraph(nbunch)
         bfo_graph, bfo_to_raw = subgraph_enumeration.get_bfo(induced_star, fragment=True)
@@ -166,7 +166,7 @@ def get_frequencies(args):
         # vert_cand_a = pareidoscope.query._get_isomorphism_vertex_candidates(ga, normal_cand_a, vs, subgraph, vid_to_iso)
         # subsumed_by_ga[iso] = subgraph_enumeration.subsumes_nx(stripped_ga, target_graph, vertex_candidates=vert_cand_a)
     for subg in n_counts["subgraphs"]:
-        neighbors = [target_graph.successors(v) | target_graph.predecessors(v) for v in subg]
+        neighbors = [set(target_graph.successors(v) + target_graph.predecessors(v)) for v in subg]
         nbunch = functools.reduce(lambda x, y: x.union(y), neighbors + [subg])
         induced_star = target_graph.subgraph(nbunch)
         bfo_graph, bfo_to_raw = subgraph_enumeration.get_bfo(induced_star, fragment=True)
