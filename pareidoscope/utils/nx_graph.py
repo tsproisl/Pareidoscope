@@ -116,7 +116,7 @@ def is_sensible_graph(nx_graph):
     # is the graph overly dense, i.e. is there a vertex with an
     # extended star (neighbors + edges between them) with more than 18
     # edges?
-    if any([nx_graph.subgraph(set([v] + list(nx_graph.predecessors(v)) + list(nx_graph.successors(v)))).number_of_edges() > 18 for v in nx_graph.nodes()]):
+    if any([nx_graph.subgraph(set([v]) | nx_graph.predecessors(v) | nx_graph.successors(v)).number_of_edges() > 18 for v in nx_graph.nodes()]):
         return False
     return True
 
@@ -407,11 +407,11 @@ def is_star(nx_graph, return_centers=False):
     """
     vertices = set(nx_graph.nodes())
     if return_centers:
-        centers = [v for v in vertices if set([v] + list(nx_graph.predecessors(v)) + list(nx_graph.successors(v))) == vertices]
+        centers = [v for v in vertices if set([v]) | nx_graph.predecessors(v) | nx_graph.successors(v) == vertices]
         is_star = len(centers) >= 1
         return is_star, set(centers)
     else:
-        return any((set([v] + list(nx_graph.predecessors(v)) + list(nx_graph.successors(v))) == vertices for v in vertices))
+        return any((set([v]) | nx_graph.predecessors(v) | nx_graph.successors(v) == vertices for v in vertices))
 
 
 def is_star_center(nx_graph, v):
@@ -420,7 +420,7 @@ def is_star_center(nx_graph, v):
 
     """
     vertices = set(nx_graph.nodes())
-    return set([v] + list(nx_graph.predecessors(v)) + list(nx_graph.successors(v))) == vertices
+    return set([v]) | nx_graph.predecessors(v) | nx_graph.successors(v) == vertices
 
 
 def ensure_consecutive_vertices(graph):
