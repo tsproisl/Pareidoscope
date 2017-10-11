@@ -254,7 +254,7 @@ def enumerate_connected_subgraphs_recursive(graph, subgraph, prohibited_edges, n
                 local_subgraph = subgraph.copy()
                 # add edges
                 for s, t in ec + nec:
-                    local_subgraph.add_edge(s, t, **graph.edge[s][t])
+                    local_subgraph.add_edge(s, t, **graph.edges[s, t])
                     for k, v in graph.node[s].items():
                         local_subgraph.node[s][k] = v
                     for k, v in graph.node[t].items():
@@ -345,7 +345,7 @@ def enumerate_csg_minmax_recursive(graph, subgraph, prohibited_edges, graph_to_r
                 local_subgraph = subgraph.copy()
                 # add edges
                 for s, t in ec + nec:
-                    local_subgraph.add_edge(s, t, **graph.edge[s][t])
+                    local_subgraph.add_edge(s, t, **graph.edges[s, t])
                     for k, v in graph.node[s].items():
                         local_subgraph.node[s][k] = v
                     for k, v in graph.node[t].items():

@@ -151,7 +151,7 @@ def get_vertex_candidates(query_graph, target_graph):
         target_candidates = set([])
         for cs, ct in itertools.product(candidates[s], candidates[t]):
             if target_graph.has_edge(cs, ct):
-                if dictionary_match(l, target_graph.edge[cs][ct]):
+                if dictionary_match(l, target_graph.edges[cs, ct]):
                     source_candidates.add(cs)
                     target_candidates.add(ct)
         candidates[s] = source_candidates
@@ -286,8 +286,8 @@ def _get_vertex_tuple(nx_graph, vertex):
     indegree = nx_graph.in_degree(vertex)
     outdegree = nx_graph.out_degree(vertex)
     label = tuple(sorted(nx_graph.node[vertex].items()))
-    inedgelabels = tuple(sorted([tuple(sorted(nx_graph.edge[s][t].items())) for s, t in nx_graph.in_edges(vertex)]))
-    outedgelabels = tuple(sorted([tuple(sorted(nx_graph.edge[s][t].items())) for s, t in nx_graph.out_edges(vertex)]))
+    inedgelabels = tuple(sorted([tuple(sorted(nx_graph.edges[s, t].items())) for s, t in nx_graph.in_edges(vertex)]))
+    outedgelabels = tuple(sorted([tuple(sorted(nx_graph.edges[s, t].items())) for s, t in nx_graph.out_edges(vertex)]))
     return (root, antiroot, star_center, choke_point, indegree, outdegree, label, inedgelabels, outedgelabels)
 
 

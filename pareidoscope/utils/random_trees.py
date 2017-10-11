@@ -131,9 +131,9 @@ def add_edge_labels(tree, edge_label_distri, underspec):
     """
     for s, t in tree.edges():
         if random.random() < underspec:
-            tree.edge[s][t]["relation"] = ".+"
+            tree.edges[s, t]["relation"] = ".+"
         else:
-            tree.edge[s][t]["relation"] = random.choice(edge_label_distri)
+            tree.edges[s, t]["relation"] = random.choice(edge_label_distri)
 
 
 def distribution(n, total):
@@ -247,17 +247,17 @@ def split_tree(tree):
     for vertex in n.nodes():
         n.node[vertex]["word"] = ".+"
     for s, t in n.edges():
-        n.edge[s][t]["relation"] = ".+"
+        n.edges[s, t]["relation"] = ".+"
     r1 = n.copy()
     for vertex in a.nodes():
         r1.node[vertex]["word"] = a.node[vertex]["word"]
     for s, t in a.edges():
-        r1.edge[s][t]["relation"] = a.edge[s][t]["relation"]
+        r1.edges[s, t]["relation"] = a.edge[s][t]["relation"]
     c1 = n.copy()
     for vertex in b.nodes():
         c1.node[vertex]["word"] = b.node[vertex]["word"]
     for s, t in b.edges():
-        c1.edge[s][t]["relation"] = b.edge[s][t]["relation"]
+        c1.edges[s, t]["relation"] = b.edge[s][t]["relation"]
     return a, b, r1, c1, n
 
 
