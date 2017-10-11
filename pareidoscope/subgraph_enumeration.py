@@ -9,9 +9,6 @@ import networkx
 
 from pareidoscope.utils import nx_graph
 
-import json
-from networkx.readwrite import json_graph
-
 
 def get_subgraphs_nx(query_graph, target_graph, vertex_candidates=None):
     """Return a list of subgraphs of target_graph that are isomorphic to
@@ -142,7 +139,7 @@ def get_bfo(target_graph, fragment=False):
     root = roots[0]
     raw_to_bfo[root] = 0
     bfo_to_raw[0] = root
-    graph.add_node(0, target_graph.node[root])
+    graph.add_node(0, **target_graph.node[root])
     agenda.insert(0, root)
     seen_vertices = set([])
     while len(agenda) > 0:
@@ -150,7 +147,7 @@ def get_bfo(target_graph, fragment=False):
         if vertex in seen_vertices:
             continue
         seen_vertices.add(vertex)
-        edges = target_graph.out_edges(nbunch=[vertex], data=True)
+        edges = list(target_graph.out_edges(nbunch=[vertex], data=True))
         edges.sort(key=lambda x: (x[2]["relation"], x[1]))
         for source, target, label in edges:
             if target not in raw_to_bfo:
@@ -158,8 +155,8 @@ def get_bfo(target_graph, fragment=False):
                 bfo_to_raw[vertex_counter] = target
                 agenda.append(target)
                 vertex_counter += 1
-            graph.add_node(raw_to_bfo[target], target_graph.node[target])
-            graph.add_edge(raw_to_bfo[vertex], raw_to_bfo[target], label)
+            graph.add_node(raw_to_bfo[target], **target_graph.node[target])
+            graph.add_edge(raw_to_bfo[vertex], raw_to_bfo[target], **label)
     return graph, bfo_to_raw
 
 
@@ -194,8 +191,8 @@ def enumerate_connected_subgraphs(graph, graph_to_raw, nr_of_vertices, nr_of_edg
         if vertex not in vertex_candidates:
             continue
         subgraph = networkx.DiGraph()
-        #subgraph = [[{} for j in range(max_subgraph_size)] for i in range(max_subgraph_size)]
-        subgraph.add_node(vertex, graph.node[vertex])
+        # subgraph = [[{} for j in range(max_subgraph_size)] for i in range(max_subgraph_size)]
+        subgraph.add_node(vertex, **graph.node[vertex])
         nr_of_subgraph_vertices = subgraph.number_of_nodes()
         nr_of_subgraph_edges = subgraph.number_of_edges()
         if nr_of_subgraph_vertices == nr_of_vertices and nr_of_edges == nr_of_subgraph_edges:
@@ -257,7 +254,7 @@ def enumerate_connected_subgraphs_recursive(graph, subgraph, prohibited_edges, n
                 local_subgraph = subgraph.copy()
                 # add edges
                 for s, t in ec + nec:
-                    local_subgraph.add_edge(s, t, graph.edge[s][t])
+                    local_subgraph.add_edge(s, t, **graph.edge[s][t])
                     for k, v in graph.node[s].items():
                         local_subgraph.node[s][k] = v
                     for k, v in graph.node[t].items():
@@ -295,7 +292,7 @@ def enumerate_csg_minmax(graph, graph_to_raw, min_vertices=2, max_vertices=5):
     """
     for vertex in sorted(graph.nodes(), reverse=True):
         subgraph = networkx.DiGraph()
-        subgraph.add_node(vertex, graph.node[vertex])
+        subgraph.add_node(vertex, **graph.node[vertex])
         nr_of_subgraph_vertices = subgraph.number_of_nodes()
         if min_vertices <= nr_of_subgraph_vertices <= max_vertices:
             yield return_corpus_order(subgraph, graph_to_raw)
@@ -348,7 +345,7 @@ def enumerate_csg_minmax_recursive(graph, subgraph, prohibited_edges, graph_to_r
                 local_subgraph = subgraph.copy()
                 # add edges
                 for s, t in ec + nec:
-                    local_subgraph.add_edge(s, t, graph.edge[s][t])
+                    local_subgraph.add_edge(s, t, **graph.edge[s][t])
                     for k, v in graph.node[s].items():
                         local_subgraph.node[s][k] = v
                     for k, v in graph.node[t].items():
@@ -406,7 +403,7 @@ def powerset(iterable, min_size, max_size=-1):
     if max_size == -1:
         max_size = len(s)
     max_size = min(max_size, len(s))
-    #return itertools.chain(itertools.combinations(s, r) for r in range(max_size + 1))
+    # return itertools.chain(itertools.combinations(s, r) for r in range(max_size + 1))
     powerset = []
     for r in range(min_size, max_size + 1):
         powerset.extend(list(itertools.combinations(s, r)))

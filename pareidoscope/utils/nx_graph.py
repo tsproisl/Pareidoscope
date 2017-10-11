@@ -16,7 +16,7 @@ def create_nx_digraph(adj_matrix):
             if i == j:
                 continue
             if adj_matrix[i][j]:
-                dg.add_edge(i, j, adj_matrix[i][j])
+                dg.add_edge(i, j, **adj_matrix[i][j])
     return dg
 
 
@@ -42,9 +42,9 @@ def create_nx_digraph_from_cwb(cwb, origid=None):
                 if relation == "punct":
                     continue
                 if offset != 0:
-                    dg.add_edge(i + offset, i, {"relation": relation})
+                    dg.add_edge(i + offset, i, relation=relation)
     # remove unconnected vertices, e.g. punctuation in the SD model
-    for v, l in dg.nodes(data=True):
+    for v, l in list(dg.nodes(data=True)):
         if "root" not in l and dg.degree(v) == 0:
             dg.remove_node(v)
     # make sure that the remaining vertices are consecutively labeled
@@ -77,9 +77,9 @@ def create_nx_digraph_from_conllu(conllu, origid=None):
         for governor, relation in relations:
             if relation == "root" or relation == "punct":
                 continue
-            dg.add_edge(governor, i, {"relation": relation})
+            dg.add_edge(governor, i, relation=relation)
     # remove unconnected vertices, e.g. punctuation in the SD model
-    for v, l in dg.nodes(data=True):
+    for v, l in list(dg.nodes(data=True)):
         if "root" not in l and dg.degree(v) == 0:
             dg.remove_node(v)
     # make sure that the remaining vertices are consecutively labeled
@@ -353,9 +353,9 @@ def canonize(nx_graph, order=False):
     mapping = {v: i for i, v in enumerate(co)}
     canonized = networkx.DiGraph(**nx_graph.graph)
     for v, l in nx_graph.nodes(data=True):
-        canonized.add_node(mapping[v], l)
+        canonized.add_node(mapping[v], **l)
     for s, t, l in nx_graph.edges(data=True):
-        canonized.add_edge(mapping[s], mapping[t], l)
+        canonized.add_edge(mapping[s], mapping[t], **l)
     if order:
         return canonized, co
     else:
@@ -367,7 +367,8 @@ def skeletize(nx_graph, only_vertices=False):
     skeleton = networkx.DiGraph(**nx_graph.graph)
     for s, t, l in nx_graph.edges(data=True):
         if only_vertices:
-            skeleton.add_edge(s, t, {k: v for k, v in l.items()})
+            ll = {k: v for k, v in l.items()}
+            skeleton.add_edge(s, t, **ll)
         else:
             skeleton.add_edge(s, t)
     return skeleton
@@ -433,7 +434,7 @@ def ensure_consecutive_vertices(graph):
         mapping = {v: i for i, v in enumerate(sorted(graph.nodes()))}
         new_graph = networkx.DiGraph(**graph.graph)
         for vertex, label in graph.nodes(data=True):
-            new_graph.add_node(mapping[vertex], label)
+            new_graph.add_node(mapping[vertex], **label)
         for s, t, l in graph.edges(data=True):
-            new_graph.add_edge(mapping[s], mapping[t], l)
+            new_graph.add_edge(mapping[s], mapping[t], **l)
         return new_graph

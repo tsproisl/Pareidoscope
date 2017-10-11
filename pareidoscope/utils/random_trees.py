@@ -1,9 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-import argparse
 import itertools
-import json
 import os
 import random
 import sys
@@ -17,11 +15,11 @@ if script_directory not in sys.path:
 import nx_graph
 
 
-def get_random_near_tree(nr_of_vertices, vertex_label_distri, edge_label_distri, max_outdegree = 0):
+def get_random_near_tree(nr_of_vertices, vertex_label_distri, edge_label_distri, max_outdegree=0):
     """Create a random near tree with nr_of_vertices vertices. The
     vertex and edge labels are determined by vertex_label_distri and
     edge_label_distri.
-    
+
     Arguments:
     - `nr_of_vertices`:
     - `vertex_label_distri`:
@@ -35,7 +33,7 @@ def get_random_tree(nr_of_vertices, vertex_label_distri, edge_label_distri, degr
     """Create a random tree with nr_of_vertices vertices. The vertex
     and edge labels are determined by vertex_label_distri and
     edge_label_distri.
-    
+
     Arguments:
     - `nr_of_vertices`:
     - `vertex_label_distri`:
@@ -61,7 +59,7 @@ def get_random_tree(nr_of_vertices, vertex_label_distri, edge_label_distri, degr
 
 def get_powerlaw_tree_sequence(nr_of_vertices):
     """Return a powerlaw degree sequence
-    
+
     Arguments:
     - `nr_of_vertices`:
     """
@@ -76,7 +74,7 @@ def get_powerlaw_tree_sequence(nr_of_vertices):
 
 def create_tree_skeleton(nr_of_vertices, degree_distri, max_outdegree):
     """Create a random undirected tree without any labels.
-    
+
     Arguments:
     - `nr_of_vertices`:
     - `degree_distri`:
@@ -112,7 +110,7 @@ def create_tree_skeleton(nr_of_vertices, degree_distri, max_outdegree):
 
 def add_vertex_labels(tree, vertex_label_distri, underspec):
     """Add vertex labels to tree according to vertex_label_distri.
-    
+
     Arguments:
     - `tree`:
     - `vertex_label_distri`:
@@ -126,7 +124,7 @@ def add_vertex_labels(tree, vertex_label_distri, underspec):
 
 def add_edge_labels(tree, edge_label_distri, underspec):
     """Add vertex labels to tree according to vertex_label_distri.
-    
+
     Arguments:
     - `tree`:
     - `vertex_label_distri`:
@@ -141,13 +139,13 @@ def add_edge_labels(tree, edge_label_distri, underspec):
 def distribution(n, total):
     """Return n random natural numbers that sum up to total and follow
     a uniform distribution.
-    
+
     Arguments:
     - `n`:
     - `total`:
     """
     maximum = total - (n - 1)
-    p = [0] + sorted( random.random() for _ in range(n - 1) ) + [1]
+    p = [0] + sorted(random.random() for _ in range(n - 1)) + [1]
     distri_1 = [p[i+1] - p[i] for i in range(n)]
     distri_total = [int(total * _) for _ in distri_1]
     # adjust lowest values
@@ -164,7 +162,7 @@ def adjust_distribution(dist_to_adjust, random_dist, total, maximum):
     """Adjust dist_to_adjust so that it sums up to total, no value is
     larger that maximum or smaller than one and relative difference to
     random_dist is minimal.
-    
+
     Arguments:
     - `dist_to_adjust`:
     - `random_dist`:
@@ -176,9 +174,9 @@ def adjust_distribution(dist_to_adjust, random_dist, total, maximum):
     comp = maximum
     adj = 1
     if sum(dist_to_adjust) < total:
-        deviations.sort(key = lambda x: x[1])
+        deviations.sort(key=lambda x: x[1])
     else:
-        deviations.sort(key = lambda x: x[1], reverse = True)
+        deviations.sort(key=lambda x: x[1], reverse=True)
         comp = 1
         adj = -1
     for (idx, _) in deviations:
@@ -191,7 +189,7 @@ def adjust_distribution(dist_to_adjust, random_dist, total, maximum):
 
 def create_distribution(size, distribution, prefix):
     """Create data according to distribution.
-    
+
     Arguments:
     - `size`:
     - `distribution`:
@@ -208,7 +206,7 @@ def create_distribution(size, distribution, prefix):
 
 def get_length(sent_dist, mu, sigma, min_length, max_length):
     """Return an integer.
-    
+
     Arguments:
     - `sent_dist`:
     - `mu`:
@@ -228,7 +226,7 @@ def get_length(sent_dist, mu, sigma, min_length, max_length):
 
 def split_tree(tree):
     """Split tree into two subtrees and return queries.
-    
+
     Arguments:
     - `tree`:
     """
@@ -240,11 +238,11 @@ def split_tree(tree):
     b = tree.subgraph(t_bunch)
     # give edge to either source or target vertex
     if random.choice(["source", "target"]) == "source":
-        a.add_node(t, {"word": ".+"})
-        a.add_edge(s, t, {"relation": tree[s][t]["relation"]})
+        a.add_node(t, word=".+")
+        a.add_edge(s, t, relation=tree[s][t]["relation"])
     else:
-        b.add_node(s, {"word": ".+"})
-        b.add_edge(s, t, {"relation": tree[s][t]["relation"]})
+        b.add_node(s, word=".+")
+        b.add_edge(s, t, relation=tree[s][t]["relation"])
     n = tree.copy()
     for vertex in n.nodes():
         n.node[vertex]["word"] = ".+"
@@ -265,7 +263,7 @@ def split_tree(tree):
 
 def cwb_format(tree, length, sid):
     """Do actual formatting work.
-    
+
     Arguments:
     - `tree`:
     - `length`:
