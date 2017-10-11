@@ -30,7 +30,7 @@ def create_nx_digraph_from_cwb(cwb, origid=None):
     dg.add_nodes_from([(l, attributes(cwb[l])) for l in range(len(cwb))])
     for l in range(len(cwb)):
         if cwb[l][6] == "root":
-            dg.node[l]["root"] = "root"
+            dg.nodes[l]["root"] = "root"
     for i, line in enumerate(cwb):
         indeps = line[4]
         if indeps != "|":
@@ -62,7 +62,7 @@ def create_nx_digraph_from_conllu(conllu, origid=None):
     id_to_enumeration = {conllu[l][0]: l for l in range(len(conllu))}
     for l in range(len(conllu)):
         if conllu[l][7] == "root":
-            dg.node[l]["root"] = "root"
+            dg.nodes[l]["root"] = "root"
     for i, line in enumerate(conllu):
         relations = set()
         if line[8] != "_":
@@ -128,19 +128,19 @@ def get_vertex_candidates(query_graph, target_graph):
     """
     candidates = [[] for v in query_graph.nodes()]
     for vertex in query_graph.nodes():
-        if len(query_graph.node[vertex]) == 0:
+        if len(query_graph.nodes[vertex]) == 0:
             candidates[vertex] = target_graph.nodes()
         else:
-            candidates[vertex] = [tv for tv in target_graph.nodes() if dictionary_match(query_graph.node[vertex], target_graph.node[tv])]
+            candidates[vertex] = [tv for tv in target_graph.nodes() if dictionary_match(query_graph.nodes[vertex], target_graph.nodes[tv])]
         query_in = query_graph.in_degree(vertex)
         query_out = query_graph.out_degree(vertex)
         candidates[vertex] = [tv for tv in candidates[vertex] if (query_in <= target_graph.in_degree(tv)) and (query_out <= target_graph.out_degree(tv))]
         # negated edges
-        not_indep = query_graph.node[vertex].get("not_indep")
+        not_indep = query_graph.nodes[vertex].get("not_indep")
         if not_indep is not None:
             not_indep = set(not_indep)
             candidates[vertex] = [tv for tv in candidates[vertex] if len(not_indep & set([l["relation"] for s, t, l in target_graph.in_edges(tv, data=True)])) == 0]
-        not_outdep = query_graph.node[vertex].get("not_outdep")
+        not_outdep = query_graph.nodes[vertex].get("not_outdep")
         if not_outdep is not None:
             not_outdep = set(not_outdep)
             candidates[vertex] = [tv for tv in candidates[vertex] if len(not_outdep & set([l["relation"] for s, t, l in target_graph.out_edges(tv, data=True)])) == 0]
@@ -199,11 +199,11 @@ def export_to_cwb_format(nx_graph):
     """Do actual formatting work."""
     output = []
     for v in sorted(nx_graph.nodes()):
-        word = nx_graph.node[v]["word"]
-        pos = nx_graph.node[v].get("pos", "X")
-        lemma = nx_graph.node[v].get("lemma", word)
-        wc = nx_graph.node[v].get("wc", "X")
-        root = nx_graph.node[v].get("root", "")
+        word = nx_graph.nodes[v]["word"]
+        pos = nx_graph.nodes[v].get("pos", "X")
+        lemma = nx_graph.nodes[v].get("lemma", word)
+        wc = nx_graph.nodes[v].get("wc", "X")
+        root = nx_graph.nodes[v].get("root", "")
         indeps = ["%s(%d,0)" % (l["relation"], s - v) for s, t, l in nx_graph.in_edges(v, data=True)]
         outdeps = ["%s(0,%d)" % (l["relation"], t - v) for s, t, l in nx_graph.out_edges(v, data=True)]
         indeps = "|" + "|".join(indeps)
@@ -228,10 +228,10 @@ def export_to_chemical_format(graph, vertex_dict, edge_dict):
     except ValueError:
         vmax = 0
     for v in sorted(graph.nodes()):
-        word = graph.node[v]["word"]
-        pos = graph.node[v].get("pos", "X")
-        lemma = graph.node[v].get("lemma", word)
-        wc = graph.node[v].get("wc", "X")
+        word = graph.nodes[v]["word"]
+        pos = graph.nodes[v].get("pos", "X")
+        lemma = graph.nodes[v].get("lemma", word)
+        wc = graph.nodes[v].get("wc", "X")
         t = (word, pos, lemma, wc)
         if t not in vertex_dict:
             vmax += 1
@@ -285,7 +285,7 @@ def _get_vertex_tuple(nx_graph, vertex):
         choke_point = all((networkx.has_path(nx_graph, vertex, x) or networkx.has_path(nx_graph, x, vertex) for x in other_vertices))
     indegree = nx_graph.in_degree(vertex)
     outdegree = nx_graph.out_degree(vertex)
-    label = tuple(sorted(nx_graph.node[vertex].items()))
+    label = tuple(sorted(nx_graph.nodes[vertex].items()))
     inedgelabels = tuple(sorted([tuple(sorted(nx_graph.edges[s, t].items())) for s, t in nx_graph.in_edges(vertex)]))
     outedgelabels = tuple(sorted([tuple(sorted(nx_graph.edges[s, t].items())) for s, t in nx_graph.out_edges(vertex)]))
     return (root, antiroot, star_center, choke_point, indegree, outdegree, label, inedgelabels, outedgelabels)

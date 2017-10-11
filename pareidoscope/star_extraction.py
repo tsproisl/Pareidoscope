@@ -21,8 +21,8 @@ def _extract_stars(graph, vertex, edge_stars, skel_stars, edge_to_skel={}, inclu
 
     """
     identity_mapping = {v: v for v in graph.nodes()}
-    pos = graph.node[vertex]["pos"]
-    wc = graph.node[vertex]["wc"]
+    pos = graph.nodes[vertex]["pos"]
+    wc = graph.nodes[vertex]["wc"]
     whole_star = graph.subgraph(set([vertex] + list(graph.predecessors(vertex)) + list(graph.successors(vertex))))
     for subgraph in subgraph_enumeration.enumerate_csg_minmax(whole_star, identity_mapping, min_vertices=2, max_vertices=whole_star.__len__()):
         # vertex must be in subgraph

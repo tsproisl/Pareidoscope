@@ -51,7 +51,7 @@ def get_random_tree(nr_of_vertices, vertex_label_distri, edge_label_distri, degr
         root = random.choice(list(itertools.chain.from_iterable([[v] * undirected_tree.degree(v) for v in undirected_tree.nodes()])))
         directed_tree.add_edges_from(networkx.bfs_edges(undirected_tree, root))
     if not no_root:
-        directed_tree.node[root]["root"] = "root"
+        directed_tree.nodes[root]["root"] = "root"
     add_vertex_labels(directed_tree, vertex_label_distri, underspec)
     add_edge_labels(directed_tree, edge_label_distri, underspec)
     return directed_tree
@@ -117,9 +117,9 @@ def add_vertex_labels(tree, vertex_label_distri, underspec):
     """
     for vertex in tree.nodes():
         if random.random() < underspec:
-            tree.node[vertex]["word"] = ".+"
+            tree.nodes[vertex]["word"] = ".+"
         else:
-            tree.node[vertex]["word"] = random.choice(vertex_label_distri)
+            tree.nodes[vertex]["word"] = random.choice(vertex_label_distri)
 
 
 def add_edge_labels(tree, edge_label_distri, underspec):
@@ -245,17 +245,17 @@ def split_tree(tree):
         b.add_edge(s, t, relation=tree[s][t]["relation"])
     n = tree.copy()
     for vertex in n.nodes():
-        n.node[vertex]["word"] = ".+"
+        n.nodes[vertex]["word"] = ".+"
     for s, t in n.edges():
         n.edges[s, t]["relation"] = ".+"
     r1 = n.copy()
     for vertex in a.nodes():
-        r1.node[vertex]["word"] = a.node[vertex]["word"]
+        r1.nodes[vertex]["word"] = a.nodes[vertex]["word"]
     for s, t in a.edges():
         r1.edges[s, t]["relation"] = a.edge[s][t]["relation"]
     c1 = n.copy()
     for vertex in b.nodes():
-        c1.node[vertex]["word"] = b.node[vertex]["word"]
+        c1.nodes[vertex]["word"] = b.nodes[vertex]["word"]
     for s, t in b.edges():
         c1.edges[s, t]["relation"] = b.edge[s][t]["relation"]
     return a, b, r1, c1, n

@@ -35,11 +35,11 @@ def insert_sentence(c, origid, gs, graph):
     sid = c.execute("SELECT sentence_id FROM sentences WHERE original_id = ?", (origid, )).fetchall()[0][0]
     token_id = {}
     for vertice in sorted(gs.nodes()):
-        word = gs.node[vertice]["word"]
-        pos = gs.node[vertice]["pos"]
-        lemma = gs.node[vertice]["lemma"]
-        wc = gs.node[vertice]["wc"]
-        root = "root" in gs.node[vertice] and gs.node[vertice]["root"] == "root"
+        word = gs.nodes[vertice]["word"]
+        pos = gs.nodes[vertice]["pos"]
+        lemma = gs.nodes[vertice]["lemma"]
+        wc = gs.nodes[vertice]["wc"]
+        root = "root" in gs.nodes[vertice] and gs.nodes[vertice]["root"] == "root"
         c.execute("INSERT INTO tokens (sentence_id, position, word, pos, lemma, wc, indegree, outdegree, root) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (sid, vertice, word, pos, lemma, wc, gs.in_degree(vertice), gs.out_degree(vertice), root))
         token_id[vertice] = c.execute("SELECT token_id FROM tokens WHERE sentence_id = ? AND position = ?", (sid, vertice)).fetchall()[0][0]
     for s, t, l in gs.edges(data=True):
@@ -80,7 +80,7 @@ def sentence_candidates(c, g):
         if outdegree > 0:
             where.append("outdegree >= ?")
             args.append(outdegree)
-        for k, v in g.node[vertex].items():
+        for k, v in g.nodes[vertex].items():
             if k in pos_lexical:
                 where.append("%s = ?" % k)
                 if k == "root":
@@ -149,7 +149,7 @@ def create_sql_query(query_graph):
             where.append("tok_%s.indegree >= %d" % (vertex, indegree))
         if outdegree > 0:
             where.append("tok_%s.outdegree >= %d" % (vertex, outdegree))
-        for k, v in query_graph.node[vertex].items():
+        for k, v in query_graph.nodes[vertex].items():
             if k in pos_lexical:
                 where.append("tok_%s.%s = ?" % (vertex, k))
                 if k == "root":

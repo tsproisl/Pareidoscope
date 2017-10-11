@@ -27,7 +27,7 @@ def strip_vid(graph):
     """Return a copy of graph without vertex id (vid) labels."""
     copy = graph.copy()
     for vertex in copy.nodes():
-        del copy.node[vertex]["vid"]
+        del copy.nodes[vertex]["vid"]
     return copy
 
 
@@ -95,7 +95,7 @@ def all_counting_methods(gc, ga, gb, gn, gs, focus_point, candidates=None):
         normal_cand_a = nx_graph.get_vertex_candidates(stripped_ga, gs)
         normal_cand_b = nx_graph.get_vertex_candidates(stripped_gb, gs)
     for embedding in embeddings:
-        vid_to_iso = {gn.node[qv]["vid"]: tv for qv, tv in zip(sorted(gn.nodes()), embedding)}
+        vid_to_iso = {gn.nodes[qv]["vid"]: tv for qv, tv in zip(sorted(gn.nodes()), embedding)}
         v_embedding = set(embedding)
         vert_cand_c = _get_isomorphism_vertex_candidates(gc, normal_cand_c, vs, v_embedding, vid_to_iso)
         vert_cand_a = _get_isomorphism_vertex_candidates(ga, normal_cand_a, vs, v_embedding, vid_to_iso)
@@ -146,7 +146,7 @@ def isomorphisms(gc, ga, gb, gn, gs, candidates=None):
             normal_cand_a = nx_graph.get_vertex_candidates(stripped_ga, gs)
         if normal_cand_b is None:
             normal_cand_b = nx_graph.get_vertex_candidates(stripped_gb, gs)
-        vid_iso = {gn.node[qv]["vid"]: tv for qv, tv in zip(sorted(gn.nodes()), isomorphism)}
+        vid_iso = {gn.nodes[qv]["vid"]: tv for qv, tv in zip(sorted(gn.nodes()), isomorphism)}
         v_isomorphism = set(isomorphism)
         vert_cand_c = _get_isomorphism_vertex_candidates(gc, normal_cand_c, vs, v_isomorphism, vid_iso)
         vert_cand_a = _get_isomorphism_vertex_candidates(ga, normal_cand_a, vs, v_isomorphism, vid_iso)
@@ -223,7 +223,7 @@ def choke_points(gc, ga, gb, gn, gs, choke_point, candidates=None):
     stripped_gc = strip_vid(gc)
     stripped_ga = strip_vid(ga)
     stripped_gb = strip_vid(gb)
-    choke_vid = gn.node[choke_point]["vid"]
+    choke_vid = gn.nodes[choke_point]["vid"]
     choke_c = [v for v, l in gc.nodes(data=True) if l["vid"] == choke_vid][0]
     choke_a = [v for v, l in ga.nodes(data=True) if l["vid"] == choke_vid][0]
     choke_b = [v for v, l in gb.nodes(data=True) if l["vid"] == choke_vid][0]

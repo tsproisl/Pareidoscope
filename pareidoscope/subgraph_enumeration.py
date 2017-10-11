@@ -139,7 +139,7 @@ def get_bfo(target_graph, fragment=False):
     root = roots[0]
     raw_to_bfo[root] = 0
     bfo_to_raw[0] = root
-    graph.add_node(0, **target_graph.node[root])
+    graph.add_node(0, **target_graph.nodes[root])
     agenda.insert(0, root)
     seen_vertices = set([])
     while len(agenda) > 0:
@@ -155,7 +155,7 @@ def get_bfo(target_graph, fragment=False):
                 bfo_to_raw[vertex_counter] = target
                 agenda.append(target)
                 vertex_counter += 1
-            graph.add_node(raw_to_bfo[target], **target_graph.node[target])
+            graph.add_node(raw_to_bfo[target], **target_graph.nodes[target])
             graph.add_edge(raw_to_bfo[vertex], raw_to_bfo[target], **label)
     return graph, bfo_to_raw
 
@@ -192,7 +192,7 @@ def enumerate_connected_subgraphs(graph, graph_to_raw, nr_of_vertices, nr_of_edg
             continue
         subgraph = networkx.DiGraph()
         # subgraph = [[{} for j in range(max_subgraph_size)] for i in range(max_subgraph_size)]
-        subgraph.add_node(vertex, **graph.node[vertex])
+        subgraph.add_node(vertex, **graph.nodes[vertex])
         nr_of_subgraph_vertices = subgraph.number_of_nodes()
         nr_of_subgraph_edges = subgraph.number_of_edges()
         if nr_of_subgraph_vertices == nr_of_vertices and nr_of_edges == nr_of_subgraph_edges:
@@ -255,10 +255,10 @@ def enumerate_connected_subgraphs_recursive(graph, subgraph, prohibited_edges, n
                 # add edges
                 for s, t in ec + nec:
                     local_subgraph.add_edge(s, t, **graph.edges[s, t])
-                    for k, v in graph.node[s].items():
-                        local_subgraph.node[s][k] = v
-                    for k, v in graph.node[t].items():
-                        local_subgraph.node[t][k] = v
+                    for k, v in graph.nodes[s].items():
+                        local_subgraph.nodes[s][k] = v
+                    for k, v in graph.nodes[t].items():
+                        local_subgraph.nodes[t][k] = v
                 nr_of_subgraph_vertices = local_subgraph.number_of_nodes()
                 nr_of_subgraph_edges = local_subgraph.number_of_edges()
                 if nr_of_subgraph_edges != subgraph_edges + len(ec + nec):
@@ -292,7 +292,7 @@ def enumerate_csg_minmax(graph, graph_to_raw, min_vertices=2, max_vertices=5):
     """
     for vertex in sorted(graph.nodes(), reverse=True):
         subgraph = networkx.DiGraph()
-        subgraph.add_node(vertex, **graph.node[vertex])
+        subgraph.add_node(vertex, **graph.nodes[vertex])
         nr_of_subgraph_vertices = subgraph.number_of_nodes()
         if min_vertices <= nr_of_subgraph_vertices <= max_vertices:
             yield return_corpus_order(subgraph, graph_to_raw)
@@ -346,10 +346,10 @@ def enumerate_csg_minmax_recursive(graph, subgraph, prohibited_edges, graph_to_r
                 # add edges
                 for s, t in ec + nec:
                     local_subgraph.add_edge(s, t, **graph.edges[s, t])
-                    for k, v in graph.node[s].items():
-                        local_subgraph.node[s][k] = v
-                    for k, v in graph.node[t].items():
-                        local_subgraph.node[t][k] = v
+                    for k, v in graph.nodes[s].items():
+                        local_subgraph.nodes[s][k] = v
+                    for k, v in graph.nodes[t].items():
+                        local_subgraph.nodes[t][k] = v
                 nr_of_subgraph_vertices = local_subgraph.number_of_nodes()
                 nr_of_subgraph_edges = local_subgraph.number_of_edges()
                 if nr_of_subgraph_edges != subgraph_edges + len(ec + nec):
