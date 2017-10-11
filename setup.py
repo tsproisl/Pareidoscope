@@ -45,7 +45,7 @@ setup(
     description='A collection of tools for determining the association between arbitrary linguistic structures.',
     long_description=long_description,
     install_requires=[
-        'networkx >= 1.6, < 2',
+        'networkx >= 2, < 3',
     ],
     classifiers=[
         'Development Status :: 4 - Beta',
