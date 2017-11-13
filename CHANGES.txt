@@ -1,5 +1,10 @@
 # CHANGELOG #
 
+## forthcoming release ##
+
+We use threads instead of subprocesses for filling the processing
+queues.
+
 ## Version 0.10.2, 2017-10-11 ##
 
 We switched from NetworkX 1.x to 2.0. The 1.x branch is no longer
