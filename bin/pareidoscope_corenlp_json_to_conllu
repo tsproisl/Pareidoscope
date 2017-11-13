@@ -3,12 +3,12 @@
 import argparse
 import collections
 import functools
+import functools
 import gzip
 import json
 import operator
 import os
 import re
-import functools
 # import sys
 
 

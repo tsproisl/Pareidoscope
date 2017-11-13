@@ -7,6 +7,7 @@ import json
 import logging
 import multiprocessing
 import os
+import threading
 
 from networkx.readwrite import json_graph
 
@@ -102,7 +103,7 @@ def main():
         sents = ((s, "s-%d" % i) for i, (s, _) in zip(itertools.count(1), sents))
     input_queue = multiprocessing.Queue(maxsize=processes * 100)
     output_queue = multiprocessing.Queue(maxsize=processes * 100)
-    producer = multiprocessing.Process(target=fill_input_queue, args=(input_queue, sents, args.format, processes, sentinel))
+    producer = threading.Thread(target=fill_input_queue, args=(input_queue, sents, args.format, processes, sentinel))
     consumer = multiprocessing.Process(target=consume_output_queue, args=(output_queue, args.db, processes, sentinel))
     with multiprocessing.Pool(processes=processes, initializer=process_input_queue, initargs=(sentence_to_graph, input_queue, output_queue, sentinel)):
         producer.start()
