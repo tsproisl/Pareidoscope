@@ -36,6 +36,7 @@ def arguments():
     parser = argparse.ArgumentParser(description="Find associated larger structures, i.e. structures with additional adjacent vertices.")
     parser.add_argument("--max-size", type=int, default=7, help="Maximal number of vertices in the larger structure. Default: 7")
     parser.add_argument("--min-coocc", type=int, default=5, help="Minimal number of sentences in which the larger structure has to cooccur with the query. Default: 5")
+    parser.add_argument("-l", "--lemmata", action="store_true", help="Larger structures should be annotated with lemmata in addition to wordclasses")
     parser.add_argument("-o", "--output", type=str, required=True, help="Output prefix")
     parser.add_argument("-p", "--cpu", type=int, default=25, help="Percentage of CPUs to use (0-100; default: 25)")
     parser.add_argument("CORPUS", type=os.path.abspath, help="Input corpus as SQLite3 database")
@@ -72,13 +73,17 @@ def delexicalize(query):
 
 def get_cooccurring_structures(args):
     """"""
-    query_graph, target_graph, focus_point_vertex, max_size = args
+    query_graph, target_graph, focus_point_vertex, max_size, keep_lemma = args
+    attributes_to_delete = ("word", "pos", "lemma", "root")
+    if keep_lemma:
+        attributes_to_delete = ("word", "pos", "root")        
     target_graph = json_graph.node_link_graph(json.loads(target_graph))
     isomorphisms = subgraph_isomorphism.get_subgraph_isomorphisms_nx(pareidoscope.query.strip_vid(query_graph), target_graph)
     r1_counts = collections.defaultdict(set)
     mappings = collections.defaultdict(lambda: collections.defaultdict(set))
     o11 = {}
     o11_counts = collections.defaultdict(lambda: collections.defaultdict(set))
+    gc_to_gb = {}
     for iso in isomorphisms:
         subgraph = frozenset(iso)
         focus_point = iso[focus_point_vertex]
@@ -94,7 +99,7 @@ def get_cooccurring_structures(args):
         induced_star = target_graph.subgraph(nbunch)
         bfo_graph, bfo_to_raw = subgraph_enumeration.get_bfo(induced_star, fragment=True)
         for sg in subgraph_enumeration.enumerate_csg_minmax(bfo_graph, bfo_to_raw, min_vertices=len(subg) + 1, max_vertices=min(induced_star.number_of_nodes(), max_size)):
-            # all vertices from sg have to be in isg
+            # all vertices from subg have to be in sg
             if not subg <= set(sg.nodes()):
                 continue
             # all edges from query_graph have to be in isg
@@ -109,11 +114,20 @@ def get_cooccurring_structures(args):
                         if attribute not in query_graph.nodes[subgraph_to_query[v]]:
                             del sg.nodes[v][attribute]
                 else:
-                    for attribute in ("word", "pos", "lemma", "root"):
+                    for attribute in attributes_to_delete:
                         if attribute in sg.nodes[v]:
                             del sg.nodes[v][attribute]
             gc = nx_graph.canonize(sg)
             gc_json = json.dumps(json_graph.node_link_data(gc), ensure_ascii=False, sort_keys=True)
+            # create gb, i.e. delexicalize overlapping parts
+            for v in list(sg.nodes()):
+                if v in subgraph_to_query:
+                    for attribute in list(sg.nodes[v]):
+                        if attribute in attributes_to_delete:
+                            del sg.nodes[v][attribute]
+            gb = nx_graph.canonize(sg)
+            gb_json = json.dumps(json_graph.node_link_data(gb), ensure_ascii=False, sort_keys=True)
+            gc_to_gb[gc_json] = gb_json
             o11_counts[gc_json]["subgraphs"].add(subg)
             o11_counts[gc_json]["embeddings"] |= mappings["subgraph_to_embeddings"][subg]
             o11_counts[gc_json]["focus_points"] |= mappings["subgraph_to_focus_points"][subg]
@@ -128,7 +142,7 @@ def get_cooccurring_structures(args):
     for gc_json, counts in o11_counts.items():
         o11[gc_json] = Frequencies(len(counts["embeddings"]), len(counts["subgraphs"]), len(counts["focus_points"]), 1)
     r1 = Frequencies(len(r1_counts["embeddings"]), len(r1_counts["subgraphs"]), len(r1_counts["focus_points"]), min(1, len(r1_counts["embeddings"])))
-    return o11, r1
+    return o11, r1, gc_to_gb
 
 
 def derive_frequency_tuple(embeddings, focus_point_vertex):
@@ -141,7 +155,10 @@ def derive_frequency_tuple(embeddings, focus_point_vertex):
 
 def get_frequencies(args):
     """"""
-    gn, ga, gc_to_gb, gbs, gs, focus_point_vertex, max_size = args
+    gn, ga, gc_to_gb, gbs, gs, focus_point_vertex, max_size, keep_lemma = args
+    attributes_to_delete = ("word", "pos", "lemma", "root")
+    if keep_lemma:
+        attributes_to_delete = ("word", "pos", "root")        
     n_counts = collections.defaultdict(set)
     mappings = collections.defaultdict(lambda: collections.defaultdict(set))
     subsumed_by_ga = {}
@@ -188,13 +205,19 @@ def get_frequencies(args):
                         if attribute not in ga.nodes[subgraph_to_query[v]]:
                             del gc.nodes[v][attribute]
                 else:
-                    for attribute in ("word", "pos", "lemma", "root"):
+                    for attribute in attributes_to_delete:
                         if attribute in gc.nodes[v]:
                             del gc.nodes[v][attribute]
             gc_json = json.dumps(json_graph.node_link_data(nx_graph.canonize(gc)), ensure_ascii=False, sort_keys=True)
             for iso in mappings["subgraph_to_embeddings"][subg]:
                 mappings["gc_json_to_embedding_and_gc"][gc_json].add((iso, gc))
-            gb = delexicalize(gc)
+            # create gb, i.e. delexicalize overlapping parts
+            gb = gc.copy()
+            for v in list(gb.nodes()):
+                if v in subgraph_to_query:
+                    for attribute in list(gb.nodes[v]):
+                        if attribute in attributes_to_delete:
+                            del gb.nodes[v][attribute]
             gb_json = json.dumps(json_graph.node_link_data(nx_graph.canonize(gb)), ensure_ascii=False, sort_keys=True)
             # check if gb is in gb_to_gc
             if gb_json in gbs:
@@ -251,22 +274,22 @@ def write_results(prefix, results):
                 fh.write("\t".join(line) + "\n")
 
 
-def fill_input_queue(input_queue, corpus, graph, focus_point, max_size, processes, sentinel):
+def fill_input_queue(input_queue, corpus, graph, focus_point, max_size, keep_lemmata, processes, sentinel):
     """"""
     conn, c = database.connect_to_database(corpus)
     sents = database.sentence_candidates(c, pareidoscope.query.strip_vid(graph))
     for s in sents:
-        input_queue.put((graph, s, focus_point, max_size))
+        input_queue.put((graph, s, focus_point, max_size, keep_lemmata))
     for proc in range(processes):
         input_queue.put(sentinel)
 
 
-def fill_second_input_queue(input_queue, corpus, delexicalized, graph, gc_to_gb, gbs, focus_point, max_size, processes, sentinel):
+def fill_second_input_queue(input_queue, corpus, delexicalized, graph, gc_to_gb, gbs, focus_point, max_size, keep_lemmata, processes, sentinel):
     """"""
     conn, c = database.connect_to_database(corpus)
     sents = database.sentence_candidates(c, pareidoscope.query.strip_vid(graph))
     for s in sents:
-        input_queue.put((delexicalized, graph, gc_to_gb, gbs, s, focus_point, max_size))
+        input_queue.put((delexicalized, graph, gc_to_gb, gbs, s, focus_point, max_size, keep_lemmata))
     for proc in range(processes):
         input_queue.put(sentinel)
 
@@ -298,13 +321,14 @@ def main():
         r1 = Frequencies(0, 0, 0, 0)
         o11 = collections.defaultdict(lambda: Frequencies(0, 0, 0, 0))
         frequencies = collections.defaultdict(lambda: collections.defaultdict(lambda: (0, 0, 0, 0, 0)))
+        gc_to_gb = {}
         logging.info("query no. %d" % i)
         graph, focus_point = get_focus_point(query)
         delexicalized = delexicalize(graph)
         logging.info("Collect cooccurring larger structures")
         input_queue = multiprocessing.Queue(maxsize=processes * 100)
         output_queue = multiprocessing.Queue(maxsize=processes * 100)
-        producer = threading.Thread(target=fill_input_queue, args=(input_queue, args.CORPUS, graph, focus_point, args.max_size, processes, sentinel))
+        producer = threading.Thread(target=fill_input_queue, args=(input_queue, args.CORPUS, graph, focus_point, args.max_size, args.lemmata, processes, sentinel))
         with multiprocessing.Pool(processes=processes, initializer=process_input_queue, initargs=(get_cooccurring_structures, input_queue, output_queue, sentinel)):
             producer.start()
             observed_sentinels = 0
@@ -316,26 +340,23 @@ def main():
                         break
                     else:
                         continue
-                local_o11, local_r1 = data
+                local_o11, local_r1, local_gc_to_gb = data
                 r1 = [sum(_) for _ in zip(r1, local_r1)]
                 for g, freq in local_o11.items():
                     o11[g] = [sum(_) for _ in zip(o11[g], freq)]
+                for lgc, lgb in local_gc_to_gb.items():
+                    gc_to_gb[lgc] = lgb
             producer.join()
-        gc_to_gb = {}
         gbs = set()
         for gc, freq in o11.items():
             if freq[3] < args.min_coocc:
+                del gc_to_gb[gc]
                 continue
-            gb = json_graph.node_link_graph(json.loads(gc))
-            gb = delexicalize(gb)
-            gb = nx_graph.canonize(gb)
-            gb = json.dumps(json_graph.node_link_data(gb), ensure_ascii=False, sort_keys=True)
-            gc_to_gb[gc] = gb
-            gbs.add(gb)
+            gbs.add(gc_to_gb[gc])
         logging.info("Determine association strengths")
         input_queue = multiprocessing.Queue(maxsize=processes * 10)
         output_queue = multiprocessing.Queue(maxsize=processes * 10)
-        producer = threading.Thread(target=fill_second_input_queue, args=(input_queue, args.CORPUS, delexicalized, graph, gc_to_gb, gbs, focus_point, args.max_size, processes, sentinel))
+        producer = threading.Thread(target=fill_second_input_queue, args=(input_queue, args.CORPUS, delexicalized, graph, gc_to_gb, gbs, focus_point, args.max_size, args.lemmata, processes, sentinel))
         with multiprocessing.Pool(processes=processes, initializer=process_input_queue, initargs=(get_frequencies, input_queue, output_queue, sentinel)):
             producer.start()
             observed_sentinels = 0
