@@ -2,8 +2,10 @@
 
 ## forthcoming release ##
 
-We use threads instead of subprocesses for filling the processing
-queues.
+- We use threads instead of subprocesses for filling the processing
+  queues.
+- pareidoscope_associated_structures supports associated larger
+  structures that contain lemmata.
 
 ## Version 0.10.2, 2017-10-11 ##
 
