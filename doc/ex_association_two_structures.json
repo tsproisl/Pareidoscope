@@ -115,5 +115,6 @@
             }
         ]
     },
-    {"graph": {"description": "another test"}, "links": [{"relation": "nsubj:pass", "source": 0, "target": 1}, {"relation": "nmod", "source": 1, "target": 2}, {"relation": "case", "source": 2, "target": 3}, {"relation": "det", "source": 2, "target": 4}, {"relation": "nmod", "source": 2, "target": 5}], "nodes": [{"id": 0, "wc": "VERB", "query": "B"}, {"id": 1, "wc": "NOUN", "query": "AB"}, {"id": 2, "wc": "NOUN", "query": "AB"}, {"id": 3, "lemma": "of", "query": "AB", "only_A": ["lemma"]}, {"id": 4, "lemma": "the", "query": "AB", "only_A": ["lemma"]}, {"id": 5, "wc": "NOUN", "query": "B"}]}
+    {"graph": {"description": "another test"}, "links": [{"relation": "nsubj:pass", "source": 0, "target": 1}, {"relation": "nmod", "source": 1, "target": 2}, {"relation": "case", "source": 2, "target": 3}, {"relation": "det", "source": 2, "target": 4}, {"relation": "nmod", "source": 2, "target": 5}], "nodes": [{"id": 0, "wc": "VERB", "query": "B"}, {"id": 1, "wc": "NOUN", "query": "AB"}, {"id": 2, "wc": "NOUN", "query": "AB"}, {"id": 3, "lemma": "of", "query": "AB", "only_A": ["lemma"]}, {"id": 4, "lemma": "the", "query": "AB", "only_A": ["lemma"]}, {"id": 5, "wc": "NOUN", "query": "B"}]},
+    {"graph": {"description": "yet another test; expected frequency signature: 23, 253, 123, 884"}, "links": [{"relation": "advcl", "source": 0, "target": 1}], "nodes": [{"id": 0, "wc": "VERB", "query": "B"}, {"id": 1, "lemma": "give", "wc": "VERB", "query": "AB", "only_A": ["lemma"], "focus_point": true}]}
 ]
