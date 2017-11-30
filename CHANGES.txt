@@ -1,13 +1,13 @@
 # CHANGELOG #
 
-## forthcoming release ##
+## Version 0.11.0, 2017-11-30 ##
 
-- We use threads instead of subprocesses for filling the processing
-  queues.
-- pareidoscope_associated_structures supports associated larger
-  structures that contain lemmata (option -l/--lemmata).
+- New feature: pareidoscope_associated_structures supports associated
+  larger structures that contain lemmata (option -l/--lemmata).
 - Bugfix in pareidoscope_associated_structures: The sample size was
   determined on the basis of the wrong graph and was too small.
+- Internal change: We use threads instead of subprocesses for filling
+  the processing queues.
 
 ## Version 0.10.2, 2017-10-11 ##
 
