@@ -6,6 +6,8 @@
   queues.
 - pareidoscope_associated_structures supports associated larger
   structures that contain lemmata.
+- Bugfix in pareidoscope_associated_structures: The sample size was
+  determined on the basis of the wrong graph and was too small.
 
 ## Version 0.10.2, 2017-10-11 ##
 
