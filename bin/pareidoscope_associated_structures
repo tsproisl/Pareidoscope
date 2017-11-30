@@ -357,7 +357,7 @@ def fill_input_queue(input_queue, corpus, graph, focus_point, max_size, keep_lem
 def fill_second_input_queue(input_queue, corpus, delexicalized, graph, gc_to_gb, gbs, focus_point, max_size, keep_lemmata, processes, sentinel):
     """"""
     conn, c = database.connect_to_database(corpus)
-    sents = database.sentence_candidates(c, pareidoscope.query.strip_vid(graph))
+    sents = database.sentence_candidates(c, pareidoscope.query.strip_vid(delexicalized))
     for s in sents:
         input_queue.put((delexicalized, graph, gc_to_gb, gbs, s, focus_point, max_size, keep_lemmata))
     for proc in range(processes):
