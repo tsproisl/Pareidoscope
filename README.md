@@ -452,7 +452,8 @@ The associated larger structures output by
 `pareidoscope_associated_structures` are in the same node-link format
 as the query graphs and can be visualized with the program
 `pareidoscope_draw_graphs`. Note that this requires that Graphviz and
-the Python package PyDotPlus are installed on your computer.
+the Python package [pydot](https://github.com/erocarrera/pydot) are
+installed on your computer.
 
 Here is an example for invoking the program (use the option `-h` for
 detailed usage information):
