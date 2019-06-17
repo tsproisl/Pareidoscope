@@ -4,7 +4,8 @@ The Pareidoscope is a collection of tools for determining the
 association between arbitrary linguistic structures, e.g. between
 words (collocations), between words and structures (collostructions)
 or between larger linguistic structures. For the underlying
-cooccurrence model, cf. Proisl (in preparation).
+cooccurrence model, cf. [Proisl
+(2019)](https://doi.org/10.25593/978-3-96147-201-7).
 
 
 ## Installation ##
