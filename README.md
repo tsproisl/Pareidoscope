@@ -472,3 +472,20 @@ monotransitive *give*.
 ![Rank 2](doc/monotransitive_give_02.png?raw=true)
 ![Rank 3](doc/monotransitive_give_03.png?raw=true)
 ![Rank 4](doc/monotransitive_give_04.png?raw=true)
+
+## References ##
+
+  * Proisl, Thomas. 2019. The Cooccurrence of Linguistic Structures.
+    Erlangen: FAU University Press.
+    <https://doi.org/10.25593/978-3-96147-201-7>.
+    
+        @Book{Proisl:2019,
+          author    = {Proisl, Thomas},
+          title     = {The cooccurrence of linguistic structures},
+          publisher = {FAU University Press},
+          year      = {2019},
+          address   = {Erlangen},
+          doi       = {10.25593/978-3-96147-201-7},
+          url       = {https://doi.org/10.25593/978-3-96147-201-7},
+          isbn      = {978-3-96147-200-0},
+        }
