@@ -31,6 +31,7 @@ def arguments():
     parser.add_argument("-f", "--format", choices=["conllu", "cwb"], required=True, help="Input format of the corpus: CoNLL-U or CWB-treebank")
     parser.add_argument("-p", "--cpu", type=int, default=25, help="Percentage of CPUs to use (0-100; default: 25)")
     parser.add_argument("--max-sentences", type=int, default=0, help="Only read the first max-sentences sentences from the corpus")
+    parser.add_argument("--max-tokens", type=int, default=0, help="Only read the first max-tokens tokens from the corpus")
     parser.add_argument("CORPUS", type=os.path.abspath, help="The input corpus (can be gzip compressed)")
     args = parser.parse_args()
     return args
@@ -51,11 +52,15 @@ def sentence_to_graph(args):
     return gs, graph, origid, sensible
 
 
-def fill_input_queue(input_queue, sentences, corpus_format, processes, sentinel, max_sentences):
+def fill_input_queue(input_queue, sentences, corpus_format, processes, sentinel, max_sentences, max_tokens):
     """"""
+    n_tokens = 0
     for i, ((s, sid), cf) in enumerate(zip(sentences, itertools.repeat(corpus_format)), start=1):
         if max_sentences > 0 and i > max_sentences:
             break
+        if max_tokens > 0 and n_tokens > max_tokens:
+            break
+        n_tokens += len(s)
         input_queue.put((s, sid, cf))
     for proc in range(processes):
         input_queue.put(sentinel)
@@ -110,7 +115,7 @@ def main():
         sents = ((s, "s-%d" % i) for i, (s, _) in zip(itertools.count(1), sents))
     input_queue = multiprocessing.Queue(maxsize=processes * 100)
     output_queue = multiprocessing.Queue(maxsize=processes * 100)
-    producer = threading.Thread(target=fill_input_queue, args=(input_queue, sents, args.format, processes, sentinel, args.max_sentences))
+    producer = threading.Thread(target=fill_input_queue, args=(input_queue, sents, args.format, processes, sentinel, args.max_sentences, args.max_tokens))
     consumer = multiprocessing.Process(target=consume_output_queue, args=(output_queue, args.db, processes, sentinel))
     with multiprocessing.Pool(processes=processes, initializer=process_input_queue, initargs=(sentence_to_graph, input_queue, output_queue, sentinel)):
         producer.start()
