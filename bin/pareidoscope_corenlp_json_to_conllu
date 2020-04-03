@@ -32,7 +32,7 @@ def map_penn_to_upos(lemma, xpostag, deprel, gov_pos):
                "HYPH": "PUNCT", "#": "SYM", "$": "SYM", "ADD": "X",
                "AFX": "X", "GW": "X", "XX": "X"}
     fused_det_noun_pronouns = set(["somebody", "something", "someone", "anybody", "anything", "anyone", "everybody", "everything", "everyone", "nobody", "nothing"])
-    aux_relations = set(["aux", "aux:pass", "cop"])
+    aux_relations = set(["aux", "aux:pass", "auxpass", "cop"])  # Stanford CoreNLP produces auxpass
     this_that = set(["this", "that", "these", "those"])
     that_which = set(["that", "which"])
     if xpostag in mapping:
